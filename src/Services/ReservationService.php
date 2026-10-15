@@ -33,6 +33,7 @@ final class ReservationService
 
     public function create(array $input, bool $asStaff): array
     {
+        $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
         $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff) {
             $customerId = (int) $input['customer_id'];
             $vehicleId = (int) $input['vehicle_id'];
@@ -113,6 +114,82 @@ final class ReservationService
             (int) $created['reservation_id']
         );
         return $created;
+    }
+
+    /** Update a pending booking while rechecking and locking its new availability. */
+    public function updatePending(int $id, array $input, bool $asStaff): array
+    {
+        $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
+        $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff) {
+            $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
+            $stmt->execute([$id]);
+            $reservation = $stmt->fetch();
+            if (!$reservation) {
+                throw new InvalidArgumentException('Reservation not found.');
+            }
+            if ($reservation['status'] !== 'pending') {
+                throw new InvalidArgumentException('Only pending reservations can be edited.');
+            }
+
+            $customerId = (int) $reservation['customer_id'];
+            $vehicleId = (int) ($input['vehicle_id'] ?? 0);
+            $customer = Database::fetch('SELECT * FROM customers WHERE customer_id = ? FOR UPDATE', [$customerId]);
+            if (!$customer || $customer['status'] === 'blacklisted') {
+                throw new InvalidArgumentException('This customer is not allowed to book.');
+            }
+            if (!empty($customer['license_expiry_date']) && $customer['license_expiry_date'] < date('Y-m-d')) {
+                throw new InvalidArgumentException('Driving licence has expired.');
+            }
+
+            $vehicleIds = array_values(array_unique([(int) $reservation['vehicle_id'], $vehicleId]));
+            sort($vehicleIds, SORT_NUMERIC);
+            $locked = [];
+            foreach ($vehicleIds as $lockedVehicleId) {
+                $locked[$lockedVehicleId] = $this->availability->lockVehicle($pdo, $lockedVehicleId);
+            }
+            $vehicle = $locked[$vehicleId];
+            $block = $this->availability->isOperationallyBookable($vehicle);
+            if ($block) {
+                throw new InvalidArgumentException($block);
+            }
+            $pickup = (string) $input['pickup_datetime'];
+            $returnAt = (string) $input['return_datetime'];
+            $conflict = $this->availability->hasConflict($vehicleId, $pickup, $returnAt, $id);
+            if ($conflict) {
+                throw new InvalidArgumentException($conflict);
+            }
+            $discount = $asStaff ? (string) ($input['discount_amount'] ?? '0') : '0';
+            $quote = $this->pricing->quoteRates($vehicle, $pickup, $returnAt, $discount);
+            Database::execute(
+                'UPDATE reservations SET vehicle_id = ?, pickup_datetime = ?, return_datetime = ?,
+                    pickup_location = ?, return_location = ?, agreed_daily_rate = ?, estimated_days = ?,
+                    estimated_amount = ?, discount_amount = ?, tax_amount = ?, security_deposit = ?,
+                    customer_notes = ?, internal_notes = ? WHERE reservation_id = ?',
+                [
+                    $vehicleId, $pickup, $returnAt, $input['pickup_location'] ?? null, $input['return_location'] ?? null,
+                    $quote['agreed_daily_rate'], $quote['estimated_days'], $quote['estimated_amount'],
+                    $quote['discount_amount'], $quote['tax_amount'], $quote['security_deposit'],
+                    $input['customer_notes'] ?? null, $asStaff ? ($input['internal_notes'] ?? null) : $reservation['internal_notes'], $id,
+                ]
+            );
+            if ((int) $reservation['vehicle_id'] !== $vehicleId) {
+                $this->syncVehicleStatus((int) $reservation['vehicle_id']);
+            }
+            $this->syncVehicleStatus($vehicleId);
+            Audit::log('reservation.updated', 'reservation', (string) $id, $reservation['reservation_code'], $reservation, ['vehicle_id' => $vehicleId, 'pickup_datetime' => $pickup, 'return_datetime' => $returnAt]);
+            (new NotificationService())->notifyUser(
+                Auth::id(), $customerId, 'reservation_updated', 'Reservation ' . $reservation['reservation_code'],
+                'Your pending reservation details have been updated.', 'reservation', $id
+            );
+            return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
+        });
+
+        (new SmsService())->sendToCustomer(
+            (int) $updated['customer_id'], 'reservation_updated', 'Reservation ' . $updated['reservation_code'],
+            'Reservation ' . $updated['reservation_code'] . ' details were updated. Pickup ' . $updated['pickup_datetime'] . '.',
+            'reservation', $id
+        );
+        return $updated;
     }
 
     public function transition(int $id, string $to, ?string $reason = null): void

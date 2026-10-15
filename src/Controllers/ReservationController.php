@@ -37,19 +37,42 @@ final class ReservationController
         } else {
             Rbac::require('reservations.manage');
         }
+        $reservationId = Http::int('id');
+        $reservation = null;
+        if ($reservationId > 0) {
+            Rbac::assertCustomerOwns('reservation', $reservationId);
+            $reservation = Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$reservationId]);
+            if (!$reservation) {
+                http_response_code(404);
+                View::render('errors/404', ['title' => 'Not found']);
+                return;
+            }
+            if ($reservation['status'] !== 'pending') {
+                Http::flash('warning', 'Only pending reservations can be edited.');
+                Http::redirect('reservations/show', ['id' => $reservationId]);
+            }
+        }
         $customers = Database::fetchAll("SELECT * FROM customers WHERE status = 'active' ORDER BY last_name");
         $vehicles = Database::fetchAll("SELECT * FROM vehicles WHERE status NOT IN ('inactive') ORDER BY registration_no");
-        $preVehicle = Http::int('vehicle_id') ?: null;
-        $pickup = Http::str('pickup_datetime');
-        $returnAt = Http::str('return_datetime');
+        $preVehicle = Http::int('vehicle_id') ?: ($reservation ? (int) $reservation['vehicle_id'] : null);
+        $pickup = Http::str('pickup_datetime', $reservation['pickup_datetime'] ?? '');
+        $returnAt = Http::str('return_datetime', $reservation['return_datetime'] ?? '');
+        if ($reservation && !in_array((int) $reservation['vehicle_id'], array_map(static fn(array $v): int => (int) $v['vehicle_id'], $vehicles), true)) {
+            $oldVehicle = Database::fetch('SELECT * FROM vehicles WHERE vehicle_id = ?', [(int) $reservation['vehicle_id']]);
+            if ($oldVehicle) $vehicles[] = $oldVehicle;
+        }
+        if ($reservation && Http::isPost()) {
+            $pickup = Http::str('pickup_datetime');
+            $returnAt = Http::str('return_datetime');
+        }
         if (Auth::isCustomer()) {
             $customers = Database::fetchAll('SELECT * FROM customers WHERE customer_id = ?', [Auth::customerId()]);
         }
         if (Http::isPost()) {
-            $customerId = Auth::isCustomer() ? (int) Auth::customerId() : Http::int('customer_id');
+            $customerId = $reservation ? (int) $reservation['customer_id'] : (Auth::isCustomer() ? (int) Auth::customerId() : Http::int('customer_id'));
             try {
                 $svc = new ReservationService();
-                $svc->create([
+                $input = [
                     'customer_id' => $customerId,
                     'vehicle_id' => Http::int('vehicle_id'),
                     'pickup_datetime' => Http::datetime('pickup_datetime'),
@@ -59,7 +82,13 @@ final class ReservationController
                     'discount_amount' => Auth::isCustomer() ? '0' : (Http::str('discount_amount') ?: '0'),
                     'customer_notes' => Http::str('customer_notes'),
                     'internal_notes' => Auth::isCustomer() ? null : Http::str('internal_notes'),
-                ], !Auth::isCustomer());
+                ];
+                if ($reservation) {
+                    $svc->updatePending($reservationId, $input, !Auth::isCustomer());
+                    Http::flash('success', 'Reservation updated. Availability and pricing were rechecked.');
+                    Http::redirect('reservations/show', ['id' => $reservationId]);
+                }
+                $svc->create($input, !Auth::isCustomer());
                 Http::flash('success', 'Reservation saved. Availability was locked and rechecked in a database transaction.');
                 Http::redirect('reservations');
             } catch (InvalidArgumentException $e) {
@@ -69,12 +98,13 @@ final class ReservationController
             }
         }
         View::render('reservations/form', [
-            'title' => 'New reservation',
+            'title' => $reservation ? 'Edit reservation' : 'New reservation',
             'customers' => $customers,
             'vehicles' => $vehicles,
             'preVehicle' => $preVehicle,
             'pickup' => $pickup,
             'returnAt' => $returnAt,
+            'reservation' => $reservation,
         ]);
     }
 
@@ -97,7 +127,13 @@ final class ReservationController
             return;
         }
         $rental = Database::fetch('SELECT * FROM rentals WHERE reservation_id = ?', [$id]);
-        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental]);
+        $drivers = [];
+        $assignment = null;
+        if (Rbac::can('drivers.manage') && in_array($row['status'], ['pending', 'confirmed'], true)) {
+            $drivers = Database::fetchAll("SELECT * FROM drivers WHERE status='active' ORDER BY last_name,first_name");
+            $assignment = Database::fetch('SELECT * FROM driver_assignments WHERE reservation_id=?', [$id]);
+        }
+        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'drivers' => $drivers, 'assignment' => $assignment]);
     }
 
     public function transition(): void

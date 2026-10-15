@@ -6,6 +6,7 @@ require __DIR__ . '/src/bootstrap.php';
 use Crms\Controllers\AdminController;
 use Crms\Controllers\AuthController;
 use Crms\Controllers\CustomerController;
+use Crms\Controllers\DriverController;
 use Crms\Controllers\FinanceController;
 use Crms\Controllers\HomeController;
 use Crms\Controllers\InvoiceController;
@@ -36,6 +37,10 @@ $routes = [
     'vehicles/show' => [VehicleController::class, 'show'],
     'customers' => [CustomerController::class, 'index'],
     'customers/form' => [CustomerController::class, 'form'],
+    'drivers' => [DriverController::class, 'index'],
+    'drivers/form' => [DriverController::class, 'form'],
+    'drivers/assign' => [DriverController::class, 'assign'],
+    'drivers/schedule' => [DriverController::class, 'schedule'],
     'reservations' => [ReservationController::class, 'index'],
     'reservations/form' => [ReservationController::class, 'form'],
     'reservations/show' => [ReservationController::class, 'show'],
@@ -54,6 +59,7 @@ $routes = [
     'finance/form' => [FinanceController::class, 'form'],
     'payments/momo' => [PaymentController::class, 'momo'],
     'payments/sync' => [PaymentController::class, 'sync'],
+    'payments/receipt' => [PaymentController::class, 'receipt'],
     'maintenance' => [MaintenanceController::class, 'index'],
     'admin/users' => [AdminController::class, 'users'],
     'admin/settings' => [AdminController::class, 'settings'],

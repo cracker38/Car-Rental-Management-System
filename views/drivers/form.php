@@ -1,0 +1,14 @@
+<form method="post" class="card card-body"><input type="hidden" name="_csrf" value="<?= e(\Crms\Csrf::token()) ?>">
+  <div class="row g-3">
+    <div class="col-md-6"><label class="form-label" for="driver-first">First name</label><input class="form-control" id="driver-first" name="first_name" required value="<?= e($driver['first_name'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="driver-last">Last name</label><input class="form-control" id="driver-last" name="last_name" required value="<?= e($driver['last_name'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="driver-phone">Phone</label><input class="form-control" id="driver-phone" name="phone" required value="<?= e($driver['phone'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="driver-email">Email</label><input class="form-control" id="driver-email" type="email" name="email" value="<?= e($driver['email'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="driver-license">Driving licence number</label><input class="form-control" id="driver-license" name="driving_license_number" required value="<?= e($driver['driving_license_number'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="driver-expiry">Licence expiry</label><input class="form-control" id="driver-expiry" type="date" name="license_expiry_date" value="<?= e($driver['license_expiry_date'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="driver-account">Login account</label><select class="form-select" id="driver-account" name="user_id"><option value="">No schedule login</option><?php foreach ($users as $account): ?><option value="<?= (int)$account['user_id'] ?>" <?= (string)($driver['user_id'] ?? '') === (string)$account['user_id'] ? 'selected' : '' ?>><?= e($account['first_name'] . ' ' . $account['last_name'] . ' · ' . $account['email']) ?></option><?php endforeach; ?></select><small class="form-text">Only active accounts with the Driver role appear here.</small></div>
+    <div class="col-md-6"><label class="form-label" for="driver-status">Status</label><select class="form-select" id="driver-status" name="status"><option value="active" <?= ($driver['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option><option value="inactive" <?= ($driver['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive</option></select></div>
+    <div class="col-12"><label class="form-label" for="driver-notes">Notes</label><textarea class="form-control" id="driver-notes" name="notes" rows="3"><?= e($driver['notes'] ?? '') ?></textarea></div>
+  </div>
+  <div class="d-flex gap-2 mt-4"><button class="btn btn-primary">Save driver</button><a class="btn btn-outline-secondary" href="<?= e(url('drivers')) ?>">Cancel</a></div>
+</form>

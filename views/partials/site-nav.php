@@ -44,6 +44,7 @@ if (!function_exists('crms_nav_link')) {
           <?php if (can('invoices.view')): ?>
             <a class="nav-link<?= $current === 'invoices' || str_starts_with($current, 'invoices/') ? ' active' : '' ?>" href="<?= e(url('invoices')) ?>">Invoices</a>
           <?php endif; ?>
+          <?php if (can('drivers.schedule') && !can('drivers.manage')): ?><a class="nav-link<?= $current === 'drivers/schedule' ? ' active' : '' ?>" href="<?= e(url('drivers/schedule')) ?>">My schedule</a><?php endif; ?>
           <?php
             $ops = [];
             if (can('vehicles.view') && !\Crms\Auth::isCustomer()) $ops[] = ['vehicles', 'Vehicles'];
@@ -51,6 +52,8 @@ if (!function_exists('crms_nav_link')) {
             if (can('rentals.manage')) $ops[] = ['rentals', 'Rentals'];
             if (can('transactions.manage')) $ops[] = ['finance', 'Payments'];
             if (can('maintenance.manage')) $ops[] = ['maintenance', 'Maintenance'];
+            if (can('drivers.manage')) $ops[] = ['drivers', 'Drivers'];
+            if (can('drivers.schedule')) $ops[] = ['drivers/schedule', 'Driver schedule'];
             if (can('reports.operational') || can('reports.financial')) $ops[] = ['reports', 'Reports'];
             if (can('users.manage')) $ops[] = ['admin/users', 'Users'];
             if (can('settings.manage')) $ops[] = ['admin/settings', 'Settings'];

@@ -88,4 +88,35 @@ final class PaymentController
         }
         Http::redirect('finance');
     }
+
+    public function receipt(): void
+    {
+        Auth::requireLogin();
+        $id = Http::int('id');
+        $row = Database::fetch(
+            'SELECT ft.*, c.first_name, c.last_name, c.phone, c.email, i.invoice_number
+             FROM financial_transactions ft JOIN customers c ON c.customer_id=ft.customer_id
+             LEFT JOIN invoices i ON i.invoice_id=ft.invoice_id WHERE ft.transaction_id=?',
+            [$id]
+        );
+        if (!$row) {
+            http_response_code(404);
+            \Crms\View::render('errors/404', ['title' => 'Not found']);
+            return;
+        }
+        if (Auth::isCustomer()) {
+            if ((int)$row['customer_id'] !== (int)Auth::customerId() || $row['status'] !== 'completed') {
+                http_response_code(403);
+                \Crms\View::render('errors/403', ['title' => 'Forbidden']);
+                return;
+            }
+        } else {
+            Rbac::require('transactions.manage');
+        }
+        if ($row['status'] !== 'completed') {
+            Http::flash('warning', 'A receipt is available after the transaction is completed.');
+            Http::redirect(!empty($row['invoice_id']) ? 'invoices/show' : 'finance', !empty($row['invoice_id']) ? ['id' => $row['invoice_id']] : []);
+        }
+        \Crms\View::render('payments/receipt', ['title' => 'Receipt ' . $row['transaction_number'], 'row' => $row]);
+    }
 }

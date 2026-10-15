@@ -16,14 +16,14 @@ final class AuthController
     public function login(): void
     {
         if (Auth::check()) {
-            Http::redirect('home');
+            Http::redirect('dashboard');
         }
         if (Http::isPost()) {
             $email = strtolower(Http::str('email'));
             $password = (string) ($_POST['password'] ?? '');
             if (Auth::login($email, $password)) {
                 Http::clearOld();
-                Http::redirect('home');
+                Http::redirect('dashboard');
             }
         }
         View::render('auth/login', ['title' => 'Sign in', 'fullBleed' => true], 'site');

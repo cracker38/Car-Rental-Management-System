@@ -9,6 +9,7 @@ use Crms\Http;
 use Crms\View;
 use Crms\Services\AvailabilityService;
 use Crms\Services\PricingService;
+use Crms\Services\DashboardService;
 
 final class HomeController
 {
@@ -42,18 +43,52 @@ final class HomeController
         $results = [];
         $quotes = [];
         $error = null;
-        if ($pickup && $returnAt) {
+        $filters = [
+            'model' => substr(trim(Http::str('model')), 0, 80),
+            'min_rate' => trim(Http::str('min_rate')),
+            'max_rate' => trim(Http::str('max_rate')),
+            'fuel_type' => Http::str('fuel_type'),
+            'transmission' => Http::str('transmission'),
+        ];
+        if (($pickup === '') !== ($returnAt === '')) {
+            $error = 'Choose both a pick-up time and a return time.';
+        }
+        foreach (['min_rate', 'max_rate'] as $rateKey) {
+            $rate = $filters[$rateKey];
+            if ($rate !== '' && (!is_numeric($rate) || (float) $rate < 0 || (float) $rate > 999999999999)) {
+                $error = 'Enter a valid non-negative daily price.';
+                break;
+            }
+            if ($rate !== '') {
+                $filters[$rateKey] = number_format((float) $rate, 2, '.', '');
+            }
+        }
+        if ($error === null && $filters['min_rate'] !== '' && $filters['max_rate'] !== '' && (float) $filters['min_rate'] > (float) $filters['max_rate']) {
+            $error = 'The minimum daily price cannot exceed the maximum.';
+        }
+        if (!in_array($filters['fuel_type'], ['', 'petrol', 'diesel', 'hybrid', 'electric', 'other'], true)) {
+            $filters['fuel_type'] = '';
+        }
+        if (!in_array($filters['transmission'], ['', 'manual', 'automatic', 'other'], true)) {
+            $filters['transmission'] = '';
+        }
+        if ($pickup && $returnAt && $error === null) {
             try {
-                $results = (new AvailabilityService())->search($pickup, $returnAt, $categoryId);
+                $results = (new AvailabilityService())->search($pickup, $returnAt, $categoryId, $filters);
                 $pricing = new PricingService();
                 foreach ($results as $v) {
                     $quotes[(int) $v['vehicle_id']] = $pricing->quoteRates($v, $pickup, $returnAt);
                 }
-            } catch (\Throwable $e) {
-                $error = $e->getMessage();
+            } catch (\Throwable) {
+                $error = 'We could not check availability right now. Please try again or contact our Kigali team.';
             }
         }
-        $categories = Database::fetchAll('SELECT * FROM vehicle_categories WHERE is_active = 1 ORDER BY category_name');
+        $categories = [];
+        try {
+            $categories = Database::fetchAll('SELECT * FROM vehicle_categories WHERE is_active = 1 ORDER BY category_name');
+        } catch (\Throwable) {
+            $error ??= 'Car search is temporarily unavailable. Please contact our Kigali team for help.';
+        }
         View::render('home/search', [
             'title' => 'Book a car',
             'categories' => $categories,
@@ -62,6 +97,7 @@ final class HomeController
             'pickup' => $pickup,
             'returnAt' => $returnAt,
             'categoryId' => $categoryId,
+            'filters' => $filters,
             'error' => $error,
             'fullBleed' => true,
         ], 'site');
@@ -70,7 +106,9 @@ final class HomeController
     public function dashboard(): void
     {
         Auth::requireLogin();
-        Http::redirect('home');
+        $user = Auth::user();
+        $data = (new DashboardService())->data($user ?? []);
+        View::render(DashboardService::templateFor((string) ($user['role_name'] ?? '')), $data + ['title' => 'Dashboard']);
     }
 
     public function about(): void

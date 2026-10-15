@@ -93,16 +93,33 @@ final class AdminController
         if (!Rbac::can('reports.operational') && !Rbac::can('reports.financial')) {
             Rbac::require('reports.operational');
         }
-        $ops = Database::fetchAll(
-            "SELECT v.registration_no, v.status,
-                    SUM(r.status = 'confirmed') AS confirmed_bookings,
-                    SUM(rt.status IN ('active','overdue')) AS live_rentals
-             FROM vehicles v
-             LEFT JOIN reservations r ON r.vehicle_id = v.vehicle_id
-             LEFT JOIN rentals rt ON rt.vehicle_id = v.vehicle_id
-             GROUP BY v.vehicle_id, v.registration_no, v.status
-             ORDER BY v.registration_no"
-        );
+        $dateFrom = Http::str('date_from', date('Y-m-01'));
+        $dateTo = Http::str('date_to', date('Y-m-d'));
+        foreach (['date_from' => $dateFrom, 'date_to' => $dateTo] as $key => $date) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !checkdate((int)substr($date, 5, 2), (int)substr($date, 8, 2), (int)substr($date, 0, 4))) {
+                Http::flash('danger', 'Choose valid report start and end dates.');
+                $dateFrom = date('Y-m-01');
+                $dateTo = date('Y-m-d');
+                break;
+            }
+        }
+        if ($dateFrom > $dateTo) {
+            Http::flash('danger', 'The report start date must be on or before the end date.');
+            $dateFrom = date('Y-m-01');
+            $dateTo = date('Y-m-d');
+        }
+        $ops = [];
+        if (Rbac::can('reports.operational')) {
+            $ops = Database::fetchAll(
+                "SELECT v.registration_no, v.status,
+                    (SELECT COUNT(*) FROM reservations r WHERE r.vehicle_id=v.vehicle_id AND r.status IN ('confirmed','completed') AND DATE(r.pickup_datetime) BETWEEN ? AND ?) AS confirmed_bookings,
+                    (SELECT COUNT(*) FROM rentals rt JOIN reservations r ON r.reservation_id=rt.reservation_id
+                     WHERE rt.vehicle_id=v.vehicle_id AND rt.status IN ('active','overdue','returned','inspected','closed')
+                       AND DATE(COALESCE(rt.actual_pickup_datetime,r.pickup_datetime)) BETWEEN ? AND ?) AS live_rentals
+                 FROM vehicles v ORDER BY v.registration_no",
+                [$dateFrom, $dateTo, $dateFrom, $dateTo]
+            );
+        }
         $fin = [];
         if (Rbac::can('reports.financial')) {
             $fin = Database::fetch(
@@ -110,9 +127,10 @@ final class AdminController
                     COALESCE(SUM(CASE WHEN transaction_type='payment' AND status='completed' THEN amount END),0) AS payments,
                     COALESCE(SUM(CASE WHEN transaction_type='payment_refund' AND status='completed' THEN amount END),0) AS refunds,
                     COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount END),0) AS deposits
-                 FROM financial_transactions"
+                 FROM financial_transactions WHERE DATE(transaction_date) BETWEEN ? AND ?",
+                [$dateFrom, $dateTo]
             );
         }
-        View::render('admin/reports', ['title' => 'Reports', 'ops' => $ops, 'fin' => $fin]);
+        View::render('admin/reports', ['title' => 'Reports', 'ops' => $ops, 'fin' => $fin, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo]);
     }
 }

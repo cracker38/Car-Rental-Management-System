@@ -64,7 +64,7 @@ if ($mysqli->connect_error) {
         $ins = $mysqli->prepare('INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, status) VALUES (?,?,?,?,?,?,\'active\')');
         $fn = 'System';
         $ln = 'Administrator';
-        $phone = '+250000000000';
+        $phone = '+250785354935';
         $ins->bind_param('isssss', $role['role_id'], $fn, $ln, $adminEmail, $phone, $hash);
         $ins->execute();
         $messages[] = 'Admin user created: admin@crms.local / Admin@12345 (change this password after first login).';

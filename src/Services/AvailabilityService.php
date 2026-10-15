@@ -21,8 +21,13 @@ final class AvailabilityService
 {
     public function assertValidPeriod(string $pickup, string $returnAt): void
     {
-        $p = new DateTimeImmutable($pickup);
-        $r = new DateTimeImmutable($returnAt);
+        $p = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $pickup);
+        $pErrors = DateTimeImmutable::getLastErrors();
+        $r = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $returnAt);
+        $rErrors = DateTimeImmutable::getLastErrors();
+        if (!$p || !$r || ($pErrors !== false && ($pErrors['warning_count'] > 0 || $pErrors['error_count'] > 0)) || ($rErrors !== false && ($rErrors['warning_count'] > 0 || $rErrors['error_count'] > 0))) {
+            throw new InvalidArgumentException('Enter valid pickup and return date/times.');
+        }
         if ($r <= $p) {
             throw new InvalidArgumentException('Return date/time must be after pickup.');
         }
@@ -111,7 +116,7 @@ final class AvailabilityService
         return null;
     }
 
-    public function search(string $pickup, string $returnAt, ?int $categoryId = null): array
+    public function search(string $pickup, string $returnAt, ?int $categoryId = null, array $filters = []): array
     {
         $this->assertValidPeriod($pickup, $returnAt);
         $sql = 'SELECT v.*, c.category_name FROM vehicles v
@@ -121,6 +126,28 @@ final class AvailabilityService
         if ($categoryId) {
             $sql .= ' AND v.category_id = ?';
             $params[] = $categoryId;
+        }
+        $model = trim((string) ($filters['model'] ?? ''));
+        if ($model !== '') {
+            $sql .= ' AND (v.make LIKE ? OR v.model LIKE ?)';
+            $params[] = '%' . $model . '%';
+            $params[] = '%' . $model . '%';
+        }
+        if (($filters['min_rate'] ?? '') !== '') {
+            $sql .= ' AND v.daily_rate >= ?';
+            $params[] = $filters['min_rate'];
+        }
+        if (($filters['max_rate'] ?? '') !== '') {
+            $sql .= ' AND v.daily_rate <= ?';
+            $params[] = $filters['max_rate'];
+        }
+        if (($filters['fuel_type'] ?? '') !== '') {
+            $sql .= ' AND v.fuel_type = ?';
+            $params[] = $filters['fuel_type'];
+        }
+        if (($filters['transmission'] ?? '') !== '') {
+            $sql .= ' AND v.transmission = ?';
+            $params[] = $filters['transmission'];
         }
         $sql .= ' ORDER BY v.daily_rate ASC, v.make ASC';
         $out = [];

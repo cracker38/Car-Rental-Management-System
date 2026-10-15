@@ -10,15 +10,7 @@ final class DashboardService
 {
     public static function templateFor(string $roleName): string
     {
-        return match ($roleName) {
-            'System Administrator' => 'dashboards/admin',
-            'Business Manager' => 'dashboards/manager',
-            'Rental Officer' => 'dashboards/officer',
-            'Accountant/Cashier' => 'dashboards/cashier',
-            'Vehicle Inspector/Maintenance Staff' => 'dashboards/inspector',
-            'Customer' => 'dashboards/customer',
-            default => 'dashboards/officer',
-        };
+        return 'dashboards/index';
     }
 
     public function data(array $user): array
@@ -36,6 +28,7 @@ final class DashboardService
             'Accountant/Cashier' => $base + $this->cashier(),
             'Vehicle Inspector/Maintenance Staff' => $base + $this->inspector(),
             'Customer' => $base + $this->customer(),
+            'Driver' => $base + $this->driver(),
             default => $base + $this->officer(),
         };
     }
@@ -171,6 +164,29 @@ final class DashboardService
                 "SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id
                  WHERE v.status NOT IN ('inactive','maintenance') ORDER BY v.daily_rate ASC LIMIT 6"
             ),
+        ];
+    }
+
+    private function driver(): array
+    {
+        $userId = Auth::id() ?: 0;
+        $assignments = Database::fetchAll(
+            "SELECT da.assignment_id, da.notes AS assignment_notes, r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
+                    r.pickup_location, r.return_location, r.status AS reservation_status,
+                    c.first_name, c.last_name, c.phone, v.registration_no, v.make, v.model
+             FROM drivers d JOIN driver_assignments da ON da.driver_id = d.driver_id
+             JOIN reservations r ON r.reservation_id = da.reservation_id
+             JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+             WHERE d.user_id = ? AND r.status IN ('pending','confirmed')
+             ORDER BY r.pickup_datetime ASC LIMIT 100",
+            [$userId]
+        );
+        return [
+            'kpis' => [
+                ['label' => 'Assigned trips', 'value' => count($assignments), 'hint' => 'Upcoming chauffeur bookings'],
+                ['label' => 'Next pickup', 'value' => $assignments ? date('M j, H:i', strtotime($assignments[0]['pickup_datetime'])) : '—', 'hint' => $assignments ? $assignments[0]['reservation_code'] : 'No upcoming trips'],
+            ],
+            'assignments' => $assignments,
         ];
     }
 

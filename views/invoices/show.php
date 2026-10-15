@@ -47,6 +47,7 @@
       <?php if ($t['status'] === 'pending' && $t['external_reference']): ?>
         <form method="post" action="<?= e(url('payments/sync', ['id' => $t['transaction_id']])) ?>" class="d-inline"><?= \Crms\Csrf::field() ?><button class="btn btn-sm btn-outline-secondary">Check HDEV</button></form>
       <?php endif; ?>
+      <?php if ($t['status'] === 'completed' && in_array($t['transaction_type'], ['payment','deposit_received','payment_refund','deposit_refund','deposit_deduction'], true)): ?><a class="btn btn-sm btn-outline-dark" href="<?= e(url('payments/receipt', ['id' => $t['transaction_id']])) ?>">Receipt</a><?php endif; ?>
     </li>
   <?php endforeach; ?>
 </ul>

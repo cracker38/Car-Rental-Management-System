@@ -69,6 +69,25 @@ CREATE TABLE IF NOT EXISTS customers (
   CONSTRAINT fk_customer_creator FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS drivers (
+  driver_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT UNSIGNED NULL UNIQUE,
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  phone VARCHAR(30) NOT NULL,
+  email VARCHAR(190) NULL,
+  driving_license_number VARCHAR(100) NOT NULL UNIQUE,
+  license_expiry_date DATE NULL,
+  status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes TEXT NULL,
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_driver_status_name (status,last_name,first_name),
+  CONSTRAINT fk_driver_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_driver_creator FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS vehicle_categories (
   category_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   category_name VARCHAR(80) NOT NULL UNIQUE,
@@ -146,6 +165,19 @@ CREATE TABLE IF NOT EXISTS reservations (
   CONSTRAINT fk_res_confirmer FOREIGN KEY (confirmed_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT chk_res_period CHECK (return_datetime > pickup_datetime),
   CONSTRAINT chk_res_amounts CHECK (agreed_daily_rate >= 0 AND estimated_days > 0 AND estimated_amount >= 0 AND discount_amount >= 0 AND tax_amount >= 0 AND security_deposit >= 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS driver_assignments (
+  assignment_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  driver_id BIGINT UNSIGNED NOT NULL,
+  reservation_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  assigned_by BIGINT UNSIGNED NULL,
+  notes VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_driver_assignment_driver FOREIGN KEY (driver_id) REFERENCES drivers(driver_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT fk_driver_assignment_reservation FOREIGN KEY (reservation_id) REFERENCES reservations(reservation_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_driver_assignment_user FOREIGN KEY (assigned_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
+  KEY idx_driver_assignment_driver (driver_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS rentals (
@@ -364,7 +396,8 @@ INSERT IGNORE INTO roles (role_name,description) VALUES
  ('Rental Officer','Manage vehicles, customers, reservations and rentals'),
  ('Accountant/Cashier','Manage invoices, transactions and refunds'),
  ('Vehicle Inspector/Maintenance Staff','Inspect vehicles and manage maintenance'),
- ('Customer','Access own reservations and invoices');
+ ('Customer','Access own reservations and invoices'),
+ ('Driver','View assigned chauffeur trips');
 
 INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('users.manage','Manage user accounts and roles'),('vehicles.view','View vehicles'),('vehicles.manage','Create and update vehicles'),
@@ -375,6 +408,8 @@ INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('inspections.manage','Record vehicle inspections'),('reports.operational','View operational reports'),
  ('reports.financial','View financial reports'),('notifications.manage','Manage notifications'),
  ('audit.view','Review audit logs'),('settings.manage','Manage system settings');
+INSERT IGNORE INTO permissions (permission_key,description) VALUES
+ ('drivers.manage','Manage driver records and assignments'),('drivers.schedule','View assigned driver schedule');
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r CROSS JOIN permissions p WHERE r.role_name='System Administrator';
@@ -398,6 +433,14 @@ INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
 ('vehicles.view','maintenance.manage','inspections.manage','reports.operational')
 WHERE r.role_name='Vehicle Inspector/Maintenance Staff';
+
+INSERT IGNORE INTO role_permissions (role_id,permission_id)
+SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
+('drivers.manage','drivers.schedule') WHERE r.role_name IN ('System Administrator','Business Manager','Rental Officer');
+
+INSERT IGNORE INTO role_permissions (role_id,permission_id)
+SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key='drivers.schedule'
+WHERE r.role_name='Driver';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
