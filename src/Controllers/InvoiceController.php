@@ -9,6 +9,7 @@ use Crms\Http;
 use Crms\Rbac;
 use Crms\View;
 use Crms\Services\InvoiceService;
+use Crms\Services\SmsService;
 use InvalidArgumentException;
 
 final class InvoiceController
@@ -57,6 +58,17 @@ final class InvoiceController
         Rbac::require('invoices.manage');
         try {
             (new InvoiceService())->issue(Http::int('id'));
+            $inv = Database::fetch('SELECT * FROM invoices WHERE invoice_id = ?', [Http::int('id')]);
+            if ($inv) {
+                (new SmsService())->sendToCustomer(
+                    (int) $inv['customer_id'],
+                    'invoice_issued',
+                    'Invoice ' . $inv['invoice_number'],
+                    'Invoice ' . $inv['invoice_number'] . ' of RWF ' . (int) $inv['total_amount'] . ' has been issued.',
+                    'invoice',
+                    (int) $inv['invoice_id']
+                );
+            }
             Http::flash('success', 'Invoice issued.');
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());

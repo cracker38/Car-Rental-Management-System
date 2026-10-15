@@ -33,7 +33,7 @@ final class ReservationService
 
     public function create(array $input, bool $asStaff): array
     {
-        return Database::transaction(function (PDO $pdo) use ($input, $asStaff) {
+        $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff) {
             $customerId = (int) $input['customer_id'];
             $vehicleId = (int) $input['vehicle_id'];
             $pickup = $input['pickup_datetime'];
@@ -103,11 +103,21 @@ final class ReservationService
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
+        (new SmsService())->sendToCustomer(
+            (int) $created['customer_id'],
+            'reservation_created',
+            'Reservation ' . $created['reservation_code'],
+            'Reservation ' . $created['reservation_code'] . ' is ' . $created['status'] . '. Pickup ' . $created['pickup_datetime'] . '.'
+            ,
+            'reservation',
+            (int) $created['reservation_id']
+        );
+        return $created;
     }
 
     public function transition(int $id, string $to, ?string $reason = null): void
     {
-        Database::transaction(function (PDO $pdo) use ($id, $to, $reason) {
+        $before = Database::transaction(function (PDO $pdo) use ($id, $to, $reason) {
             $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
             $stmt->execute([$id]);
             $res = $stmt->fetch();
@@ -144,7 +154,16 @@ final class ReservationService
             Database::execute($sql, $params);
             $this->syncVehicleStatus((int) $res['vehicle_id']);
             Audit::log('reservation.status', 'reservation', (string) $id, "{$from} -> {$to}", ['status' => $from], ['status' => $to]);
+            return $res;
         });
+        (new SmsService())->sendToCustomer(
+            (int) $before['customer_id'],
+            'reservation_status',
+            'Reservation ' . $before['reservation_code'],
+            'Reservation ' . $before['reservation_code'] . ' is now ' . $to . '.',
+            'reservation',
+            $id
+        );
     }
 
     public function syncVehicleStatus(int $vehicleId): void

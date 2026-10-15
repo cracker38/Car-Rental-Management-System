@@ -24,9 +24,29 @@
 <?php if (can('transactions.manage') && !in_array($row['status'], ['draft','void'], true)): ?>
   <a class="btn btn-outline-primary" href="<?= e(url('finance/form', ['invoice_id' => $row['invoice_id']])) ?>">Post payment / refund</a>
 <?php endif; ?>
+<?php if (!in_array($row['status'], ['draft','void','paid'], true) && (float)($row['outstanding_balance'] ?? 0) > 0 && (can('transactions.manage') || \Crms\Auth::isCustomer())): ?>
+<form method="post" action="<?= e(url('payments/momo')) ?>" class="card card-body my-3">
+  <?= \Crms\Csrf::field() ?>
+  <input type="hidden" name="invoice_id" value="<?= (int)$row['invoice_id'] ?>">
+  <input type="hidden" name="customer_id" value="<?= (int)$row['customer_id'] ?>">
+  <input type="hidden" name="transaction_type" value="payment">
+  <h3 class="h6">Pay with MTN/Airtel MoMo (HDEV)</h3>
+  <div class="row g-2">
+    <div class="col-md-4"><label class="form-label">MoMo phone</label><input class="form-control" name="phone" required value="<?= e((string)$row['phone']) ?>" placeholder="07xxxxxxxx"></div>
+    <div class="col-md-4"><label class="form-label">Amount (RWF)</label><input class="form-control" name="amount" required value="<?= e((string)((int)($row['outstanding_balance'] ?? 0))) ?>"></div>
+    <div class="col-md-4 d-flex align-items-end"><button class="btn btn-success">Send MoMo prompt</button></div>
+  </div>
+  <p class="small text-muted mb-0 mt-2">The invoice is not marked paid until HDEV confirms the transaction. Pending rows do not change the balance.</p>
+</form>
+<?php endif; ?>
 <h3 class="h6 mt-4">Ledger</h3>
 <ul>
   <?php foreach ($txns as $t): ?>
-    <li><?= e($t['transaction_number']) ?> · <?= e($t['transaction_type']) ?> · <?= e(\Crms\Money::format($t['amount'])) ?> · <?= e($t['status']) ?></li>
+    <li>
+      <?= e($t['transaction_number']) ?> · <?= e($t['transaction_type']) ?> · <?= e(\Crms\Money::format($t['amount'])) ?> · <?= e($t['status']) ?>
+      <?php if ($t['status'] === 'pending' && $t['external_reference']): ?>
+        <form method="post" action="<?= e(url('payments/sync', ['id' => $t['transaction_id']])) ?>" class="d-inline"><?= \Crms\Csrf::field() ?><button class="btn btn-sm btn-outline-secondary">Check HDEV</button></form>
+      <?php endif; ?>
+    </li>
   <?php endforeach; ?>
 </ul>

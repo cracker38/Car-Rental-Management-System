@@ -45,6 +45,9 @@ if ($mysqli->connect_error) {
         ['late_fee_per_hour', '0', 'number', 'RWF per started hour after expected return.'],
         ['login_max_attempts', '5', 'number', 'Failed logins per email+IP before throttle.'],
         ['login_window_minutes', '15', 'number', 'Throttle window in minutes.'],
+        ['hdev_callback_url', '', 'string', 'Public HTTPS URL for hdev_callback.php. Localhost is not reachable from HDEV.'],
+        ['hdev_sms_sender', 'CRMS', 'string', 'Approved HDEV SMS sender ID.'],
+        ['hdev_sms_enabled', 'true', 'boolean', 'Send customer SMS via HDEV when true.'],
     ];
     $stmt = $mysqli->prepare('INSERT IGNORE INTO system_settings (setting_key, setting_value, value_type, description) VALUES (?,?,?,?)');
     foreach ($extras as $row) {

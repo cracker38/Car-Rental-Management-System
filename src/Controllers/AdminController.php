@@ -40,6 +40,7 @@ final class AdminController
             $keys = [
                 'business_name', 'tax_rate_percent', 'default_deposit_amount', 'turnaround_minutes',
                 'extra_km_rate', 'included_km_per_day', 'late_fee_per_hour', 'reservation_confirmation_required',
+                'hdev_callback_url', 'hdev_sms_sender', 'hdev_sms_enabled',
             ];
             foreach ($keys as $k) {
                 if (isset($_POST[$k])) {
@@ -49,6 +50,16 @@ final class AdminController
             Audit::log('settings.updated', 'system_settings', null, 'Settings saved');
             Http::flash('success', 'Settings saved. Pricing and availability use these values on the server.');
             Http::redirect('admin/settings');
+        }
+        foreach ([
+            ['hdev_callback_url', '', 'string', 'Public HTTPS URL for hdev_callback.php'],
+            ['hdev_sms_sender', 'CRMS', 'string', 'Approved HDEV SMS sender ID'],
+            ['hdev_sms_enabled', 'true', 'boolean', 'Send customer SMS via HDEV when true'],
+        ] as $row) {
+            Database::execute(
+                'INSERT IGNORE INTO system_settings (setting_key, setting_value, value_type, description) VALUES (?,?,?,?)',
+                $row
+            );
         }
         $rows = Database::fetchAll('SELECT * FROM system_settings ORDER BY setting_key');
         View::render('admin/settings', ['title' => 'Settings', 'rows' => $rows]);

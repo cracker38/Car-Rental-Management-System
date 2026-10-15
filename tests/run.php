@@ -9,6 +9,8 @@ require dirname(__DIR__) . '/src/bootstrap.php';
 
 use Crms\Money;
 use Crms\Period;
+use Crms\Phone;
+use Crms\Services\HdevClient;
 use Crms\Services\PricingService;
 use Crms\Services\ReservationService;
 use Crms\Services\RentalService;
@@ -84,6 +86,13 @@ expect(!in_array('closed', RentalService::TRANSITIONS['active'], true), 'cannot 
 $refundable = (float) Money::sub('100000', '40000');
 expect($refundable === 60000.0, 'partial refund remaining');
 expect((float) Money::sub('100000', '100000') === 0.0, 'full refund remaining is 0');
+
+expect(Phone::rwandaMobile('0788123456') === '250788123456', 'normalize local MoMo number');
+expect(Phone::rwandaMobile('+250 788 123 456') === '250788123456', 'normalize +250 MoMo number');
+expect(Phone::rwandaMobile('12345') === null, 'reject invalid phone');
+expect(HdevClient::statusOf((object) ['status' => 'success']) === 'success', 'HDEV success status mapping');
+expect(HdevClient::statusOf((object) ['status' => 'pending']) === 'pending', 'HDEV pending does not complete ledger');
+expect(HdevClient::statusOf((object) ['status' => 'failed']) === 'failed', 'HDEV failed status mapping');
 
 echo "\n=== Optional database checks ===\n";
 try {

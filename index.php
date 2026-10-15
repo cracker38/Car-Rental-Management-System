@@ -10,6 +10,7 @@ use Crms\Controllers\FinanceController;
 use Crms\Controllers\HomeController;
 use Crms\Controllers\InvoiceController;
 use Crms\Controllers\MaintenanceController;
+use Crms\Controllers\PaymentController;
 use Crms\Controllers\RentalController;
 use Crms\Controllers\ReservationController;
 use Crms\Controllers\VehicleController;
@@ -46,6 +47,8 @@ $routes = [
     'invoices/issue' => [InvoiceController::class, 'issue'],
     'finance' => [FinanceController::class, 'index'],
     'finance/form' => [FinanceController::class, 'form'],
+    'payments/momo' => [PaymentController::class, 'momo'],
+    'payments/sync' => [PaymentController::class, 'sync'],
     'maintenance' => [MaintenanceController::class, 'index'],
     'admin/users' => [AdminController::class, 'users'],
     'admin/settings' => [AdminController::class, 'settings'],
