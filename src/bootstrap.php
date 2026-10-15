@@ -66,6 +66,34 @@ if (!function_exists('can')) {
     }
 }
 
+if (!function_exists('nav_active')) {
+    function nav_active(string ...$routes): string
+    {
+        $current = (string) ($_GET['r'] ?? 'home');
+        foreach ($routes as $route) {
+            if ($current === $route || str_starts_with($current, $route . '/')) {
+                return 'active';
+            }
+        }
+        return '';
+    }
+}
+
+if (!function_exists('status_badge')) {
+    function status_badge(string $status): string
+    {
+        $cls = \Crms\Ui::statusClass($status);
+        return '<span class="badge text-bg-' . e($cls) . ' badge-status">' . e($status) . '</span>';
+    }
+}
+
+if (!function_exists('vehicle_img')) {
+    function vehicle_img(?string $path): string
+    {
+        return \Crms\Ui::vehicleImage($path);
+    }
+}
+
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || ((int) ($_SERVER['SERVER_PORT'] ?? 80) === 443);
 

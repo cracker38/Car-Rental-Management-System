@@ -16,23 +16,23 @@ final class AuthController
     public function login(): void
     {
         if (Auth::check()) {
-            Http::redirect('dashboard');
+            Http::redirect('home');
         }
         if (Http::isPost()) {
             $email = strtolower(Http::str('email'));
             $password = (string) ($_POST['password'] ?? '');
             if (Auth::login($email, $password)) {
                 Http::clearOld();
-                Http::redirect('dashboard');
+                Http::redirect('home');
             }
         }
-        View::render('auth/login', ['title' => 'Sign in'], 'public');
+        View::render('auth/login', ['title' => 'Sign in', 'fullBleed' => true], 'site');
     }
 
     public function register(): void
     {
         if (Auth::check()) {
-            Http::redirect('dashboard');
+            Http::redirect('home');
         }
         if (Http::isPost()) {
             $v = new Validator();
@@ -88,7 +88,7 @@ final class AuthController
                 }
             }
         }
-        View::render('auth/register', ['title' => 'Create account'], 'public');
+        View::render('auth/register', ['title' => 'Create account', 'fullBleed' => true], 'site');
     }
 
     public function logout(): void
@@ -99,6 +99,6 @@ final class AuthController
             Csrf::token();
             Http::flash('success', 'You have signed out.');
         }
-        Http::redirect('login');
+        Http::redirect('home');
     }
 }

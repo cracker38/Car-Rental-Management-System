@@ -76,13 +76,14 @@ if ($mysqli->connect_error) {
     $catId = $cat && ($c = $cat->fetch_assoc()) ? (int) $c['category_id'] : 0;
     if ($catId && $mysqli->query('SELECT COUNT(*) c FROM vehicles')->fetch_assoc()['c'] == 0) {
         $adminId = $mysqli->query("SELECT user_id FROM users WHERE email = 'admin@crms.local'")->fetch_assoc()['user_id'] ?? null;
-        $insv = $mysqli->prepare('INSERT INTO vehicles (category_id, registration_no, make, model, manufacture_year, colour, transmission, fuel_type, daily_rate, weekly_rate, monthly_rate, current_mileage, status, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,\'available\',?)');
+        $insv = $mysqli->prepare('INSERT INTO vehicles (category_id, registration_no, make, model, manufacture_year, colour, transmission, fuel_type, daily_rate, weekly_rate, monthly_rate, current_mileage, image_path, status, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,\'available\',?)');
+        $img = 'public/img/fleet/default.svg';
         $samples = [
-            [$catId, 'RAD-001-A', 'Toyota', 'Corolla', 2020, 'White', 'automatic', 'petrol', '35000', '210000', '700000', 12000, $adminId],
-            [$catId, 'RAD-002-B', 'Honda', 'Civic', 2021, 'Silver', 'automatic', 'petrol', '38000', '228000', '760000', 8000, $adminId],
+            [$catId, 'RAD-001-A', 'Toyota', 'Corolla', 2020, 'White', 'automatic', 'petrol', '35000', '210000', '700000', 12000, $img, $adminId],
+            [$catId, 'RAD-002-B', 'Honda', 'Civic', 2021, 'Silver', 'automatic', 'petrol', '38000', '228000', '760000', 8000, $img, $adminId],
         ];
         foreach ($samples as $s) {
-            $insv->bind_param('isssissssssii', $s[0], $s[1], $s[2], $s[3], $s[4], $s[5], $s[6], $s[7], $s[8], $s[9], $s[10], $s[11], $s[12]);
+            $insv->bind_param('isssissssssisi', $s[0], $s[1], $s[2], $s[3], $s[4], $s[5], $s[6], $s[7], $s[8], $s[9], $s[10], $s[11], $s[12], $s[13]);
             $insv->execute();
         }
         $suv = $mysqli->query("SELECT category_id FROM vehicle_categories WHERE category_name='SUV'")->fetch_assoc();
@@ -99,11 +100,12 @@ if ($mysqli->connect_error) {
             $w = '360000';
             $m = '1200000';
             $km = 5000;
-            $insv->bind_param('isssissssssii', $sid, $reg, $make, $model, $year, $colour, $tr, $fuel, $d, $w, $m, $km, $adminId);
+            $insv->bind_param('isssissssssisi', $sid, $reg, $make, $model, $year, $colour, $tr, $fuel, $d, $w, $m, $km, $img, $adminId);
             $insv->execute();
         }
         $messages[] = 'Sample vehicles added because the fleet was empty.';
     }
+    $mysqli->query("UPDATE vehicles SET image_path = 'public/img/fleet/default.svg' WHERE image_path IS NULL OR image_path = ''");
 }
 
 header('Content-Type: text/html; charset=utf-8');

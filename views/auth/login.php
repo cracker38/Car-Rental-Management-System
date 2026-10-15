@@ -1,14 +1,15 @@
-<div class="row justify-content-center">
-  <div class="col-md-5">
-    <div class="card"><div class="card-body p-4">
-      <h1 class="h4 mb-3">Sign in</h1>
+<section class="auth-wrap">
+  <div class="container" style="max-width:440px">
+    <div class="auth-card">
+      <h1 class="h3 mb-2">Sign in</h1>
+      <p class="text-muted">Customers return to the website. Staff also get an Operations menu.</p>
       <form method="post" action="<?= e(url('login')) ?>">
         <?= \Crms\Csrf::field() ?>
         <div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required value="<?= e((string)\Crms\Http::old('email')) ?>"></div>
         <div class="mb-3"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>
-        <button class="btn btn-primary w-100">Sign in</button>
+        <button class="btn btn-accent w-100">Continue</button>
       </form>
-      <p class="mt-3 mb-0 small">Need an account? <a href="<?= e(url('register')) ?>">Register</a></p>
-    </div></div>
+      <p class="mt-3 mb-0">New here? <a href="<?= e(url('register')) ?>">Create an account</a></p>
+    </div>
   </div>
-</div>
+</section>

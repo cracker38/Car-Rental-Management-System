@@ -5,7 +5,7 @@ namespace Crms;
 
 final class View
 {
-    public static function render(string $template, array $data = [], string $layout = 'main'): void
+    public static function render(string $template, array $data = [], string $layout = 'site'): void
     {
         $data['flashes'] = Http::flashes();
         $data['user'] = Auth::user();

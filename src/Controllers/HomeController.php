@@ -21,16 +21,17 @@ final class HomeController
             $vehicles = Database::fetchAll(
                 "SELECT v.*, c.category_name FROM vehicles v
                  JOIN vehicle_categories c ON c.category_id = v.category_id
-                 WHERE v.status <> 'inactive' ORDER BY v.created_at DESC LIMIT 8"
+                 WHERE v.status <> 'inactive' ORDER BY v.daily_rate ASC, v.created_at DESC LIMIT 12"
             );
         } catch (\Throwable) {
             Http::flash('warning', 'Database is not ready. Run install.php first.');
         }
         View::render('home/index', [
-            'title' => 'Car Rental Management System',
+            'title' => 'Home',
             'categories' => $categories,
             'vehicles' => $vehicles,
-        ], 'public');
+            'fullBleed' => true,
+        ], 'site');
     }
 
     public function search(): void
@@ -54,7 +55,7 @@ final class HomeController
         }
         $categories = Database::fetchAll('SELECT * FROM vehicle_categories WHERE is_active = 1 ORDER BY category_name');
         View::render('home/search', [
-            'title' => 'Search vehicles',
+            'title' => 'Book a car',
             'categories' => $categories,
             'results' => $results,
             'quotes' => $quotes,
@@ -62,34 +63,75 @@ final class HomeController
             'returnAt' => $returnAt,
             'categoryId' => $categoryId,
             'error' => $error,
-        ], Auth::check() ? 'main' : 'public');
+            'fullBleed' => true,
+        ], 'site');
     }
 
     public function dashboard(): void
     {
         Auth::requireLogin();
-        $stats = [
-            'vehicles' => Database::fetch("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'")['c'] ?? 0,
-            'reservations' => Database::fetch("SELECT COUNT(*) c FROM reservations WHERE status IN ('pending','confirmed')")['c'] ?? 0,
-            'active_rentals' => Database::fetch("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue')")['c'] ?? 0,
-            'outstanding' => Database::fetch("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE outstanding_balance > 0")['s'] ?? 0,
-        ];
-        $mine = [];
-        if (Auth::isCustomer() && Auth::customerId()) {
-            $mine = Database::fetchAll(
-                'SELECT * FROM reservations WHERE customer_id = ? ORDER BY created_at DESC LIMIT 10',
-                [Auth::customerId()]
-            );
+        Http::redirect('home');
+    }
+
+    public function about(): void
+    {
+        View::render('home/about', ['title' => 'About', 'fullBleed' => true], 'site');
+    }
+
+    public function services(): void
+    {
+        View::render('home/services', ['title' => 'Services', 'fullBleed' => true], 'site');
+    }
+
+    public function blog(): void
+    {
+        View::render('home/blog', ['title' => 'Rwanda journal', 'fullBleed' => true], 'site');
+    }
+
+    public function contact(): void
+    {
+        if (Http::isPost()) {
+            $name = Http::str('name');
+            $contact = Http::str('contact');
+            $message = Http::str('message');
+            if ($name === '' || $contact === '' || $message === '') {
+                Http::flash('danger', 'Please complete the contact form.');
+            } else {
+                try {
+                    Database::execute(
+                        'INSERT INTO notifications (channel, notification_type, subject, message, status)
+                         VALUES (\'in_app\',\'contact_form\',?,?,\'queued\')',
+                        ['Website enquiry from ' . $name, $contact . "\n" . $message]
+                    );
+                    Http::flash('success', 'Thank you. We have received your message.');
+                    Http::redirect('contact');
+                } catch (\Throwable) {
+                    Http::flash('danger', 'Could not send the message. Try again later.');
+                }
+            }
         }
-        $notes = Database::fetchAll(
-            'SELECT * FROM notifications WHERE user_id = ? OR customer_id = ? ORDER BY created_at DESC LIMIT 8',
-            [Auth::id(), Auth::customerId()]
-        );
-        View::render('home/dashboard', [
-            'title' => 'Dashboard',
-            'stats' => $stats,
-            'mine' => $mine,
-            'notes' => $notes,
-        ]);
+        View::render('home/contact', ['title' => 'Contact', 'fullBleed' => true], 'site');
+    }
+
+    public function fleet(): void
+    {
+        $vehicles = [];
+        $categories = [];
+        try {
+            $categories = Database::fetchAll('SELECT * FROM vehicle_categories WHERE is_active = 1 ORDER BY category_name');
+            $vehicles = Database::fetchAll(
+                "SELECT v.*, c.category_name FROM vehicles v
+                 JOIN vehicle_categories c ON c.category_id = v.category_id
+                 WHERE v.status <> 'inactive' ORDER BY c.category_name, v.daily_rate"
+            );
+        } catch (\Throwable) {
+            Http::flash('warning', 'Database is not ready. Run install.php first.');
+        }
+        View::render('home/fleet', [
+            'title' => 'Our fleet',
+            'vehicles' => $vehicles,
+            'categories' => $categories,
+            'fullBleed' => true,
+        ], 'site');
     }
 }
