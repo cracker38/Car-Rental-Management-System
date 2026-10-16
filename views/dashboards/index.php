@@ -1,4 +1,7 @@
-<section class="card card-body">
-  <h1 class="h4">Dashboard unavailable</h1>
-  <p class="mb-0">This account’s role does not have a configured dashboard. Contact a System Administrator to review the role assignment.</p>
-</section>
+<?php
+$dashboardSubtitle = 'Your workspace for Rent Car Rwanda.';
+$dashboardActions = [['route' => 'search', 'label' => 'Find a vehicle', 'icon' => 'bi-search']];
+require dirname(__DIR__) . '/partials/dashboard-heading.php';
+require dirname(__DIR__) . '/partials/kpis.php';
+require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
+require dirname(__DIR__) . '/partials/dashboard-notifications.php';

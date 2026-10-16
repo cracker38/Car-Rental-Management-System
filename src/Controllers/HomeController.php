@@ -107,8 +107,9 @@ final class HomeController
     {
         Auth::requireLogin();
         $user = Auth::user();
+        $role = (string) ($user['role_name'] ?? '');
         $data = (new DashboardService())->data($user ?? []);
-        View::render(DashboardService::templateFor((string) ($user['role_name'] ?? '')), $data + ['title' => 'Dashboard']);
+        View::render(DashboardService::templateFor($role), $data + ['title' => DashboardService::pageTitle($role)]);
     }
 
     public function about(): void

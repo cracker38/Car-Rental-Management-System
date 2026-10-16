@@ -608,3 +608,106 @@ html { scroll-behavior: smooth; }
   .search-results-heading > span { text-align: left; }
   .receipt-details > div { gap: .8rem; }
 }
+
+/* Workspace (role dashboards, ops pages) */
+.app-body { background: var(--rcr-paper); }
+.app-shell {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  min-height: 100vh;
+}
+.app-shell > .sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: 1.25rem 1rem 2rem;
+  background: #141618;
+  min-height: 100vh;
+}
+.app-shell .brand {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  margin-bottom: .85rem;
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+.app-shell .brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--rcr-orange);
+  color: #fff;
+}
+.sidebar-role { display: flex; flex-direction: column; gap: .15rem; margin: 0 0 1rem; padding: .85rem .9rem; border-radius: .7rem; background: rgba(255,255,255,.05); font-weight: 700; }
+.sidebar-role span { font-size: .75rem; font-weight: 500; color: #aeb1b3; }
+.app-shell .nav-label { margin: .85rem .4rem .35rem; color: #85898c; font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.app-shell .nav-link { display: flex; align-items: center; gap: .65rem; margin-bottom: .15rem; padding: .55rem .7rem; color: #c7c9ca; font-weight: 600; text-decoration: none; }
+.app-shell .nav-link i { width: 1.1rem; color: var(--rcr-orange); }
+.app-main { display: flex; flex-direction: column; min-width: 0; }
+.app-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+  background: #fff;
+  border-bottom: 1px solid #ece9e4;
+}
+.app-topbar .eyebrow { color: var(--rcr-orange); }
+.app-topbar-actions { display: flex; gap: .5rem; margin-left: auto; }
+.app-content { padding: 1.4rem 1.4rem 3rem; }
+.app-offcanvas, .app-offcanvas .sidebar { background: #141618; color: #fff; }
+.app-offcanvas .btn-close { filter: invert(1); }
+.dashboard-heading { display: flex; justify-content: space-between; align-items: end; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.dashboard-heading h1 { margin: 0; font-size: clamp(1.6rem, 3vw, 2.15rem); font-weight: 800; letter-spacing: -.04em; }
+.dashboard-heading-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dashboard-heading-actions .btn i { margin-right: .4rem; }
+.dashboard-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: .8rem;
+  margin-bottom: 1.5rem;
+}
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  min-height: 132px;
+  padding: 1rem 1.05rem;
+  border: 1px solid #ece9e4;
+  border-radius: .8rem;
+  background: #fff;
+  color: var(--rcr-ink);
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(26,28,30,.045);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.shortcut-card:hover { transform: translateY(-3px); color: var(--rcr-ink); border-color: #f4c49a; box-shadow: 0 16px 34px rgba(26,28,30,.08); }
+.shortcut-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 11px;
+  background: #fff1e4;
+  color: #d96300;
+  font-size: 1.1rem;
+}
+.shortcut-card strong { font-size: .95rem; font-weight: 800; }
+.shortcut-card span:last-child { color: var(--rcr-muted); font-size: .78rem; line-height: 1.4; }
+.kpi-card-link { display: block; color: inherit; text-decoration: none; }
+.kpi-card-link:hover { color: inherit; border-color: #f4c49a; }
+.page-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin-bottom: 1rem; }
+.table-panel { height: auto; }
+.invoice-hero h2 { margin: 0 0 .35rem; font-size: 1.7rem; font-weight: 800; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1.2rem 0; }
+.kpi-row span { display: block; color: var(--rcr-muted); font-size: .75rem; font-weight: 600; }
+.kpi-row strong { font-size: 1rem; }
+.momo-card { border-color: #f4c49a; background: linear-gradient(180deg, #fffaf4, #fff); }
+.empty-state { padding: 1.5rem; color: var(--rcr-muted); text-align: center; }
+.app-content .home-vehicle-photo { height: 170px; }
+@media (max-width: 991.98px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .app-content { padding: 1rem 1rem 2.5rem; }
+}

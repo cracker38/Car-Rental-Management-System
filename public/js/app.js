@@ -55,3 +55,22 @@ document.querySelectorAll('.home-nav .navbar-collapse .nav-link[href^="#"]').for
     }
   });
 });
+
+document.querySelectorAll('[data-payment-poll]').forEach(function (el) {
+  var pollUrl = el.getAttribute('data-payment-poll');
+  if (!pollUrl) return;
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries += 1;
+    fetch(pollUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data && data.ledger_status && data.ledger_status !== 'pending') {
+          clearInterval(timer);
+          window.location.reload();
+        }
+      })
+      .catch(function () {});
+    if (tries >= 40) clearInterval(timer);
+  }, 3000);
+});

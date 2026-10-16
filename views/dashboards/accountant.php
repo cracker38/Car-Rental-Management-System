@@ -1,17 +1,18 @@
 <?php
-$dashboardSubtitle = 'Track unpaid invoices, Mobile Money requests, and today’s receipts.';
+$dashboardSubtitle = 'Collect outstanding invoices, confirm Mobile Money, and post cash or refunds.';
 $dashboardActions = [
   ['route' => 'invoices', 'label' => 'Invoices', 'icon' => 'bi-receipt'],
-  ['route' => 'finance', 'label' => 'Payments', 'icon' => 'bi-wallet2'],
+  ['route' => 'finance/form', 'label' => 'Post payment', 'icon' => 'bi-plus-lg'],
   ['route' => 'reports', 'label' => 'Financial reports', 'icon' => 'bi-graph-up'],
 ];
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
 require dirname(__DIR__) . '/partials/kpis.php';
+require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
 ?>
-<div class="row g-4">
+<div class="row g-3">
   <div class="col-xl-8">
-    <section class="card card-body h-100">
-      <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0">Invoices needing attention</h2><a href="<?= e(url('invoices')) ?>">All invoices</a></div>
+    <section class="panel table-panel h-100">
+      <div class="panel-h d-flex justify-content-between">Invoices needing attention <a class="small fw-normal" href="<?= e(url('invoices')) ?>">All invoices</a></div>
       <?php if (!$invoices): ?><p class="text-muted mb-0">No invoices need attention.</p><?php else: ?>
         <div class="table-responsive"><table class="table align-middle mb-0">
           <thead><tr><th>Invoice</th><th>Customer</th><th>Total</th><th>Balance</th><th>Status</th></tr></thead>
@@ -25,15 +26,18 @@ require dirname(__DIR__) . '/partials/kpis.php';
     </section>
   </div>
   <div class="col-xl-4">
-    <section class="card card-body h-100">
-      <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0">Pending payments</h2><a href="<?= e(url('finance')) ?>">Payments</a></div>
+    <section class="panel h-100">
+      <div class="panel-h d-flex justify-content-between">Pending MoMo <a class="small fw-normal" href="<?= e(url('finance')) ?>">Ledger</a></div>
       <?php if (!$pendingPay): ?><p class="text-muted mb-0">No payment requests are waiting.</p><?php else: ?>
-        <ul class="list-group list-group-flush">
-          <?php foreach ($pendingPay as $payment): ?><li class="list-group-item px-0 d-flex justify-content-between gap-2">
-            <span><strong><?= e($payment['transaction_number']) ?></strong><small class="d-block text-muted"><?= e($payment['transaction_date']) ?></small></span>
-            <span class="text-end"><?= e(\Crms\Money::format($payment['amount'])) ?><small class="d-block text-muted"><?= e($payment['status']) ?></small></span>
-          </li><?php endforeach; ?>
-        </ul>
+        <?php foreach ($pendingPay as $payment): ?>
+          <div class="mini-row" <?= $payment['external_reference'] ? 'data-payment-poll="' . e(url('payments/status', ['id' => $payment['transaction_id']])) . '"' : '' ?>>
+            <strong><?= e($payment['transaction_number']) ?></strong>
+            <span><?= e(\Crms\Money::format($payment['amount'])) ?> · <?= e($payment['external_reference'] ?: 'No HDEV ref') ?></span>
+            <?php if ($payment['external_reference']): ?>
+              <form method="post" action="<?= e(url('payments/sync', ['id' => $payment['transaction_id']])) ?>"><?= \Crms\Csrf::field() ?><button class="btn btn-sm btn-outline-secondary mt-1">Check HDEV</button></form>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
       <?php endif; ?>
     </section>
   </div>
