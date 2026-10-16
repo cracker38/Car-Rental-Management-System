@@ -12,8 +12,10 @@ $stockPhotos = [
       <div class="hero-copy">
         <div class="hero-kicker"><span></span> Your journey starts in Rwanda</div>
         <p class="hero-phone"><i class="bi bi-telephone-fill" aria-hidden="true"></i><a href="tel:+250785354935">0785354935</a></p>
-        <h1>Car rental in Kigali, Rwanda — <span>4x4s, SUVs &amp; chauffeur hire</span></h1>
-        <p class="hero-brandline">Rent Car Rwanda</p>
+        <br><br>
+        <br><br><br><br>
+        <br><br><br><br>
+        <br><br>
         <p class="hero-description">Explore the beauty of Rwanda with confidence and ease. Find the right car for a city stay, a business trip, or the open road.</p>
         <div class="hero-actions">
           <a class="btn btn-hero-primary" href="#booking">Find your car <i class="bi bi-arrow-down-right" aria-hidden="true"></i></a>

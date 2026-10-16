@@ -233,11 +233,8 @@ a { color: var(--teal); }
 .hero-kicker, .eyebrow { color: var(--rcr-orange); font-size: .73rem; line-height: 1.2; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .hero-kicker { display: inline-flex; align-items: center; gap: .6rem; color: #fff; }
 .hero-kicker span { width: 7px; height: 7px; border-radius: 50%; background: var(--rcr-orange); box-shadow: 0 0 0 5px rgba(244,122,8,.2); }
-.hero-phone { margin: 1.15rem 0 .9rem; }
+.hero-phone { margin: 1.15rem 0 2rem; }
 .hero-phone a { display: inline-flex; gap: .5rem; align-items: center; padding: .28rem .75rem; background: var(--rcr-orange); color: #fff; text-decoration: none; font-size: clamp(1.25rem, 2.8vw, 2.2rem); line-height: 1.1; font-weight: 800; letter-spacing: .035em; }
-.hero-site h1 { max-width: 1050px; margin: 0 auto; color: #fff; font-size: clamp(2.35rem, 5.1vw, 5.1rem); line-height: 1.02; font-weight: 800; letter-spacing: -.055em; text-wrap: balance; }
-.hero-site h1 span { display: inline; }
-.hero-brandline { display: inline-block; margin: 1.15rem 0 .8rem; padding: .34rem .8rem .42rem; background: var(--rcr-orange); color: #fff; font-size: clamp(1.45rem, 3vw, 2.3rem); line-height: 1.1; font-weight: 500; }
 .hero-description { max-width: 850px; margin: .3rem auto 1.25rem; color: rgba(255,255,255,.92); font-size: clamp(1rem, 1.45vw, 1.28rem); line-height: 1.65; }
 .hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; }
 .btn-hero-primary, .btn-booking { display: inline-flex; align-items: center; justify-content: center; gap: .75rem; color: #fff; background: var(--rcr-orange); border: 1px solid var(--rcr-orange); font-weight: 700; transition: transform .2s ease, background .2s ease, box-shadow .2s ease; }
@@ -358,7 +355,7 @@ a { color: var(--teal); }
   .hero-content { padding: 7rem 1rem 4.8rem; }
   .hero-copy { margin-top: auto; margin-bottom: 1.35rem; }
   .hero-site h1 { font-size: clamp(2.3rem, 10vw, 3.7rem); }
-  .hero-phone { margin: 1rem 0 .75rem; }
+  .hero-phone { margin: 1rem 0 1.5rem; }
   .hero-description { max-width: 510px; font-size: .98rem; }
   .home-landing .booking-panel { padding: 1rem; }
   .booking-heading { margin-bottom: .8rem; }
