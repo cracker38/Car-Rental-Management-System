@@ -14,7 +14,7 @@ $vehicleImageAlt = $useCategoryPhoto
 ?>
 <article class="vehicle-card">
   <div class="vehicle-photo">
-    <img src="<?= e($vehicleImage) ?>" alt="<?= e($vehicleImageAlt) ?>">
+    <img class="<?= $useCategoryPhoto ? 'vehicle-local-photo' : '' ?>" src="<?= e($vehicleImage) ?>" alt="<?= e($vehicleImageAlt) ?>">
     <?= status_badge((string)($v['status'] ?? 'available')) ?>
   </div>
   <div class="vehicle-body">
