@@ -88,9 +88,9 @@ if (!function_exists('status_badge')) {
 }
 
 if (!function_exists('vehicle_img')) {
-    function vehicle_img(?string $path): string
+    function vehicle_img(?string $path, ?string $categoryName = null): string
     {
-        return \Crms\Ui::vehicleImage($path);
+        return \Crms\Ui::vehicleImage($path, $categoryName);
     }
 }
 

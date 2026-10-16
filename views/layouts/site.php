@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <?php $isHome = (string) ($_GET['r'] ?? 'home') === 'home'; ?>
   <meta name="theme-color" content="#1b1d1f">
-  <meta name="description" content="Discover Rwanda with Rent Car Rwanda. Book reliable 4x4s, SUVs and chauffeur-ready vehicles in Kigali.">
+  <meta name="description" content="<?= e($metaDescription ?? 'Discover Rwanda with Rent Car Rwanda. Book reliable 4x4s, SUVs and chauffeur-ready vehicles in Kigali.') ?>">
   <title><?= e($title ?? 'Rent Car Rwanda') ?> &middot; Car hire in Kigali</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

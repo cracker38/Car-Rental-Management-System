@@ -123,7 +123,11 @@ final class HomeController
 
     public function blog(): void
     {
-        View::render('home/blog', ['title' => 'Rwanda journal', 'fullBleed' => true], 'site');
+        View::render('home/blog', [
+            'title' => 'Rwanda travel journal',
+            'metaDescription' => 'Practical travel inspiration, local car hire guidance, and trip-planning tips for exploring Rwanda from Kigali.',
+            'fullBleed' => true,
+        ], 'site');
     }
 
     public function contact(): void

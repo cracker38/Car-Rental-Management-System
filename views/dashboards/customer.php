@@ -44,7 +44,7 @@ require dirname(__DIR__) . '/partials/kpis.php';
     <div class="row g-3">
       <?php foreach ($fleet as $vehicle): ?><div class="col-md-6 col-xl-4">
         <article class="card h-100 overflow-hidden">
-          <img src="<?= e(vehicle_img($vehicle['image_path'] ?? null)) ?>" alt="<?= e($vehicle['make'] . ' ' . $vehicle['model']) ?>" class="card-img-top" style="height:180px;object-fit:cover">
+          <img src="<?= e(vehicle_img($vehicle['image_path'] ?? null, $vehicle['category_name'] ?? null)) ?>" alt="<?= e($vehicle['make'] . ' ' . $vehicle['model']) ?>" class="card-img-top" style="height:180px;object-fit:cover">
           <div class="card-body"><small class="text-muted"><?= e($vehicle['category_name']) ?></small><h3 class="h6 mt-1"><?= e($vehicle['make'] . ' ' . $vehicle['model']) ?></h3><p class="mb-0"><?= e(\Crms\Money::format($vehicle['daily_rate'])) ?> / day</p></div>
         </article>
       </div><?php endforeach; ?>

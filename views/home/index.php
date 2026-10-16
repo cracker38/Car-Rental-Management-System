@@ -1,10 +1,3 @@
-<?php
-$stockPhotos = [
-    'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=1200&q=85',
-    'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=85',
-    'https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=1200&q=85',
-];
-?>
 <main class="home-landing">
   <section class="hero-site" id="home">
     <div class="hero-shade"></div>
@@ -14,8 +7,7 @@ $stockPhotos = [
         <p class="hero-phone"><i class="bi bi-telephone-fill" aria-hidden="true"></i><a href="tel:+250785354935">0785354935</a></p>
         <br><br>
         <br><br><br><br>
-        <br><br><br><br>
-        <br><br>
+        <br><br><br>
         <p class="hero-description">Explore the beauty of Rwanda with confidence and ease. Find the right car for a city stay, a business trip, or the open road.</p>
         <div class="hero-actions">
           <a class="btn btn-hero-primary" href="#booking">Find your car <i class="bi bi-arrow-down-right" aria-hidden="true"></i></a>
@@ -52,15 +44,14 @@ $stockPhotos = [
         <div class="fleet-empty"><i class="bi bi-car-front" aria-hidden="true"></i><h3>Our fleet is getting ready</h3><p>Check back soon or contact our Kigali team to plan your trip.</p><a class="btn btn-outline-dark" href="<?= e(url('contact')) ?>">Contact us</a></div>
       <?php else: ?>
         <div class="row g-4">
-          <?php foreach (array_slice($vehicles, 0, 3) as $index => $vehicle):
-            $fallbackPhoto = $stockPhotos[$index % count($stockPhotos)];
-            $imagePath = !empty($vehicle['image_path']) ? vehicle_img($vehicle['image_path']) : $fallbackPhoto;
+          <?php foreach (array_slice($vehicles, 0, 3) as $vehicle):
+            $imagePath = vehicle_img(null, $vehicle['category_name'] ?? null);
             $isAvailable = ($vehicle['status'] ?? '') === 'available';
           ?>
             <div class="col-md-6 col-lg-4">
               <article class="home-vehicle-card">
                 <a class="home-vehicle-photo" href="<?= e(url('search', ['category_id' => (int)$vehicle['category_id']])) ?>" aria-label="Find availability for <?= e(($vehicle['make'] ?? '') . ' ' . ($vehicle['model'] ?? '')) ?>">
-                  <img src="<?= e($imagePath) ?>" alt="<?= e(($vehicle['make'] ?? '') . ' ' . ($vehicle['model'] ?? '')) ?>" loading="lazy">
+                  <img src="<?= e($imagePath) ?>" alt="Example <?= e($vehicle['category_name'] ?? 'vehicle') ?> vehicle" loading="lazy">
                   <span class="vehicle-tag"><?= e($vehicle['category_name'] ?? 'Vehicle') ?></span>
                   <span class="vehicle-arrow"><i class="bi bi-arrow-up-right" aria-hidden="true"></i></span>
                 </a>

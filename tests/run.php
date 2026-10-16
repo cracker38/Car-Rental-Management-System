@@ -33,6 +33,18 @@ function expect($cond, string $name): void
 
 echo "=== Unit tests (no database required for most) ===\n";
 
+$fleetFallbacks = [
+    'Economy' => 'hatchback1.jpg',
+    'Sedan' => 'sedan1.jpg',
+    'SUV' => 'SUV3.jpg',
+    'Van' => 'van1.jpg',
+    'Luxury' => 'luxury car1.jpg',
+];
+foreach ($fleetFallbacks as $category => $photo) {
+    expect(is_file(dirname(__DIR__) . '/public/img/fleet/' . $photo), $category . ' fallback photo exists');
+    expect(\Crms\Ui::vehicleImage(null, $category) === asset('public/img/fleet/' . $photo), $category . ' vehicles use their local fleet photo');
+}
+
 $dashboardRoles = [
     'System Administrator' => 'dashboards/admin',
     'Business Manager' => 'dashboards/manager',

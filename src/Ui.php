@@ -5,7 +5,7 @@ namespace Crms;
 
 final class Ui
 {
-    public static function vehicleImage(?string $path): string
+    public static function vehicleImage(?string $path, ?string $categoryName = null): string
     {
         if ($path && (str_starts_with($path, 'http://') || str_starts_with($path, 'https://'))) {
             return $path;
@@ -16,7 +16,16 @@ final class Ui
                 return asset($path);
             }
         }
-        return asset('public/img/fleet/default.svg');
+        $category = strtolower(trim($categoryName ?? ''));
+        $fallback = match (true) {
+            str_contains($category, 'van') => 'van1.jpg',
+            str_contains($category, 'luxury') => 'luxury car1.jpg',
+            str_contains($category, 'suv'), str_contains($category, '4x4'), str_contains($category, 'crossover') => 'SUV3.jpg',
+            str_contains($category, 'sedan') => 'sedan1.jpg',
+            str_contains($category, 'economy'), str_contains($category, 'hatchback') => 'hatchback1.jpg',
+            default => 'crossover.jpg',
+        };
+        return asset('public/img/fleet/' . $fallback);
     }
 
     public static function statusClass(string $status): string

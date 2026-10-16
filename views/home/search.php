@@ -21,7 +21,7 @@
       <div class="search-results-heading"><div><p class="eyebrow">Your dates</p><h2><?= count($results) ?> <?= count($results) === 1 ? 'vehicle' : 'vehicles' ?> available</h2></div><span><?= e($pickup) ?> <i class="bi bi-arrow-right" aria-hidden="true"></i> <?= e($returnAt) ?></span></div>
       <?php if (!$results): ?><div class="fleet-empty"><i class="bi bi-calendar-x" aria-hidden="true"></i><h3>No vehicles match those dates</h3><p>Try a different period or adjust your filters. Our Kigali team can also help find an option.</p><a class="btn btn-outline-dark" href="<?= e(url('contact')) ?>">Contact us</a></div><?php endif; ?>
       <div class="row g-4">
-        <?php foreach ($results as $vehicle): $quote = $quotes[(int)$vehicle['vehicle_id']] ?? null; $manage = false; require dirname(__DIR__) . '/partials/vehicle-card.php'; ?>
+        <?php foreach ($results as $vehicle): $quote = $quotes[(int)$vehicle['vehicle_id']] ?? null; $manage = false; $useCategoryPhoto = true; require dirname(__DIR__) . '/partials/vehicle-card.php'; ?>
       <?php endforeach; ?>
       </div>
     <?php elseif (!$error): ?>

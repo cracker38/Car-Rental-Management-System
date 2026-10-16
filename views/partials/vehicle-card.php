@@ -3,10 +3,18 @@ $v = $vehicle;
 $quote = $quote ?? null;
 $pickup = $pickup ?? '';
 $returnAt = $returnAt ?? '';
+$useCategoryPhoto = $useCategoryPhoto ?? false;
+$categoryName = $v['category_name'] ?? 'vehicle';
+$vehicleImage = $useCategoryPhoto
+    ? vehicle_img(null, $categoryName)
+    : vehicle_img($v['image_path'] ?? null, $categoryName);
+$vehicleImageAlt = $useCategoryPhoto
+    ? 'Example ' . $categoryName . ' vehicle'
+    : trim(($v['make'] ?? '') . ' ' . ($v['model'] ?? ''));
 ?>
 <article class="vehicle-card">
   <div class="vehicle-photo">
-    <img src="<?= e(vehicle_img($v['image_path'] ?? null)) ?>" alt="<?= e(($v['make'] ?? '') . ' ' . ($v['model'] ?? '')) ?>">
+    <img src="<?= e($vehicleImage) ?>" alt="<?= e($vehicleImageAlt) ?>">
     <?= status_badge((string)($v['status'] ?? 'available')) ?>
   </div>
   <div class="vehicle-body">

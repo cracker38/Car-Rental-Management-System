@@ -7,7 +7,7 @@
     <?php endif; ?>
     <div class="row g-4">
       <?php foreach ($vehicles as $vehicle): ?>
-        <div class="col-md-6 col-lg-4"><?php $manage = !empty($user) && can('vehicles.manage'); $quote = null; $pickup = ''; $returnAt = ''; require dirname(__DIR__) . '/partials/vehicle-card.php'; ?></div>
+        <div class="col-md-6 col-lg-4"><?php $manage = !empty($user) && can('vehicles.manage'); $quote = null; $pickup = ''; $returnAt = ''; $useCategoryPhoto = true; require dirname(__DIR__) . '/partials/vehicle-card.php'; ?></div>
       <?php endforeach; ?>
     </div>
   </div>
