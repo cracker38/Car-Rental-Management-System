@@ -1,8 +1,6 @@
 <?php
 /**
- * HDEV Payment Gateway client (readable MIT-style wrapper).
- * Matches hdev_payment::api_id / api_key / pay / get_pay.
- * Official GitHub pay_parse.php is obfuscated eval; this project uses a clear cURL client instead.
+ * HDEV Payment Gateway client matching hdev_payment::api_id / api_key / pay / get_pay.
  */
 class hdev_payment
 {
@@ -55,23 +53,34 @@ class hdev_payment
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => '',
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => 'POST',
-            CURLOPT_POSTFIELDS => $fields,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Content-Type: application/x-www-form-urlencoded',
+            ],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
         ]);
         $response = curl_exec($curl);
+        $http = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
         $err = curl_error($curl);
         curl_close($curl);
         if ($response === false) {
-            return (object) ['status' => 'error', 'message' => $err !== '' ? $err : 'HDEV payment request failed.'];
+            return (object) ['status' => 'error', 'message' => $err !== '' ? $err : 'HDEV payment request failed.', 'http_code' => $http];
         }
         $decoded = json_decode($response);
         if (is_object($decoded) || is_array($decoded)) {
+            if (is_object($decoded) && !isset($decoded->http_code)) {
+                $decoded->http_code = $http;
+            }
             return $decoded;
         }
-        return (object) ['status' => 'error', 'message' => 'Unexpected HDEV payment response.', 'raw' => $response];
+        return (object) ['status' => 'error', 'message' => 'Unexpected HDEV payment response.', 'raw' => $response, 'http_code' => $http];
     }
 }

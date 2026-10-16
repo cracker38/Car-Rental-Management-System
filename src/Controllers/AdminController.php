@@ -11,6 +11,7 @@ use Crms\Rbac;
 use Crms\Settings;
 use Crms\View;
 use Crms\Services\BackupService;
+use Crms\Services\SmsService;
 
 final class AdminController
 {
@@ -37,6 +38,19 @@ final class AdminController
     {
         Rbac::require('settings.manage');
         if (Http::isPost()) {
+            if (Http::str('_action') === 'test_sms') {
+                $result = (new SmsService())->deliver(
+                    Http::str('test_phone'),
+                    Http::str('test_message') ?: 'Rent Car Rwanda SMS test from settings.'
+                );
+                Http::flash(
+                    $result['status'] === 'sent' ? 'success' : 'danger',
+                    $result['status'] === 'sent'
+                        ? 'HDEV accepted the test SMS.'
+                        : ('SMS was not sent: ' . ($result['error'] ?: $result['status']))
+                );
+                Http::redirect('admin/settings');
+            }
             $keys = [
                 'business_name', 'tax_rate_percent', 'default_deposit_amount', 'turnaround_minutes',
                 'extra_km_rate', 'included_km_per_day', 'late_fee_per_hour', 'reservation_confirmation_required',
@@ -48,7 +62,7 @@ final class AdminController
                 }
             }
             Audit::log('settings.updated', 'system_settings', null, 'Settings saved');
-            Http::flash('success', 'Settings saved. Pricing and availability use these values on the server.');
+            Http::flash('success', 'Settings saved. Pricing, SMS and availability use these values immediately.');
             Http::redirect('admin/settings');
         }
         foreach ([

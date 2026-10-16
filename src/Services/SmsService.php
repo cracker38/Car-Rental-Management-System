@@ -20,41 +20,41 @@ final class SmsService
         if (!$customer) {
             return;
         }
-        $tel = Phone::rwandaMobile($customer['phone'] ?? null);
-        $enabled = Settings::get('hdev_sms_enabled', 'true') === 'true';
-        $status = 'queued';
-        $error = null;
-        $sentAt = null;
-        if ($enabled && $tel) {
-            try {
-                HdevClient::smsReady();
-                $cfg = HdevClient::config();
-                $result = \hdev_sms::send($cfg['sms_sender_id'], $tel, $message);
-                $st = HdevClient::statusOf($result);
-                if ($st === 'success' || $st === 'pending' || $st === 'ok') {
-                    $status = 'sent';
-                    $sentAt = date('Y-m-d H:i:s');
-                } else {
-                    $status = 'failed';
-                    $error = substr((string) (is_object($result) ? ($result->message ?? $result->status ?? 'SMS rejected') : 'SMS rejected'), 0, 500);
-                }
-            } catch (Throwable $e) {
-                $status = 'failed';
-                $error = 'SMS gateway error';
-            }
-        } elseif (!$tel) {
-            $status = 'failed';
-            $error = 'Customer phone is not a valid Rwanda mobile number.';
-        }
-
+        $result = $this->deliver((string) ($customer['phone'] ?? ''), $message);
         Database::execute(
             'INSERT INTO notifications (user_id, customer_id, channel, notification_type, subject, message, related_entity_type, related_entity_id, status, sent_at, error_message)
              VALUES (?,?,\'sms\',?,?,?,?,?,?,?,?)',
             [
                 $customer['linked_user_id'] ?? null, $customerId, $type, $subject, $message,
-                $entity, $entityId, $status, $sentAt, $error,
+                $entity, $entityId, $result['status'], $result['sent_at'], $result['error'],
             ]
         );
-        Audit::log('sms.' . $status, 'notification', $entityId ? (string) $entityId : null, $type . ' to customer ' . $customerId);
+        Audit::log('sms.' . $result['status'], 'notification', $entityId ? (string) $entityId : null, $type . ' to customer ' . $customerId);
+    }
+
+    /** @return array{status:string,sent_at:?string,error:?string} */
+    public function deliver(string $phone, string $message): array
+    {
+        $tel = Phone::hdevTel($phone);
+        $enabled = Settings::get('hdev_sms_enabled', 'true') === 'true';
+        if (!$enabled) {
+            return ['status' => 'queued', 'sent_at' => null, 'error' => 'SMS is disabled in settings.'];
+        }
+        if (!$tel) {
+            return ['status' => 'failed', 'sent_at' => null, 'error' => 'Phone is not a valid Rwanda mobile number.'];
+        }
+        try {
+            HdevClient::smsReady();
+            $cfg = HdevClient::config();
+            $result = \hdev_sms::send($cfg['sms_sender_id'], $tel, $message);
+            $st = HdevClient::statusOf($result);
+            if (in_array($st, ['success', 'pending'], true)) {
+                return ['status' => 'sent', 'sent_at' => date('Y-m-d H:i:s'), 'error' => null];
+            }
+            $error = HdevClient::messageOf($result);
+            return ['status' => 'failed', 'sent_at' => null, 'error' => substr($error !== '' ? $error : 'SMS rejected by HDEV', 0, 500)];
+        } catch (Throwable $e) {
+            return ['status' => 'failed', 'sent_at' => null, 'error' => substr($e->getMessage(), 0, 500)];
+        }
     }
 }

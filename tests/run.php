@@ -89,10 +89,13 @@ expect((float) Money::sub('100000', '100000') === 0.0, 'full refund remaining is
 
 expect(Phone::rwandaMobile('0788123456') === '250788123456', 'normalize local MoMo number');
 expect(Phone::rwandaMobile('+250 788 123 456') === '250788123456', 'normalize +250 MoMo number');
+expect(Phone::hdevTel('250788123456') === '0788123456', 'HDEV expects local 07 number');
 expect(Phone::rwandaMobile('12345') === null, 'reject invalid phone');
 expect(HdevClient::statusOf((object) ['status' => 'success']) === 'success', 'HDEV success status mapping');
 expect(HdevClient::statusOf((object) ['status' => 'pending']) === 'pending', 'HDEV pending does not complete ledger');
 expect(HdevClient::statusOf((object) ['status' => 'failed']) === 'failed', 'HDEV failed status mapping');
+expect(HdevClient::statusOf((object) ['data' => ['status' => 'successful', 'amount' => 1000]]) === 'success', 'nested HDEV success');
+expect(HdevClient::accepted((object) ['status' => 'error', 'message' => 'pending later']) === false, 'error status is not accepted even if message mentions pending');
 
 echo "\n=== Optional database checks ===\n";
 try {

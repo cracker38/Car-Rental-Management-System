@@ -59,6 +59,7 @@ $routes = [
     'finance/form' => [FinanceController::class, 'form'],
     'payments/momo' => [PaymentController::class, 'momo'],
     'payments/sync' => [PaymentController::class, 'sync'],
+    'payments/status' => [PaymentController::class, 'status'],
     'payments/receipt' => [PaymentController::class, 'receipt'],
     'maintenance' => [MaintenanceController::class, 'index'],
     'admin/users' => [AdminController::class, 'users'],

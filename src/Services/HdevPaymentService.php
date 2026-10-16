@@ -24,7 +24,7 @@ final class HdevPaymentService
         if ((float) $amount <= 0) {
             throw new InvalidArgumentException('Amount must be greater than zero.');
         }
-        $tel = Phone::rwandaMobile((string) ($input['phone'] ?? ''));
+        $tel = Phone::hdevTel((string) ($input['phone'] ?? ''));
         if ($tel === null) {
             throw new InvalidArgumentException('Enter a valid Rwanda mobile number for MoMo (07xxxxxxxx).');
         }
@@ -74,33 +74,39 @@ final class HdevPaymentService
 
         HdevClient::paymentReady();
         $cfg = HdevClient::config();
-        $callback = $cfg['callback_url'];
+        $callback = trim($cfg['callback_url']);
         if ($callback === '') {
             $callback = $this->localCallbackFallback();
         }
         $pay = \hdev_payment::pay($tel, (int) round((float) $amount), $txRef, $callback);
         $st = HdevClient::statusOf($pay);
+        $gatewayMessage = HdevClient::messageOf($pay);
         Audit::log('hdev.pay_initiated', 'financial_transaction', (string) $row['transaction_id'], $txRef . ' ' . $st);
 
-        if ($st === 'failed' || $st === 'error') {
+        if (!HdevClient::accepted($pay)) {
+            $detail = $gatewayMessage !== '' ? $gatewayMessage : 'Check the phone number, amount and API credentials.';
             Database::execute(
                 "UPDATE financial_transactions SET status = 'failed', reason = CONCAT(COALESCE(reason,''), ?) WHERE transaction_id = ? AND status = 'pending'",
-                [' | gateway: request rejected', $row['transaction_id']]
+                [' | gateway: ' . substr($detail, 0, 180), $row['transaction_id']]
             );
-            throw new InvalidArgumentException('HDEV did not accept the payment request. Check the phone number, amount and API credentials.');
+            throw new InvalidArgumentException('HDEV did not accept the payment request. ' . $detail);
         }
 
-        (new SmsService())->sendToCustomer(
-            (int) $row['customer_id'],
-            'payment_prompt',
-            'MoMo payment requested',
-            'Approve MoMo of RWF ' . (int) $amount . ' for ' . $row['transaction_number'] . '. Ref ' . $txRef . '.',
-            'financial_transaction',
-            (int) $row['transaction_id']
-        );
-
         $verified = $this->settleByReference($txRef);
-        return $verified ?? Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$row['transaction_id']]);
+        $current = $verified ?? Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$row['transaction_id']]);
+
+        if (($current['status'] ?? '') === 'pending') {
+            (new SmsService())->sendToCustomer(
+                (int) $row['customer_id'],
+                'payment_prompt',
+                'MoMo payment requested',
+                'Approve MoMo of RWF ' . (int) $amount . ' for ' . $row['transaction_number'] . '. Dial and confirm the prompt on ' . $tel . '.',
+                'financial_transaction',
+                (int) $row['transaction_id']
+            );
+        }
+
+        return $current;
     }
 
     public function settleByReference(string $txRef): ?array
@@ -109,7 +115,22 @@ final class HdevPaymentService
         if ($txRef === '') {
             return null;
         }
-        return Database::transaction(function (PDO $pdo) use ($txRef) {
+
+        $existing = Database::fetch('SELECT * FROM financial_transactions WHERE external_reference = ?', [$txRef]);
+        if (!$existing) {
+            return null;
+        }
+        if ($existing['status'] !== 'pending') {
+            return $existing;
+        }
+
+        HdevClient::paymentReady();
+        $result = \hdev_payment::get_pay($txRef);
+        $st = HdevClient::statusOf($result);
+        $remoteAmount = HdevClient::remoteAmount($result);
+        $gatewayMessage = HdevClient::messageOf($result);
+
+        return Database::transaction(function (PDO $pdo) use ($txRef, $st, $remoteAmount, $gatewayMessage) {
             $stmt = $pdo->prepare('SELECT * FROM financial_transactions WHERE external_reference = ? FOR UPDATE');
             $stmt->execute([$txRef]);
             $row = $stmt->fetch();
@@ -122,12 +143,6 @@ final class HdevPaymentService
             if ($row['status'] !== 'pending') {
                 return $row;
             }
-
-            HdevClient::paymentReady();
-            $result = \hdev_payment::get_pay($txRef);
-            $st = HdevClient::statusOf($result);
-            $payload = is_object($result) ? (array) $result : (is_array($result) ? $result : []);
-            $remoteAmount = isset($payload['amount']) ? Money::round($payload['amount']) : null;
 
             if ($st === 'success') {
                 if ($remoteAmount !== null && (float) $remoteAmount !== (float) $row['amount']) {
@@ -142,26 +157,39 @@ final class HdevPaymentService
                     (new InvoiceService())->refreshPaymentStatus((int) $row['invoice_id']);
                 }
                 Audit::log('hdev.pay_completed', 'financial_transaction', (string) $row['transaction_id'], $txRef);
-                (new SmsService())->sendToCustomer(
-                    (int) $row['customer_id'],
-                    'payment_received',
-                    'Payment received',
-                    'Payment of RWF ' . (int) $row['amount'] . ' was confirmed. Ref ' . $txRef . '.',
-                    'financial_transaction',
-                    (int) $row['transaction_id']
-                );
-                return Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$row['transaction_id']]);
+                $completed = Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$row['transaction_id']]);
+                return $completed;
             }
 
             if ($st === 'failed') {
+                $note = $gatewayMessage !== '' ? ' | gateway: ' . substr($gatewayMessage, 0, 180) : '';
                 Database::execute(
-                    "UPDATE financial_transactions SET status = 'failed' WHERE transaction_id = ? AND status = 'pending'",
-                    [$row['transaction_id']]
+                    "UPDATE financial_transactions SET status = 'failed', reason = CONCAT(COALESCE(reason,''), ?) WHERE transaction_id = ? AND status = 'pending'",
+                    [$note, $row['transaction_id']]
                 );
                 Audit::log('hdev.pay_failed', 'financial_transaction', (string) $row['transaction_id'], $txRef, null, null, 'failure');
             }
+
             return Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$row['transaction_id']]);
         });
+    }
+
+    public function notifyIfCompleted(array $before, ?array $after): void
+    {
+        if (!$after || ($after['status'] ?? '') !== 'completed') {
+            return;
+        }
+        if (($before['status'] ?? '') === 'completed') {
+            return;
+        }
+        (new SmsService())->sendToCustomer(
+            (int) $after['customer_id'],
+            'payment_received',
+            'Payment received',
+            'Payment of RWF ' . (int) $after['amount'] . ' was confirmed. Ref ' . $after['external_reference'] . '.',
+            'financial_transaction',
+            (int) $after['transaction_id']
+        );
     }
 
     private function localCallbackFallback(): string

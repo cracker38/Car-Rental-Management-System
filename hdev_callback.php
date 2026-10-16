@@ -7,6 +7,7 @@ declare(strict_types=1);
  */
 require __DIR__ . '/src/bootstrap_callback.php';
 
+use Crms\Database;
 use Crms\Services\HdevPaymentService;
 
 header('Content-Type: application/json; charset=utf-8');
@@ -18,8 +19,8 @@ if (!is_array($json)) {
 }
 
 $ref = $_GET['tx_ref'] ?? $_GET['trx_ref'] ?? $_GET['transaction_ref'] ?? $_GET['ref']
-    ?? $_POST['tx_ref'] ?? $_POST['trx_ref'] ?? $_POST['transaction_ref']
-    ?? $json['tx_ref'] ?? $json['trx_ref'] ?? $json['transaction_ref'] ?? '';
+    ?? $_POST['tx_ref'] ?? $_POST['trx_ref'] ?? $_POST['transaction_ref'] ?? $_POST['ref']
+    ?? $json['tx_ref'] ?? $json['trx_ref'] ?? $json['transaction_ref'] ?? $json['ref'] ?? '';
 
 $ref = is_string($ref) ? trim($ref) : '';
 if ($ref === '') {
@@ -29,7 +30,12 @@ if ($ref === '') {
 }
 
 try {
-    $row = (new HdevPaymentService())->settleByReference($ref);
+    $before = Database::fetch('SELECT * FROM financial_transactions WHERE external_reference = ?', [$ref]);
+    $service = new HdevPaymentService();
+    $row = $service->settleByReference($ref);
+    if ($before && $row) {
+        $service->notifyIfCompleted($before, $row);
+    }
     echo json_encode([
         'status' => 'ok',
         'tx_ref' => $ref,

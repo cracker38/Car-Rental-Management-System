@@ -5,11 +5,12 @@ namespace Crms;
 
 final class View
 {
-    public static function render(string $template, array $data = [], string $layout = 'site'): void
+    public static function render(string $template, array $data = [], ?string $layout = null): void
     {
         $data['flashes'] = Http::flashes();
         $data['user'] = Auth::user();
         $data['title'] = $data['title'] ?? 'CRMS';
+        $layout = $layout ?? self::layoutFor($template, $data);
         extract($data, EXTR_SKIP);
         $viewFile = dirname(__DIR__) . '/views/' . $template . '.php';
         if (!is_file($viewFile)) {
@@ -22,5 +23,21 @@ final class View
         $content = ob_get_clean();
         $layoutFile = dirname(__DIR__) . '/views/layouts/' . $layout . '.php';
         require $layoutFile;
+    }
+
+    private static function layoutFor(string $template, array $data): string
+    {
+        if (!empty($data['fullBleed'])) {
+            return 'site';
+        }
+        $marketing = [
+            'home/index', 'home/search', 'home/fleet', 'home/about', 'home/services',
+            'home/blog', 'home/contact', 'auth/login', 'auth/register',
+            'errors/404', 'errors/403', 'payments/receipt',
+        ];
+        if (in_array($template, $marketing, true) || !Auth::user()) {
+            return 'site';
+        }
+        return 'app';
     }
 }

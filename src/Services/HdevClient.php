@@ -47,22 +47,59 @@ final class HdevClient
         \hdev_sms::endpoint($c['sms_endpoint']);
     }
 
-    public static function statusOf(object|array|null $result): string
+    public static function payload(object|array|null $result): array
     {
         if ($result === null) {
-            return 'error';
+            return [];
         }
         $row = is_array($result) ? $result : (array) $result;
-        $status = strtolower((string) ($row['status'] ?? $row['state'] ?? $row['message'] ?? ''));
-        if (in_array($status, ['success', 'successful', 'paid', 'completed', 'ok'], true)) {
+        $outerStatus = $row['status'] ?? null;
+        if (isset($row['data']) && (is_array($row['data']) || is_object($row['data']))) {
+            $data = (array) $row['data'];
+            unset($row['data']);
+            $row = array_merge($row, $data);
+            if (is_string($outerStatus) && $outerStatus !== '') {
+                $row['status'] = $outerStatus;
+            }
+        }
+        return $row;
+    }
+
+    public static function statusOf(object|array|null $result): string
+    {
+        $row = self::payload($result);
+        $status = strtolower(trim((string) ($row['status'] ?? $row['state'] ?? $row['payment_status'] ?? $row['transaction_status'] ?? '')));
+        if (in_array($status, ['success', 'successful', 'paid', 'completed', 'ok', '1', 'true'], true)) {
             return 'success';
         }
-        if (in_array($status, ['pending', 'processing', 'initiated'], true)) {
+        if (in_array($status, ['pending', 'processing', 'initiated', 'queued'], true)) {
             return 'pending';
         }
-        if (in_array($status, ['failed', 'fail', 'error', 'cancelled', 'canceled'], true)) {
+        if (in_array($status, ['failed', 'fail', 'error', 'cancelled', 'canceled', 'rejected', '0', 'false'], true)) {
             return 'failed';
         }
         return $status !== '' ? $status : 'error';
+    }
+
+    public static function messageOf(object|array|null $result): string
+    {
+        $row = self::payload($result);
+        $message = trim((string) ($row['message'] ?? $row['msg'] ?? $row['error'] ?? $row['description'] ?? ''));
+        return $message;
+    }
+
+    public static function accepted(object|array|null $result): bool
+    {
+        return in_array(self::statusOf($result), ['success', 'pending'], true);
+    }
+
+    public static function remoteAmount(object|array|null $result): ?string
+    {
+        $row = self::payload($result);
+        if (!isset($row['amount']) && !isset($row['paid_amount'])) {
+            return null;
+        }
+        $raw = $row['amount'] ?? $row['paid_amount'];
+        return \Crms\Money::round($raw);
     }
 }

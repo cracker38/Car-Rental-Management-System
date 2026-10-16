@@ -22,4 +22,14 @@ final class Phone
         }
         return null;
     }
+
+    /** HDEV MoMo/SMS APIs expect a local 07xxxxxxxx number. */
+    public static function hdevTel(?string $raw): ?string
+    {
+        $intl = self::rwandaMobile($raw);
+        if ($intl === null) {
+            return null;
+        }
+        return '0' . substr($intl, 3);
+    }
 }

@@ -1,7 +1,9 @@
 <section class="auth-wrap">
   <div class="container" style="max-width:720px">
     <div class="auth-card">
+      <p class="eyebrow">Get started</p>
       <h1 class="h3 mb-3">Create your hire account</h1>
+      <p class="text-muted">Use a Rwanda mobile number so invoices can send MoMo prompts and SMS updates.</p>
       <form method="post">
         <?= \Crms\Csrf::field() ?>
         <div class="row g-3">

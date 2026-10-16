@@ -15,6 +15,10 @@ final class PaymentController
     public function momo(): void
     {
         Auth::requireLogin();
+        if (!Http::isPost()) {
+            Http::flash('danger', 'Send the Mobile Money form to start a payment.');
+            Http::redirect('finance');
+        }
         $invoiceId = Http::int('invoice_id');
         $customerId = Http::int('customer_id');
         if ($invoiceId) {
@@ -46,9 +50,11 @@ final class PaymentController
                 'reason' => Http::str('reason') ?: 'HDEV mobile money',
             ]);
             if (($row['status'] ?? '') === 'completed') {
-                Http::flash('success', 'HDEV confirmed the payment. The ledger was updated.');
+                Http::flash('success', 'Mobile Money payment confirmed. The invoice and ledger are up to date.');
+            } elseif (($row['status'] ?? '') === 'failed') {
+                Http::flash('danger', 'HDEV rejected or failed the request. Check the phone number and try again.');
             } else {
-                Http::flash('success', 'MoMo prompt sent. Status stays pending until HDEV confirms (callback or Check status). Ref ' . ($row['external_reference'] ?? ''));
+                Http::flash('success', 'Approve the MoMo prompt on the phone. This page will refresh when HDEV confirms. Ref ' . ($row['external_reference'] ?? ''));
             }
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
@@ -62,24 +68,33 @@ final class PaymentController
     public function sync(): void
     {
         Auth::requireLogin();
+        if (!Http::isPost()) {
+            Http::flash('danger', 'Use Check status to refresh a pending payment.');
+            Http::redirect('finance');
+        }
         $id = Http::int('id');
         $row = Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$id]);
         if (!$row) {
             Http::flash('danger', 'Transaction not found.');
             Http::redirect('finance');
         }
-        if (Auth::isCustomer()) {
-            if ((int) $row['customer_id'] !== (int) Auth::customerId()) {
-                http_response_code(403);
-                exit('Forbidden');
-            }
-        } else {
-            Rbac::require('transactions.manage');
+        if (!$this->canAccess($row)) {
+            http_response_code(403);
+            \Crms\View::render('errors/403', ['title' => 'Forbidden']);
+            return;
         }
         try {
-            $updated = (new HdevPaymentService())->settleByReference((string) $row['external_reference']);
+            $service = new HdevPaymentService();
+            $updated = $service->settleByReference((string) $row['external_reference']);
+            $service->notifyIfCompleted($row, $updated);
             $status = $updated['status'] ?? $row['status'];
-            Http::flash($status === 'completed' ? 'success' : 'info', 'HDEV status: ' . $status . '.');
+            if ($status === 'completed') {
+                Http::flash('success', 'Payment confirmed by HDEV.');
+            } elseif ($status === 'failed') {
+                Http::flash('danger', 'HDEV reported this payment as failed.');
+            } else {
+                Http::flash('info', 'Still waiting for the customer to approve the MoMo prompt.');
+            }
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
         }
@@ -87,6 +102,41 @@ final class PaymentController
             Http::redirect('invoices/show', ['id' => $row['invoice_id']]);
         }
         Http::redirect('finance');
+    }
+
+    public function status(): void
+    {
+        Auth::requireLogin();
+        header('Content-Type: application/json; charset=utf-8');
+        $id = Http::int('id');
+        $row = Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$id]);
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['status' => 'error', 'message' => 'Not found']);
+            return;
+        }
+        if (!$this->canAccess($row)) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
+            return;
+        }
+        $updated = $row;
+        if ($row['status'] === 'pending' && $row['external_reference']) {
+            try {
+                $service = new HdevPaymentService();
+                $updated = $service->settleByReference((string) $row['external_reference']) ?? $row;
+                $service->notifyIfCompleted($row, $updated);
+            } catch (InvalidArgumentException $e) {
+                echo json_encode(['status' => 'error', 'ledger_status' => $row['status'], 'message' => $e->getMessage()]);
+                return;
+            }
+        }
+        echo json_encode([
+            'status' => 'ok',
+            'ledger_status' => $updated['status'] ?? $row['status'],
+            'transaction_id' => (int) ($updated['transaction_id'] ?? $id),
+            'reference' => $updated['external_reference'] ?? $row['external_reference'],
+        ]);
     }
 
     public function receipt(): void
@@ -118,5 +168,16 @@ final class PaymentController
             Http::redirect(!empty($row['invoice_id']) ? 'invoices/show' : 'finance', !empty($row['invoice_id']) ? ['id' => $row['invoice_id']] : []);
         }
         \Crms\View::render('payments/receipt', ['title' => 'Receipt ' . $row['transaction_number'], 'row' => $row]);
+    }
+
+    private function canAccess(array $row): bool
+    {
+        if (Auth::isCustomer()) {
+            return (int) $row['customer_id'] === (int) Auth::customerId();
+        }
+        if (Rbac::can('transactions.manage')) {
+            return true;
+        }
+        return !empty($row['invoice_id']) && Rbac::can('invoices.view');
     }
 }
