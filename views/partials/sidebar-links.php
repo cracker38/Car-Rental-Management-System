@@ -17,7 +17,8 @@ $isDriver = $role === 'Driver';
   <?php if (can('vehicles.view')): ?><a class="nav-link <?= nav_active('vehicles') ?>" href="<?= e(url('vehicles')) ?>"><i class="bi bi-car-front"></i> Vehicles</a><?php endif; ?>
   <?php if (can('customers.view')): ?><a class="nav-link <?= nav_active('customers') ?>" href="<?= e(url('customers')) ?>"><i class="bi bi-people"></i> Customers</a><?php endif; ?>
   <?php if (can('reservations.view')): ?><a class="nav-link <?= nav_active('reservations') ?>" href="<?= e(url('reservations')) ?>"><i class="bi bi-calendar3"></i> Reservations</a><?php endif; ?>
-  <?php if (can('rentals.manage')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-key"></i> Rentals</a><?php endif; ?>
+  <?php if (can('rentals.manage')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-key"></i> Rentals</a>
+  <?php elseif (can('inspections.manage')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-clipboard-check"></i> Return inspections</a><?php endif; ?>
   <?php if (can('invoices.view')): ?><a class="nav-link <?= nav_active('invoices') ?>" href="<?= e(url('invoices')) ?>"><i class="bi bi-receipt"></i> Invoices</a><?php endif; ?>
   <?php if (can('transactions.manage')): ?><a class="nav-link <?= nav_active('finance') ?>" href="<?= e(url('finance')) ?>"><i class="bi bi-wallet2"></i> Payments</a><?php endif; ?>
   <?php if (can('maintenance.manage')): ?><a class="nav-link <?= nav_active('maintenance') ?>" href="<?= e(url('maintenance')) ?>"><i class="bi bi-wrench-adjustable"></i> Maintenance</a><?php endif; ?>

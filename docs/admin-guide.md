@@ -9,7 +9,7 @@
 
 ## Accounts and permissions
 
-Use **Users & roles** to activate accounts and set a role. The seeded roles are System Administrator, Business Manager, Rental Officer, Accountant/Cashier, Vehicle Inspector/Maintenance Staff, Customer, and Driver. Permissions are assigned in `database/carrental.sql`; the System Administrator role receives all seeded permissions.
+Public registrations create active Customer accounts. To add staff, have each person register, then use **Users & roles** to activate the account and assign the correct role. The seeded roles are System Administrator, Business Manager, Rental Officer, Accountant/Cashier, Vehicle Inspector/Maintenance Staff, Customer, and Driver. Permissions are assigned in `database/carrental.sql`; the System Administrator role receives all seeded permissions. At least one active System Administrator must remain, and an administrator cannot change their own role or status.
 
 To give a driver schedule access, assign the Driver role to an active user, then create a driver record under **Drivers** and link that account. Driver records require a unique licence number. Assign drivers from a pending or confirmed reservation. A driver with an upcoming reservation cannot be deactivated until those assignments are removed or rescheduled.
 

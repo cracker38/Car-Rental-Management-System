@@ -16,23 +16,35 @@ final class RentalController
 {
     public function index(): void
     {
-        Rbac::require('rentals.manage');
+        $canManage = Rbac::can('rentals.manage');
+        $canInspect = Rbac::can('inspections.manage');
+        if (!$canManage && !$canInspect) {
+            Rbac::require('rentals.manage');
+        }
         $sql = 'SELECT rt.*, c.first_name, c.last_name, v.registration_no
                 FROM rentals rt
                 JOIN customers c ON c.customer_id = rt.customer_id
                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id';
         $params = [];
-        if (Auth::isCustomer()) {
+        if (!$canManage && $canInspect) {
+            $sql .= " WHERE rt.status = 'returned'";
+        } elseif (Auth::isCustomer()) {
             $sql .= ' WHERE rt.customer_id = ?';
             $params[] = Auth::customerId() ?: 0;
         }
         $sql .= ' ORDER BY rt.created_at DESC LIMIT 200';
-        View::render('rentals/index', ['title' => 'Rentals', 'rows' => Database::fetchAll($sql, $params)]);
+        View::render('rentals/index', [
+            'title' => $canManage ? 'Rentals' : 'Return inspections',
+            'rows' => Database::fetchAll($sql, $params),
+            'inspectOnly' => !$canManage && $canInspect,
+        ]);
     }
 
     public function show(): void
     {
-        Rbac::require('rentals.manage');
+        if (!Rbac::can('rentals.manage') && !Rbac::can('inspections.manage')) {
+            Rbac::require('rentals.manage');
+        }
         $id = Http::int('id');
         Rbac::assertCustomerOwns('rental', $id);
         $row = Database::fetch(
@@ -47,6 +59,11 @@ final class RentalController
         if (!$row) {
             http_response_code(404);
             View::render('errors/404', ['title' => 'Not found']);
+            return;
+        }
+        if (!Rbac::can('rentals.manage') && !in_array($row['status'], ['returned', 'inspected'], true)) {
+            http_response_code(403);
+            View::render('errors/403', ['title' => 'Forbidden']);
             return;
         }
         $inspections = Database::fetchAll('SELECT * FROM inspections WHERE rental_id = ? ORDER BY inspected_at', [$id]);

@@ -18,19 +18,57 @@ final class AdminController
     public function users(): void
     {
         Rbac::require('users.manage');
-        $users = Database::fetchAll('SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.created_at DESC');
-        $roles = Database::fetchAll('SELECT * FROM roles ORDER BY role_name');
         if (Http::isPost()) {
             $status = Http::str('status');
-            if (!in_array($status, ['active', 'inactive', 'suspended', 'pending'], true)) {
-                Http::flash('danger', 'Invalid status.');
+            $userId = Http::int('user_id');
+            $roleId = Http::int('role_id');
+            if ($userId < 1 || $roleId < 1 || !in_array($status, ['active', 'inactive', 'suspended', 'pending'], true)) {
+                Http::flash('danger', 'Choose a valid user, role, and status.');
             } else {
-                Database::execute('UPDATE users SET role_id = ?, status = ? WHERE user_id = ?', [Http::int('role_id'), $status, Http::int('user_id')]);
-                Audit::log('user.updated', 'user', (string) Http::int('user_id'));
-                Http::flash('success', 'User updated.');
+                $error = null;
+                Database::transaction(function () use ($userId, $roleId, $status, &$error): void {
+                    $target = Database::fetch(
+                        'SELECT u.user_id, u.role_id, u.status, r.role_name
+                         FROM users u JOIN roles r ON r.role_id = u.role_id
+                         WHERE u.user_id = ? FOR UPDATE',
+                        [$userId]
+                    );
+                    $newRole = Database::fetch('SELECT role_id, role_name FROM roles WHERE role_id = ?', [$roleId]);
+                    if (!$target || !$newRole) {
+                        $error = 'Choose an existing user and role.';
+                        return;
+                    }
+                    if ((int) $target['user_id'] === Auth::id()
+                        && ((int) $target['role_id'] !== $roleId || $target['status'] !== $status)) {
+                        $error = 'You cannot change your own role or status.';
+                        return;
+                    }
+                    if ($target['role_name'] === 'System Administrator' && $target['status'] === 'active'
+                        && ($newRole['role_name'] !== 'System Administrator' || $status !== 'active')) {
+                        $anotherAdmin = Database::fetch(
+                            "SELECT user_id FROM users
+                             WHERE role_id = ? AND status = 'active' AND user_id <> ?
+                             LIMIT 1 FOR UPDATE",
+                            [(int) $target['role_id'], $userId]
+                        );
+                        if (!$anotherAdmin) {
+                            $error = 'At least one active System Administrator must remain.';
+                            return;
+                        }
+                    }
+                    Database::execute('UPDATE users SET role_id = ?, status = ? WHERE user_id = ?', [$roleId, $status, $userId]);
+                    Audit::log('user.updated', 'user', (string) $userId);
+                });
+                if ($error !== null) {
+                    Http::flash('danger', $error);
+                } else {
+                    Http::flash('success', 'User updated.');
+                }
             }
             Http::redirect('admin/users');
         }
+        $users = Database::fetchAll('SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.created_at DESC');
+        $roles = Database::fetchAll('SELECT * FROM roles ORDER BY role_name');
         View::render('admin/users', ['title' => 'Users', 'users' => $users, 'roles' => $roles]);
     }
 

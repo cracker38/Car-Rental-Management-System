@@ -82,7 +82,8 @@ final class DriverController
                     c.first_name,c.last_name,c.phone,v.registration_no,v.make,v.model
              FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
              JOIN customers c ON c.customer_id=r.customer_id JOIN vehicles v ON v.vehicle_id=r.vehicle_id
-             WHERE da.driver_id=? ORDER BY r.pickup_datetime DESC LIMIT 200",
+             WHERE da.driver_id=? AND r.status IN ('pending','confirmed') AND r.return_datetime >= NOW()
+             ORDER BY r.pickup_datetime ASC LIMIT 200",
             [$driverId]
         ) : [];
         $drivers = $canManage ? Database::fetchAll("SELECT driver_id,first_name,last_name FROM drivers ORDER BY last_name,first_name") : [];

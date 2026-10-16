@@ -14,6 +14,7 @@ use Crms\Services\HdevClient;
 use Crms\Services\PricingService;
 use Crms\Services\ReservationService;
 use Crms\Services\RentalService;
+use Crms\Services\DashboardService;
 
 $failed = 0;
 $passed = 0;
@@ -31,6 +32,24 @@ function expect($cond, string $name): void
 }
 
 echo "=== Unit tests (no database required for most) ===\n";
+
+$dashboardRoles = [
+    'System Administrator' => 'dashboards/admin',
+    'Business Manager' => 'dashboards/manager',
+    'Rental Officer' => 'dashboards/rental-officer',
+    'Accountant/Cashier' => 'dashboards/accountant',
+    'Vehicle Inspector/Maintenance Staff' => 'dashboards/inspector',
+    'Customer' => 'dashboards/customer',
+    'Driver' => 'dashboards/driver',
+];
+$dashboardViews = [];
+foreach ($dashboardRoles as $roleName => $expectedTemplate) {
+    $template = DashboardService::templateFor($roleName);
+    $dashboardViews[] = $template;
+    expect($template === $expectedTemplate, $roleName . ' routes to its dashboard');
+    expect(is_file(dirname(__DIR__) . '/views/' . $template . '.php'), $roleName . ' dashboard view exists');
+}
+expect(count(array_unique($dashboardViews)) === count($dashboardRoles), 'each role has a distinct dashboard view');
 
 expect(!Period::overlaps('2026-10-01 10:00:00', '2026-10-03 10:00:00', '2026-10-03 10:00:00', '2026-10-05 10:00:00'), 'adjacent half-open periods do not overlap');
 expect(Period::overlaps('2026-10-01 10:00:00', '2026-10-03 10:00:00', '2026-10-03 09:59:00', '2026-10-05 10:00:00'), 'one-minute overlap is a conflict');
@@ -103,7 +122,30 @@ try {
     $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
     expect(in_array('reservations', $tables, true) && in_array('financial_transactions', $tables, true), 'core tables exist');
     $roles = $pdo->query('SELECT COUNT(*) FROM roles')->fetchColumn();
-    expect((int) $roles >= 6, 'roles seeded');
+    expect((int) $roles === 7, 'all seven roles seeded');
+    $rolePermissions = [
+        'System Administrator' => ['users.manage', 'settings.manage', 'audit.view'],
+        'Business Manager' => ['reports.operational', 'reports.financial', 'rentals.manage'],
+        'Rental Officer' => ['reservations.manage', 'rentals.manage', 'drivers.manage'],
+        'Accountant/Cashier' => ['invoices.manage', 'transactions.manage', 'reports.financial'],
+        'Vehicle Inspector/Maintenance Staff' => ['maintenance.manage', 'inspections.manage'],
+        'Customer' => ['reservations.view', 'invoices.view'],
+        'Driver' => ['drivers.schedule'],
+    ];
+    foreach ($rolePermissions as $roleName => $requiredPermissions) {
+        $stmt = $pdo->prepare(
+            'SELECT p.permission_key FROM role_permissions rp
+             JOIN roles r ON r.role_id = rp.role_id
+             JOIN permissions p ON p.permission_id = rp.permission_id
+             WHERE r.role_name = ?'
+        );
+        $stmt->execute([$roleName]);
+        $assigned = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        expect(count(array_diff($requiredPermissions, $assigned)) === 0, $roleName . ' has required permissions');
+        if ($roleName !== 'System Administrator') {
+            expect(!in_array('users.manage', $assigned, true), $roleName . ' cannot manage user roles');
+        }
+    }
 } catch (Throwable $e) {
     echo "SKIP  database not available (" . $e->getMessage() . ")\n";
 }

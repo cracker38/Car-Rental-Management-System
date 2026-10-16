@@ -1,4 +1,5 @@
-<div class="card table-responsive"><table class="table mb-0">
+<p class="text-muted">New customers can register from the website. To create a staff account, have the person register first, then assign their role here. Drivers also need a linked driver record.</p>
+<div class="card table-responsive"><table class="table align-middle mb-0">
   <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
   <tbody>
   <?php foreach ($users as $u): ?>
@@ -6,24 +7,25 @@
       <td><?= e($u['first_name'] . ' ' . $u['last_name']) ?></td>
       <td><?= e((string)$u['email']) ?></td>
       <td>
-        <form method="post" class="d-flex gap-1">
+        <?php $formId = 'user-form-' . (int) $u['user_id']; ?>
+        <form id="<?= e($formId) ?>" method="post">
           <?= \Crms\Csrf::field() ?>
           <input type="hidden" name="user_id" value="<?= (int)$u['user_id'] ?>">
-          <select class="form-select form-select-sm" name="role_id">
-            <?php foreach ($roles as $r): ?>
-              <option value="<?= (int)$r['role_id'] ?>" <?= $r['role_id'] === $u['role_id'] ? 'selected' : '' ?>><?= e($r['role_name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-          <select class="form-select form-select-sm" name="status">
-            <?php foreach (['active','inactive','suspended','pending'] as $s): ?>
-              <option value="<?= $s ?>" <?= $u['status'] === $s ? 'selected' : '' ?>><?= $s ?></option>
-            <?php endforeach; ?>
-          </select>
-          <button class="btn btn-sm btn-primary">Save</button>
         </form>
+        <select class="form-select form-select-sm" name="role_id" form="<?= e($formId) ?>" aria-label="Role for <?= e($u['email']) ?>">
+          <?php foreach ($roles as $r): ?>
+            <option value="<?= (int)$r['role_id'] ?>" <?= (int)$r['role_id'] === (int)$u['role_id'] ? 'selected' : '' ?>><?= e($r['role_name']) ?></option>
+          <?php endforeach; ?>
+        </select>
       </td>
-      <td><?= e($u['status']) ?></td>
-      <td></td>
+      <td>
+        <select class="form-select form-select-sm" name="status" form="<?= e($formId) ?>" aria-label="Status for <?= e($u['email']) ?>">
+          <?php foreach (['active','inactive','suspended','pending'] as $s): ?>
+            <option value="<?= $s ?>" <?= $u['status'] === $s ? 'selected' : '' ?>><?= $s ?></option>
+          <?php endforeach; ?>
+        </select>
+      </td>
+      <td><button class="btn btn-sm btn-primary" form="<?= e($formId) ?>">Save</button></td>
     </tr>
   <?php endforeach; ?>
   </tbody>

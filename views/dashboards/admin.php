@@ -1,4 +1,11 @@
-<p class="lead-muted">System overview — users, fleet health and recent security events.</p>
+<?php
+$dashboardSubtitle = 'Accounts, fleet health, and security activity.';
+$dashboardActions = [
+  ['route' => 'admin/users', 'label' => 'Manage users', 'icon' => 'bi-people'],
+  ['route' => 'admin/settings', 'label' => 'Settings', 'icon' => 'bi-sliders'],
+];
+require dirname(__DIR__) . '/partials/dashboard-heading.php';
+?>
 <?php require dirname(__DIR__) . '/partials/kpis.php'; ?>
 <div class="row g-3">
   <div class="col-lg-4">
@@ -31,3 +38,4 @@
     </div>
   </div>
 </div>
+<?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>

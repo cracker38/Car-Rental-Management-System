@@ -10,7 +10,16 @@ final class DashboardService
 {
     public static function templateFor(string $roleName): string
     {
-        return 'dashboards/index';
+        return match ($roleName) {
+            'System Administrator' => 'dashboards/admin',
+            'Business Manager' => 'dashboards/manager',
+            'Rental Officer' => 'dashboards/rental-officer',
+            'Accountant/Cashier' => 'dashboards/accountant',
+            'Vehicle Inspector/Maintenance Staff' => 'dashboards/inspector',
+            'Customer' => 'dashboards/customer',
+            'Driver' => 'dashboards/driver',
+            default => 'dashboards/index',
+        };
     }
 
     public function data(array $user): array
@@ -29,7 +38,7 @@ final class DashboardService
             'Vehicle Inspector/Maintenance Staff' => $base + $this->inspector(),
             'Customer' => $base + $this->customer(),
             'Driver' => $base + $this->driver(),
-            default => $base + $this->officer(),
+            default => $base,
         };
     }
 
@@ -177,7 +186,7 @@ final class DashboardService
              FROM drivers d JOIN driver_assignments da ON da.driver_id = d.driver_id
              JOIN reservations r ON r.reservation_id = da.reservation_id
              JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
-             WHERE d.user_id = ? AND r.status IN ('pending','confirmed')
+             WHERE d.user_id = ? AND r.status IN ('pending','confirmed') AND r.return_datetime >= NOW()
              ORDER BY r.pickup_datetime ASC LIMIT 100",
             [$userId]
         );

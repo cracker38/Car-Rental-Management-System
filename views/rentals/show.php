@@ -1,11 +1,13 @@
 <div class="card card-body mb-3">
   <h2 class="h5"><?= e($row['rental_number']) ?> · <?= e($row['reservation_code']) ?></h2>
   <p><?= e($row['first_name'] . ' ' . $row['last_name']) ?> · <?= e($row['registration_no']) ?></p>
-  <p>Agreement: <?= e($row['agreement_status']) ?> · Rental: <?= e($row['status']) ?></p>
-  <p>Base <?= e(\Crms\Money::format($row['base_amount'])) ?> · extras <?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?> · late <?= e(\Crms\Money::format($row['late_return_fee'])) ?> · damage <?= e(\Crms\Money::format($row['damage_fee'])) ?> · cleaning <?= e(\Crms\Money::format($row['cleaning_fee'])) ?></p>
-  <p class="mb-0"><strong>Final <?= e(\Crms\Money::format($row['final_amount'])) ?></strong></p>
+  <p>Rental: <?= e($row['status']) ?><?php if (can('rentals.manage')): ?> · Agreement: <?= e($row['agreement_status']) ?><?php endif; ?></p>
+  <?php if (can('rentals.manage')): ?>
+    <p>Base <?= e(\Crms\Money::format($row['base_amount'])) ?> · extras <?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?> · late <?= e(\Crms\Money::format($row['late_return_fee'])) ?> · damage <?= e(\Crms\Money::format($row['damage_fee'])) ?> · cleaning <?= e(\Crms\Money::format($row['cleaning_fee'])) ?></p>
+    <p class="mb-0"><strong>Final <?= e(\Crms\Money::format($row['final_amount'])) ?></strong></p>
+  <?php endif; ?>
 </div>
-<?php if ($row['agreement_terms']): ?>
+<?php if ($row['agreement_terms'] && can('rentals.manage')): ?>
   <pre class="bg-white p-3 border rounded small"><?= e($row['agreement_terms']) ?></pre>
 <?php endif; ?>
 
@@ -65,7 +67,7 @@
 </form>
 <?php endif; ?>
 
-<?php if ($invoice): ?>
+<?php if ($invoice && can('invoices.view')): ?>
   <p class="mt-3">Invoice <a href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>"><?= e($invoice['invoice_number']) ?></a></p>
 <?php endif; ?>
 
