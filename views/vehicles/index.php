@@ -1,10 +1,10 @@
-<p class="text-muted">These records power the public Fleet and Home pages. Change a photo, rate or status here and the website updates.</p>
-<form class="row g-2 mb-3" method="get">
+<form class="page-toolbar" method="get">
   <input type="hidden" name="r" value="vehicles">
-  <div class="col-md-4"><input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search registration, make, model"></div>
-  <div class="col-md-2"><button class="btn btn-outline-secondary">Filter</button></div>
+  <p class="text-muted mb-0 me-auto">These records power the public fleet. Change a photo, rate or status here and the website updates.</p>
+  <input class="form-control" style="max-width:280px" name="q" value="<?= e($q) ?>" placeholder="Search registration, make, model">
+  <button class="btn btn-outline-dark">Filter</button>
   <?php if (can('vehicles.manage')): ?>
-    <div class="col-md-6 text-md-end"><a class="btn btn-accent" href="<?= e(url('vehicles/form')) ?>">Add vehicle</a></div>
+    <a class="btn btn-primary" href="<?= e(url('vehicles/form')) ?>">Add vehicle</a>
   <?php endif; ?>
 </form>
 <div class="row g-4">

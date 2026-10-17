@@ -1,18 +1,28 @@
-<div class="card card-body mb-3">
-  <h2 class="h5"><?= e($row['rental_number']) ?> · <?= e($row['reservation_code']) ?></h2>
-  <p><?= e($row['first_name'] . ' ' . $row['last_name']) ?> · <?= e($row['registration_no']) ?></p>
-  <p>Rental: <?= e($row['status']) ?><?php if (can('rentals.manage')): ?> · Agreement: <?= e($row['agreement_status']) ?><?php endif; ?></p>
+<section class="panel invoice-hero mb-3">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div>
+      <p class="eyebrow mb-1">Rental</p>
+      <h2><?= e($row['rental_number']) ?></h2>
+      <p class="mb-0 text-muted"><?= e($row['reservation_code']) ?> · <?= e($row['first_name'] . ' ' . $row['last_name']) ?> · <?= e($row['registration_no']) ?></p>
+    </div>
+    <?= status_badge((string)$row['status']) ?>
+  </div>
   <?php if (can('rentals.manage')): ?>
-    <p>Base <?= e(\Crms\Money::format($row['base_amount'])) ?> · extras <?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?> · late <?= e(\Crms\Money::format($row['late_return_fee'])) ?> · damage <?= e(\Crms\Money::format($row['damage_fee'])) ?> · cleaning <?= e(\Crms\Money::format($row['cleaning_fee'])) ?></p>
-    <p class="mb-0"><strong>Final <?= e(\Crms\Money::format($row['final_amount'])) ?></strong></p>
+    <div class="kpi-row">
+      <div><span>Base</span><strong><?= e(\Crms\Money::format($row['base_amount'])) ?></strong></div>
+      <div><span>Extras</span><strong><?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?></strong></div>
+      <div><span>Late</span><strong><?= e(\Crms\Money::format($row['late_return_fee'])) ?></strong></div>
+      <div><span>Final</span><strong><?= e(\Crms\Money::format($row['final_amount'])) ?></strong></div>
+    </div>
+    <p class="small text-muted mb-0">Agreement: <?= e($row['agreement_status']) ?> · damage <?= e(\Crms\Money::format($row['damage_fee'])) ?> · cleaning <?= e(\Crms\Money::format($row['cleaning_fee'])) ?></p>
   <?php endif; ?>
-</div>
+</section>
 <?php if ($row['agreement_terms'] && can('rentals.manage')): ?>
   <pre class="bg-white p-3 border rounded small"><?= e($row['agreement_terms']) ?></pre>
 <?php endif; ?>
 
 <?php if ($row['status'] === 'scheduled' && can('rentals.manage') && !\Crms\Auth::isCustomer()): ?>
-<form method="post" action="<?= e(url('rentals/pickup', ['id' => $row['rental_id']])) ?>" class="card card-body mb-3">
+<form method="post" action="<?= e(url('rentals/pickup', ['id' => $row['rental_id']])) ?>" class="panel mb-3">
   <?= \Crms\Csrf::field() ?>
   <h3 class="h6">Pickup</h3>
   <div class="row g-2">
@@ -29,7 +39,7 @@
 <?php endif; ?>
 
 <?php if (in_array($row['status'], ['active','overdue'], true) && can('rentals.manage') && !\Crms\Auth::isCustomer()): ?>
-<form method="post" action="<?= e(url('rentals/return', ['id' => $row['rental_id']])) ?>" class="card card-body mb-3">
+<form method="post" action="<?= e(url('rentals/return', ['id' => $row['rental_id']])) ?>" class="panel mb-3">
   <?= \Crms\Csrf::field() ?>
   <h3 class="h6">Return</h3>
   <div class="row g-2">
@@ -46,7 +56,7 @@
 <?php endif; ?>
 
 <?php if ($row['status'] === 'returned' && can('inspections.manage')): ?>
-<form method="post" action="<?= e(url('rentals/inspect', ['id' => $row['rental_id']])) ?>" class="card card-body mb-3">
+<form method="post" action="<?= e(url('rentals/inspect', ['id' => $row['rental_id']])) ?>" class="panel mb-3">
   <?= \Crms\Csrf::field() ?>
   <h3 class="h6">Return inspection</h3>
   <div class="row g-2">

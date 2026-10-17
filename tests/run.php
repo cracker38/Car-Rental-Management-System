@@ -127,6 +127,13 @@ expect(HdevClient::statusOf((object) ['status' => 'pending']) === 'pending', 'HD
 expect(HdevClient::statusOf((object) ['status' => 'failed']) === 'failed', 'HDEV failed status mapping');
 expect(HdevClient::statusOf((object) ['data' => ['status' => 'successful', 'amount' => 1000]]) === 'success', 'nested HDEV success');
 expect(HdevClient::accepted((object) ['status' => 'error', 'message' => 'pending later']) === false, 'error status is not accepted even if message mentions pending');
+expect(\Crms\Services\DashboardService::templateFor('System Administrator') === 'dashboards/admin', 'admin dashboard template');
+expect(\Crms\Services\DashboardService::templateFor('Business Manager') === 'dashboards/manager', 'manager dashboard template');
+expect(\Crms\Services\DashboardService::templateFor('Rental Officer') === 'dashboards/rental-officer', 'officer dashboard template');
+expect(\Crms\Services\DashboardService::templateFor('Accountant/Cashier') === 'dashboards/accountant', 'cashier dashboard template');
+expect(\Crms\Services\DashboardService::templateFor('Vehicle Inspector/Maintenance Staff') === 'dashboards/inspector', 'inspector dashboard template');
+expect(\Crms\Services\DashboardService::templateFor('Customer') === 'dashboards/customer', 'customer dashboard template');
+expect(\Crms\Services\DashboardService::templateFor('Driver') === 'dashboards/driver', 'driver dashboard template');
 
 echo "\n=== Optional database checks ===\n";
 try {
