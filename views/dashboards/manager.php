@@ -1,8 +1,8 @@
 <?php
-$dashboardSubtitle = 'Monitor hire volume, returns, outstanding invoices, and fleet health.';
+$dashboardSubtitle = 'Business Performance — KPIs, outstanding invoices, returns, fleet utilisation, and officer activity.';
 $dashboardActions = [
   ['route' => 'reports', 'label' => 'Reports', 'icon' => 'bi-graph-up'],
-  ['route' => 'reservations', 'label' => 'Reservations', 'icon' => 'bi-calendar3'],
+  ['route' => 'reports', 'label' => 'Export CSV', 'icon' => 'bi-download', 'query' => ['export' => 'csv']],
   ['route' => 'rentals', 'label' => 'Rentals', 'icon' => 'bi-key'],
 ];
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
@@ -18,6 +18,18 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
       <?php foreach ($fleet as $f): ?>
         <div class="mini-row d-flex justify-content-between"><span><?= e(ucfirst((string)$f['status'])) ?> vehicles</span><strong><?= (int)$f['c'] ?></strong></div>
       <?php endforeach; ?>
+      <?php if (!empty($officers)): ?>
+        <p class="small text-muted mt-3 mb-1">Officer activity (7 days)</p>
+        <?php foreach ($officers as $officer): ?>
+          <div class="mini-row d-flex justify-content-between"><span><?= e($officer['first_name'] . ' ' . $officer['last_name']) ?></span><strong><?= (int)$officer['c'] ?></strong></div>
+        <?php endforeach; ?>
+      <?php endif; ?>
+      <?php if (!empty($maintAlerts)): ?>
+        <p class="small text-muted mt-3 mb-1">Maintenance alerts</p>
+        <?php foreach ($maintAlerts as $alert): ?>
+          <div class="mini-row"><strong><?= e($alert['registration_no']) ?></strong><span><?= e($alert['title']) ?> · <?= e($alert['status']) ?></span></div>
+        <?php endforeach; ?>
+      <?php endif; ?>
       <a class="btn btn-sm btn-outline-dark mt-3" href="<?= e(url('reports')) ?>">Open reports</a>
     </section>
   </div>

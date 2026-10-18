@@ -1,8 +1,8 @@
 <?php
-$dashboardSubtitle = 'Book a car, follow your trips, and pay invoices with MTN or Airtel MoMo.';
+$dashboardSubtitle = 'My Account — search, book, pay, and manage only your own records.';
 $dashboardActions = [
   ['route' => 'search', 'label' => 'Find a car', 'icon' => 'bi-search'],
-  ['route' => 'reservations', 'label' => 'My trips', 'icon' => 'bi-calendar3'],
+  ['route' => 'customers/profile', 'label' => 'My profile', 'icon' => 'bi-person'],
   ['route' => 'invoices', 'label' => 'My invoices', 'icon' => 'bi-receipt'],
 ];
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
@@ -38,6 +38,13 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
             </span>
           </div>
         <?php endforeach; ?>
+      <?php endif; ?>
+      <div class="mini-row d-flex justify-content-between mt-3"><span>Security deposit held</span><strong><?= e($deposit ?? '—') ?></strong></div>
+      <?php if (!empty($upcomingReturn)): ?>
+        <div class="mini-row"><strong>Next return</strong><span><?= e($upcomingReturn['registration_no']) ?> · <?= e($upcomingReturn['expected_return_datetime']) ?></span></div>
+      <?php endif; ?>
+      <?php if (!empty($profile)): ?>
+        <a class="btn btn-sm btn-outline-dark mt-3" href="<?= e(url('customers/profile')) ?>">Update <?= e($profile['first_name']) ?>'s contact details</a>
       <?php endif; ?>
     </section>
   </div>

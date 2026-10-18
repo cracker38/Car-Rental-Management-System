@@ -110,4 +110,28 @@ final class VehicleController
         );
         View::render('vehicles/show', ['title' => $vehicle['registration_no'], 'vehicle' => $vehicle, 'history' => $history]);
     }
+
+    public function flag(): void
+    {
+        Auth::requireLogin();
+        if (!Rbac::can('inspections.manage') && !Rbac::can('maintenance.manage')) {
+            Rbac::require('inspections.manage');
+        }
+        $id = Http::int('id');
+        $vehicle = Database::fetch('SELECT vehicle_id, registration_no, status FROM vehicles WHERE vehicle_id = ?', [$id]);
+        if (!$vehicle) {
+            http_response_code(404);
+            View::render('errors/404', ['title' => 'Not found']);
+            return;
+        }
+        if ($vehicle['status'] === 'inactive') {
+            Http::flash('danger', 'Inactive vehicles cannot be flagged.');
+            Http::redirect('vehicles/show', ['id' => $id]);
+        }
+        $note = Http::str('flag_note');
+        Database::execute("UPDATE vehicles SET status = 'maintenance' WHERE vehicle_id = ?", [$id]);
+        Audit::log('vehicle.flagged_unsafe', 'vehicle', (string) $id, trim($vehicle['registration_no'] . ' ' . $note));
+        Http::flash('success', $vehicle['registration_no'] . ' is flagged unavailable until maintenance is cleared.');
+        Http::redirect('vehicles/show', ['id' => $id]);
+    }
 }

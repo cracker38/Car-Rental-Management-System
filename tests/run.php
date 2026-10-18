@@ -134,6 +134,13 @@ expect(\Crms\Services\DashboardService::templateFor('Accountant/Cashier') === 'd
 expect(\Crms\Services\DashboardService::templateFor('Vehicle Inspector/Maintenance Staff') === 'dashboards/inspector', 'inspector dashboard template');
 expect(\Crms\Services\DashboardService::templateFor('Customer') === 'dashboards/customer', 'customer dashboard template');
 expect(\Crms\Services\DashboardService::templateFor('Driver') === 'dashboards/driver', 'driver dashboard template');
+expect(\Crms\Services\DashboardService::pageTitle('System Administrator') === 'System Overview', 'admin dashboard title');
+expect(\Crms\Services\DashboardService::pageTitle('Business Manager') === 'Business Performance', 'manager dashboard title');
+expect(\Crms\Services\DashboardService::pageTitle('Rental Officer') === 'Rental Operations', 'officer dashboard title');
+expect(\Crms\Services\DashboardService::pageTitle('Accountant/Cashier') === 'Financial Management', 'cashier dashboard title');
+expect(\Crms\Services\DashboardService::pageTitle('Vehicle Inspector/Maintenance Staff') === 'Fleet Inspection and Maintenance', 'inspector dashboard title');
+expect(\Crms\Services\DashboardService::pageTitle('Customer') === 'My Account', 'customer dashboard title');
+expect(\Crms\Services\DashboardService::pageTitle('Driver') === 'My Trips', 'driver dashboard title');
 
 echo "\n=== Optional database checks ===\n";
 try {

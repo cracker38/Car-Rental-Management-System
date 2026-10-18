@@ -56,7 +56,7 @@
 <?php endif; ?>
 
 <?php if ($row['status'] === 'returned' && can('inspections.manage')): ?>
-<form method="post" action="<?= e(url('rentals/inspect', ['id' => $row['rental_id']])) ?>" class="panel mb-3">
+<form method="post" action="<?= e(url('rentals/inspect', ['id' => $row['rental_id']])) ?>" class="panel mb-3" enctype="multipart/form-data">
   <?= \Crms\Csrf::field() ?>
   <h3 class="h6">Return inspection</h3>
   <div class="row g-2">
@@ -65,6 +65,7 @@
     <div class="col-md-3"><select class="form-select" name="exterior_condition"><option value="">Exterior</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
     <div class="col-md-3"><select class="form-select" name="interior_condition"><option value="">Interior</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
     <div class="col-12"><textarea class="form-control" name="damage_notes" placeholder="Damage notes"></textarea></div>
+    <div class="col-md-6"><label class="form-label">Condition photo</label><input class="form-control" type="file" name="photo" accept="image/jpeg,image/png,image/webp"></div>
   </div>
   <button class="btn btn-primary mt-2">Save inspection</button>
 </form>
@@ -84,6 +85,6 @@
 <h3 class="h6 mt-4">Inspections</h3>
 <ul>
   <?php foreach ($inspections as $i): ?>
-    <li><?= e($i['inspection_type']) ?> · <?= e($i['inspected_at']) ?> · <?= e((string)$i['odometer_reading']) ?> km</li>
+    <li><?= e($i['inspection_type']) ?> · <?= e($i['inspected_at']) ?> · <?= e((string)$i['odometer_reading']) ?> km<?php if (!empty($i['image_path'])): ?> · <a href="<?= e(asset($i['image_path'])) ?>" target="_blank" rel="noopener">Photo</a><?php endif; ?></li>
   <?php endforeach; ?>
 </ul>

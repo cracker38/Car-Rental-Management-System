@@ -17,7 +17,7 @@
 <?php endif; ?>
 <div class="panel table-panel">
   <div class="table-responsive"><table class="table align-middle mb-0">
-    <thead><tr><th>Booking</th><th>Pickup</th><th>Return</th><th>Customer</th><th>Vehicle</th><th>Locations</th><th>Status</th></tr></thead>
+    <thead><tr><th>Booking</th><th>Pickup</th><th>Return</th><th>Customer</th><th>Vehicle</th><th>Locations</th><th>Progress</th></tr></thead>
     <tbody>
     <?php if (!$rows): ?><tr><td colspan="7"><div class="empty-state"><?= $driverId ? 'No assigned trips found.' : 'Select a driver to view the schedule.' ?></div></td></tr><?php endif; ?>
     <?php foreach ($rows as $row): ?>
@@ -28,7 +28,12 @@
         <td><?= e($row['first_name'] . ' ' . $row['last_name']) ?><br><a href="tel:<?= e($row['phone']) ?>"><?= e($row['phone']) ?></a></td>
         <td><?= e($row['make'] . ' ' . $row['model']) ?><br><small><?= e($row['registration_no']) ?></small></td>
         <td><?= e($row['pickup_location'] ?: 'Not set') ?> → <?= e($row['return_location'] ?: 'Not set') ?></td>
-        <td><?= status_badge($row['reservation_status']) ?></td>
+        <td>
+          <?= status_badge((string)($row['trip_status'] ?? $row['reservation_status'])) ?>
+          <?php if (!$canManage): ?>
+            <?php $trip = $row; $back = 'schedule'; require dirname(__DIR__) . '/partials/driver-trip-form.php'; ?>
+          <?php endif; ?>
+        </td>
       </tr>
     <?php endforeach; ?>
     </tbody>

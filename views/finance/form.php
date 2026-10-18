@@ -46,7 +46,7 @@
           </select>
         </div>
         <div class="col-md-6"><label class="form-label">Rental ID (optional)</label><input class="form-control" name="rental_id"></div>
-        <div class="col-12"><label class="form-label">Reason</label><input class="form-control" name="reason"></div>
+        <div class="col-12"><label class="form-label">Reason</label><input class="form-control" name="reason" placeholder="Required for refunds, deductions and adjustments"></div>
       </div>
       <button class="btn btn-primary mt-3">Post ledger</button>
     </form>

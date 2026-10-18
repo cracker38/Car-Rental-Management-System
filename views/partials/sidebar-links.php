@@ -10,6 +10,7 @@ $isDriver = $role === 'Driver';
   <a class="nav-link <?= nav_active('fleet') ?>" href="<?= e(url('fleet')) ?>"><i class="bi bi-car-front"></i> Browse fleet</a>
   <a class="nav-link <?= nav_active('reservations') ?>" href="<?= e(url('reservations')) ?>"><i class="bi bi-journal-text"></i> My trips</a>
   <a class="nav-link <?= nav_active('invoices') ?>" href="<?= e(url('invoices')) ?>"><i class="bi bi-receipt"></i> My invoices</a>
+  <a class="nav-link <?= nav_active('customers/profile') ?>" href="<?= e(url('customers/profile')) ?>"><i class="bi bi-person"></i> My profile</a>
 <?php elseif ($isDriver): ?>
   <?php if (can('drivers.schedule')): ?><a class="nav-link <?= nav_active('drivers/schedule') ?>" href="<?= e(url('drivers/schedule')) ?>"><i class="bi bi-calendar2-week"></i> My schedule</a><?php endif; ?>
 <?php else: ?>

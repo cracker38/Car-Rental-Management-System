@@ -77,7 +77,8 @@ final class DriverController
             $driverId = (int)($driver['driver_id'] ?? 0);
         }
         $rows = $driverId ? Database::fetchAll(
-            "SELECT da.assignment_id, da.notes AS assignment_notes, r.reservation_code, r.pickup_datetime, r.return_datetime,
+            "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report,
+                    r.reservation_code, r.pickup_datetime, r.return_datetime,
                     r.pickup_location, r.return_location, r.status AS reservation_status,
                     c.first_name,c.last_name,c.phone,v.registration_no,v.make,v.model
              FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
@@ -88,5 +89,20 @@ final class DriverController
         ) : [];
         $drivers = $canManage ? Database::fetchAll("SELECT driver_id,first_name,last_name FROM drivers ORDER BY last_name,first_name") : [];
         View::render('drivers/schedule', ['title' => $canManage ? 'Driver schedule' : 'My schedule', 'rows' => $rows, 'drivers' => $drivers, 'driverId' => $driverId, 'canManage' => $canManage]);
+    }
+
+    public function trip(): void
+    {
+        Rbac::require('drivers.schedule');
+        if (!Http::isPost()) {
+            Http::redirect('dashboard');
+        }
+        try {
+            (new DriverService())->updateTrip(Http::int('assignment_id'), Http::str('trip_status'), Http::str('incident_report'));
+            Http::flash('success', 'Trip progress saved.');
+        } catch (InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+        }
+        Http::redirect(Http::str('back') === 'schedule' ? 'drivers/schedule' : 'dashboard');
     }
 }

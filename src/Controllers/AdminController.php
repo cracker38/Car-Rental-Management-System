@@ -183,6 +183,27 @@ final class AdminController
                 [$dateFrom, $dateTo]
             );
         }
+        if (Http::str('export') === 'csv') {
+            $filename = 'crms-report-' . $dateFrom . '-' . $dateTo . '.csv';
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            $out = fopen('php://output', 'w');
+            if ($fin) {
+                fputcsv($out, ['Financial summary', $dateFrom, $dateTo]);
+                fputcsv($out, ['Completed payments', $fin['payments']]);
+                fputcsv($out, ['Refunds', $fin['refunds']]);
+                fputcsv($out, ['Deposits received', $fin['deposits']]);
+                fputcsv($out, []);
+            }
+            if ($ops) {
+                fputcsv($out, ['Vehicle', 'Status', 'Confirmed bookings', 'Rentals']);
+                foreach ($ops as $row) {
+                    fputcsv($out, [$row['registration_no'], $row['status'], $row['confirmed_bookings'], $row['live_rentals']]);
+                }
+            }
+            fclose($out);
+            exit;
+        }
         View::render('admin/reports', ['title' => 'Reports', 'ops' => $ops, 'fin' => $fin, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo]);
     }
 }

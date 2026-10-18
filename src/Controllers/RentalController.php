@@ -7,6 +7,7 @@ use Crms\Auth;
 use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
+use Crms\Upload;
 use Crms\View;
 use Crms\Services\InvoiceService;
 use Crms\Services\RentalService;
@@ -132,6 +133,7 @@ final class RentalController
     {
         Rbac::require('inspections.manage');
         try {
+            $image = Upload::image($_FILES['photo'] ?? ['error' => UPLOAD_ERR_NO_FILE], 'inspections');
             (new RentalService())->recordInspection(Http::int('id'), [
                 'odometer_reading' => Http::str('odometer_reading'),
                 'fuel_level_percent' => Http::str('fuel_level_percent'),
@@ -140,9 +142,12 @@ final class RentalController
                 'cleanliness' => Http::str('cleanliness') ?: null,
                 'damage_notes' => Http::str('damage_notes'),
                 'notes' => Http::str('notes'),
+                'image_path' => $image,
             ]);
             Http::flash('success', 'Return inspection saved.');
         } catch (InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+        } catch (\RuntimeException $e) {
             Http::flash('danger', $e->getMessage());
         }
         Http::redirect('rentals/show', ['id' => Http::int('id')]);

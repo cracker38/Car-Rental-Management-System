@@ -1,9 +1,9 @@
 <?php
-$dashboardSubtitle = 'Users, fleet, payments, SMS, and security for Rent Car Rwanda.';
+$dashboardSubtitle = 'System Overview — accounts, backups, audit, and company records. Payments stay in the ledger until staff post them.';
 $dashboardActions = [
-  ['route' => 'admin/users', 'label' => 'Manage users', 'icon' => 'bi-people'],
-  ['route' => 'admin/settings', 'label' => 'Settings', 'icon' => 'bi-sliders'],
-  ['route' => 'reports', 'label' => 'Reports', 'icon' => 'bi-graph-up'],
+  ['route' => 'admin/users', 'label' => 'Users & roles', 'icon' => 'bi-people'],
+  ['route' => 'admin/audit', 'label' => 'Audit', 'icon' => 'bi-shield-check'],
+  ['route' => 'admin/backup', 'label' => 'Backup', 'icon' => 'bi-hdd'],
 ];
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
 require dirname(__DIR__) . '/partials/kpis.php';
@@ -17,7 +17,9 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
       <?php foreach ($fleet as $f): ?>
         <div class="mini-row d-flex justify-content-between"><span><?= status_badge($f['status']) ?></span><strong><?= (int)$f['c'] ?></strong></div>
       <?php endforeach; ?>
-      <a class="btn btn-sm btn-primary mt-3" href="<?= e(url('vehicles')) ?>">Manage fleet</a>
+      <div class="mini-row d-flex justify-content-between mt-2"><span>Completed payments (view)</span><strong><?= e($paymentsView ?? '—') ?></strong></div>
+      <div class="mini-row d-flex justify-content-between"><span>Open maintenance</span><strong><?= (int)($openMaint ?? 0) ?></strong></div>
+      <a class="btn btn-sm btn-outline-dark mt-3" href="<?= e(url('vehicles')) ?>">View fleet records</a>
     </div>
   </div>
   <div class="col-lg-4">

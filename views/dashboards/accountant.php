@@ -1,9 +1,9 @@
 <?php
-$dashboardSubtitle = 'Collect outstanding invoices, confirm Mobile Money, and post cash or refunds.';
+$dashboardSubtitle = 'Financial Management — invoices, payments, receipts, deposits, refunds, and reconciliation.';
 $dashboardActions = [
   ['route' => 'invoices', 'label' => 'Invoices', 'icon' => 'bi-receipt'],
   ['route' => 'finance/form', 'label' => 'Post payment', 'icon' => 'bi-plus-lg'],
-  ['route' => 'reports', 'label' => 'Financial reports', 'icon' => 'bi-graph-up'],
+  ['route' => 'reports', 'label' => 'Finance reports', 'icon' => 'bi-graph-up'],
 ];
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
 require dirname(__DIR__) . '/partials/kpis.php';
@@ -38,6 +38,23 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
+      <?php endif; ?>
+      <div class="mini-row d-flex justify-content-between mt-3"><span>Held deposits</span><strong><?= e($deposits ?? '—') ?></strong></div>
+    </section>
+  </div>
+  <div class="col-12">
+    <section class="panel table-panel">
+      <div class="panel-h">Overdue invoices</div>
+      <?php if (empty($overdue)): ?><p class="text-muted mb-0">No overdue balances.</p><?php else: ?>
+        <div class="table-responsive"><table class="table align-middle mb-0">
+          <thead><tr><th>Invoice</th><th>Customer</th><th>Due</th><th>Balance</th></tr></thead>
+          <tbody><?php foreach ($overdue as $item): ?><tr>
+            <td><a href="<?= e(url('invoices/show', ['id' => $item['invoice_id']])) ?>"><?= e($item['invoice_number']) ?></a></td>
+            <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td>
+            <td><?= e($item['due_date']) ?></td>
+            <td><?= e(\Crms\Money::format($item['outstanding_balance'] ?? 0)) ?></td>
+          </tr><?php endforeach; ?></tbody>
+        </table></div>
       <?php endif; ?>
     </section>
   </div>

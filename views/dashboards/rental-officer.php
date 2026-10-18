@@ -1,5 +1,5 @@
 <?php
-$dashboardSubtitle = 'Confirm bookings, run pickups, and assign chauffeurs from the front desk.';
+$dashboardSubtitle = 'Rental Operations — customers, availability, reservations, agreements, pickup and return.';
 $dashboardActions = [
   ['route' => 'reservations/form', 'label' => 'New reservation', 'icon' => 'bi-plus-circle'],
   ['route' => 'reservations', 'label' => 'All reservations', 'icon' => 'bi-calendar3'],

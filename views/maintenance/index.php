@@ -14,6 +14,7 @@
     <div class="col-md-3"><label class="form-label">Expected completion</label><input class="form-control" type="date" name="expected_completion_date"></div>
     <div class="col-md-3"><label class="form-label">Cost (RWF)</label><input class="form-control" name="cost" value="0"></div>
     <div class="col-md-3"><label class="form-label">Odometer</label><input class="form-control" name="odometer_reading" placeholder="Odometer"></div>
+    <div class="col-md-3"><label class="form-label">Next service</label><input class="form-control" type="date" name="next_service_date"></div>
     <div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><option value="scheduled">scheduled</option><option value="in_progress">in progress</option></select></div>
   </div>
   <button class="btn btn-primary mt-3">Save job</button>

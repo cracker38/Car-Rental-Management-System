@@ -1,5 +1,5 @@
 <?php
-$dashboardSubtitle = 'Inspect returned cars, keep the workshop moving, and watch certificate dates.';
+$dashboardSubtitle = 'Fleet Inspection and Maintenance — condition photos, servicing, and unsafe-vehicle flags.';
 $dashboardActions = [
   ['route' => 'rentals', 'label' => 'Return inspections', 'icon' => 'bi-clipboard-check'],
   ['route' => 'maintenance', 'label' => 'Maintenance', 'icon' => 'bi-wrench-adjustable'],
@@ -49,6 +49,21 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
             <td><?= e($item['make'] . ' ' . $item['model']) ?></td>
             <td><?= e($item['inspection_expiry_date']) ?></td>
             <td><a class="btn btn-sm btn-outline-dark" href="<?= e(url('vehicles/show', ['id' => $item['vehicle_id']])) ?>">Open</a></td>
+          </tr><?php endforeach; ?></tbody>
+        </table></div>
+      <?php endif; ?>
+    </section>
+  </div>
+  <div class="col-12">
+    <section class="panel table-panel">
+      <div class="panel-h">Next service dates</div>
+      <?php if (empty($nextService)): ?><p class="text-muted mb-0">No services fall due in the next three weeks.</p><?php else: ?>
+        <div class="table-responsive"><table class="table align-middle mb-0">
+          <thead><tr><th>Vehicle</th><th>Job</th><th>Next service</th></tr></thead>
+          <tbody><?php foreach ($nextService as $item): ?><tr>
+            <td><?= e($item['registration_no']) ?></td>
+            <td><?= e($item['title']) ?></td>
+            <td><?= e($item['next_service_date']) ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>
