@@ -405,7 +405,9 @@ final class DashboardService
                  ORDER BY CASE WHEN i.status = 'draft' THEN 0 ELSE 1 END, i.issue_date DESC LIMIT 10"
             ),
             'unbilledRentals' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, c.first_name, c.last_name
+                "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, rt.expected_return_datetime,
+                        rt.extra_mileage_fee, rt.late_return_fee, rt.damage_fee, rt.cleaning_fee, rt.other_charges,
+                        rt.return_notes, c.first_name, c.last_name
                  FROM rentals rt JOIN customers c ON c.customer_id = rt.customer_id
                  WHERE rt.status = 'closed' AND NOT EXISTS (
                    SELECT 1 FROM invoices i WHERE i.rental_id = rt.rental_id AND i.status <> 'void'

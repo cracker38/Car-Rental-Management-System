@@ -38,17 +38,21 @@ final class VehicleController
         Rbac::require('vehicles.manage');
         $rentalOfficer = (Auth::user()['role_name'] ?? '') === 'Rental Officer';
         $id = Http::int('id');
-        $vehicle = $id ? Database::fetch('SELECT * FROM vehicles WHERE vehicle_id = ?', [$id]) : null;
+        $vehicle = $id ? Database::fetch('SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.vehicle_id = ?', [$id]) : null;
         $categories = Database::fetchAll('SELECT * FROM vehicle_categories ORDER BY category_name');
         if (Http::isPost()) {
             $v = new Validator();
-            $required = ['category_id', 'registration_no', 'make', 'model'];
+            $categoryId = $rentalOfficer && $vehicle ? (int) $vehicle['category_id'] : Http::int('category_id');
+            $required = ['registration_no', 'make', 'model'];
+            if (!$rentalOfficer || !$vehicle) {
+                $required[] = 'category_id';
+            }
             if (!$rentalOfficer) {
                 $required[] = 'daily_rate';
             }
             $v->require($_POST, $required);
             $categoryIds = array_map(static fn(array $category): string => (string) $category['category_id'], $categories);
-            $v->in('category_id', (string) Http::int('category_id'), $categoryIds);
+            $v->in('category_id', (string) $categoryId, $categoryIds);
             if (!$rentalOfficer) {
                 $v->in('status', Http::str('status'), ['available', 'reserved', 'rented', 'maintenance', 'inactive']);
                 $v->decimal('daily_rate', Http::str('daily_rate'));
@@ -65,7 +69,7 @@ final class VehicleController
             if ($v->ok()) {
                 $selectedCategory = null;
                 foreach ($categories as $category) {
-                    if ((int) $category['category_id'] === Http::int('category_id')) {
+                    if ((int) $category['category_id'] === $categoryId) {
                         $selectedCategory = $category;
                         break;
                     }
@@ -92,24 +96,30 @@ final class VehicleController
                         $weeklyRate = $vehicle['weekly_rate'];
                         $monthlyRate = $vehicle['monthly_rate'];
                         $status = $vehicle['status'];
+                        $currentMileage = (int) $vehicle['current_mileage'];
+                        $vehicleFuelLevel = $vehicle['fuel_level_percent'];
                     } else {
                         $dailyRate = $selectedCategory['default_daily_rate'];
                         $weeklyRate = $selectedCategory['default_weekly_rate'];
                         $monthlyRate = $selectedCategory['default_monthly_rate'];
                         $status = 'available';
+                        $currentMileage = Http::int('current_mileage');
+                        $vehicleFuelLevel = Http::str('fuel_level_percent') !== '' ? Http::str('fuel_level_percent') : null;
                     }
                 } else {
                     $dailyRate = Http::str('daily_rate');
                     $weeklyRate = Http::str('weekly_rate') !== '' ? Http::str('weekly_rate') : null;
                     $monthlyRate = Http::str('monthly_rate') !== '' ? Http::str('monthly_rate') : null;
                     $status = Http::str('status') ?: 'available';
+                    $currentMileage = Http::int('current_mileage');
+                    $vehicleFuelLevel = Http::str('fuel_level_percent') !== '' ? Http::str('fuel_level_percent') : null;
                 }
                 $fields = [
-                    Http::int('category_id'), Http::str('registration_no'), Http::str('vin') ?: null,
+                    $categoryId, Http::str('registration_no'), Http::str('vin') ?: null,
                     Http::str('make'), Http::str('model'), Http::str('manufacture_year') !== '' ? Http::int('manufacture_year') : null,
                     Http::str('colour') ?: null, Http::str('transmission') ?: 'manual', Http::str('fuel_type') ?: 'petrol',
                     $dailyRate, $weeklyRate, $monthlyRate,
-                    Http::int('current_mileage'), Http::str('fuel_level_percent') !== '' ? Http::str('fuel_level_percent') : null,
+                    $currentMileage, $vehicleFuelLevel,
                     $image, $status,
                     Http::str('insurance_expiry_date') ?: null, Http::str('inspection_expiry_date') ?: null,
                     Http::str('description') ?: null,

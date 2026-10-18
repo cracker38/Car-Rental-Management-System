@@ -39,6 +39,9 @@ final class ReservationService
             $vehicleId = (int) $input['vehicle_id'];
             $pickup = $input['pickup_datetime'];
             $returnAt = $input['return_datetime'];
+            if ($pickup <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                throw new InvalidArgumentException('Pickup must be scheduled in the future.');
+            }
             $isRentalOfficer = (Auth::user()['role_name'] ?? '') === 'Rental Officer';
             $discount = $asStaff && !$isRentalOfficer ? (string) ($input['discount_amount'] ?? '0') : '0';
 
@@ -139,6 +142,9 @@ final class ReservationService
             if (!$reservation) {
                 throw new InvalidArgumentException('Reservation not found.');
             }
+            if ((string) $input['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                throw new InvalidArgumentException('Pickup must be scheduled in the future.');
+            }
             $editable = $reservation['status'] === 'pending';
             if (!$editable && $asStaff && $reservation['status'] === 'confirmed') {
                 $now = (string) $pdo->query('SELECT NOW()')->fetchColumn();
@@ -226,6 +232,13 @@ final class ReservationService
 
     public function transition(int $id, string $to, ?string $reason = null): void
     {
+        $reason = trim((string) $reason);
+        if (in_array($to, ['cancelled', 'rejected'], true)) {
+            $reasonLength = function_exists('mb_strlen') ? mb_strlen($reason) : strlen($reason);
+            if ($reason === '' || $reasonLength > 500) {
+                throw new InvalidArgumentException('Enter a cancellation or rejection reason of up to 500 characters.');
+            }
+        }
         $before = Database::transaction(function (PDO $pdo) use ($id, $to, $reason) {
             $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
             $stmt->execute([$id]);
@@ -236,9 +249,6 @@ final class ReservationService
             $from = $res['status'];
             if (!in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
                 throw new InvalidArgumentException("Cannot change reservation from {$from} to {$to}.");
-            }
-            if (in_array($to, ['cancelled', 'rejected'], true) && trim((string) $reason) === '') {
-                throw new InvalidArgumentException('Enter a reason for cancelling or rejecting this reservation.');
             }
             if ($to === 'cancelled' && $from === 'confirmed') {
                 if ($res['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
@@ -261,6 +271,9 @@ final class ReservationService
                 }
             }
             if ($to === 'confirmed') {
+                if ($res['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                    throw new InvalidArgumentException('This pickup time has passed. Record a no-show or update the reservation before confirming it.');
+                }
                 $vehicle = $this->availability->lockVehicle($pdo, (int) $res['vehicle_id']);
                 $block = $this->availability->isOperationallyBookable($vehicle);
                 if ($block) {
@@ -327,7 +340,7 @@ final class ReservationService
             return;
         }
         $activeRental = Database::fetch(
-            "SELECT rental_id FROM rentals WHERE vehicle_id = ? AND status IN ('active','overdue') LIMIT 1",
+            "SELECT rental_id FROM rentals WHERE vehicle_id = ? AND status IN ('active','overdue','returned') LIMIT 1",
             [$vehicleId]
         );
         if ($activeRental) {

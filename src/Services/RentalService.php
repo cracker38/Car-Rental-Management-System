@@ -42,6 +42,9 @@ final class RentalService
             if ($res['status'] !== 'confirmed') {
                 throw new InvalidArgumentException('Only confirmed reservations can become rentals.');
             }
+            if ($res['return_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                throw new InvalidArgumentException('The reservation return time has passed. Update or close out the reservation before creating an agreement.');
+            }
             $exists = Database::fetch('SELECT rental_id FROM rentals WHERE reservation_id = ?', [$reservationId]);
             if ($exists) {
                 throw new InvalidArgumentException('A rental already exists for this reservation.');
@@ -146,6 +149,9 @@ final class RentalService
             }
             $actualReturn = (string) ($data['actual_return_datetime'] ?? '');
             $this->availability->assertValidPeriod((string) $rental['actual_pickup_datetime'], $actualReturn);
+            if ($actualReturn > (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                throw new InvalidArgumentException('Return time cannot be in the future.');
+            }
             $fuel = trim((string) ($data['return_fuel_percent'] ?? ''));
             if ($fuel !== '' && (!is_numeric($fuel) || (float) $fuel < 0 || (float) $fuel > 100)) {
                 throw new InvalidArgumentException('Return fuel level must be between 0 and 100 percent.');
@@ -295,6 +301,7 @@ final class RentalService
             }
             $this->addInspection($rentalId, 'return', isset($data['odometer_reading']) ? (int) $data['odometer_reading'] : null, $data['fuel_level_percent'] ?? null, $data);
             Database::execute("UPDATE rentals SET status = 'inspected' WHERE rental_id = ?", [$rentalId]);
+            $this->reservations->syncVehicleStatus((int) $rental['vehicle_id']);
             Audit::log('rental.inspected', 'rental', (string) $rentalId, $rental['rental_number']);
         });
     }

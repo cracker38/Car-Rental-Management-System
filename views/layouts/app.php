@@ -13,7 +13,7 @@
   <link href="<?= e(asset('public/css/app.css')) ?>" rel="stylesheet">
 </head>
 <?php $isSystemAdmin = ($user['role_name'] ?? '') === 'System Administrator'; ?>
-<body class="site-body app-body<?= $isSystemAdmin ? ' admin-workspace' : '' ?>">
+<body class="site-body app-body<?= $isSystemAdmin ? ' admin-workspace' : '' ?><?= !empty($printAgreement) ? ' rental-agreement-print' : '' ?>">
 <div class="app-shell">
   <?php require dirname(__DIR__) . '/partials/sidebar.php'; ?>
   <div class="app-main">

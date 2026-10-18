@@ -716,10 +716,35 @@ html { scroll-behavior: smooth; }
 .manager-subsection-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 1rem 0 .35rem; color: var(--rcr-ink); font-size: .83rem; font-weight: 800; }
 .manager-subsection-heading a { font-size: .75rem; font-weight: 500; }
 .driver-trip-form { min-width: 220px; }
+.rental-agreement-document { max-width: 980px; margin: 0 auto 1.5rem; padding: clamp(1.25rem, 4vw, 2.5rem); color: var(--rcr-ink); }
+.rental-agreement-header { display: flex; justify-content: space-between; gap: 2rem; padding-bottom: 1.25rem; border-bottom: 2px solid var(--rcr-ink); }
+.rental-agreement-header h1 { margin: 0; font-size: 1.65rem; font-weight: 800; }
+.rental-agreement-reference { min-width: 210px; }
+.rental-agreement-reference > div { display: flex; justify-content: space-between; gap: 1rem; padding: .2rem 0; }
+.rental-agreement-reference dt { color: var(--rcr-muted); font-weight: 500; }
+.rental-agreement-reference dd { margin: 0; font-weight: 700; text-align: right; }
+.rental-agreement-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.25rem 0; }
+.rental-agreement-parties section { padding: 1rem; border: 1px solid #e8e5e0; border-radius: .6rem; }
+.rental-agreement-parties h2, .rental-agreement-section h2 { margin: 0 0 .65rem; font-size: .92rem; font-weight: 800; }
+.rental-agreement-section { margin-top: 1.35rem; }
+.rental-agreement-table th, .rental-agreement-table td { padding: .55rem .65rem; border-color: #e8e5e0; vertical-align: top; }
+.rental-agreement-table th { color: var(--rcr-muted); font-weight: 600; }
+.rental-agreement-total th, .rental-agreement-total td { color: var(--rcr-ink); font-weight: 800; }
+.rental-agreement-total small { display: block; color: var(--rcr-muted); font-weight: 400; }
+.rental-agreement-terms > div { white-space: normal; line-height: 1.65; }
+.rental-agreement-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; page-break-inside: avoid; }
+.rental-agreement-signatures > div { display: grid; gap: 1.65rem; }
+.rental-agreement-signatures strong { padding-bottom: .4rem; border-bottom: 1px solid #aaa; }
+.rental-agreement-signatures span { padding-top: .25rem; border-top: 1px solid #aaa; color: var(--rcr-muted); font-size: .78rem; }
+.rental-agreement-footer { margin-top: 1.5rem; padding-top: .8rem; border-top: 1px solid #e8e5e0; color: var(--rcr-muted); font-size: .78rem; }
 @media print {
   .app-shell > .sidebar, .app-topbar, .app-offcanvas, .report-toolbar, .alert, .dashboard-heading-actions { display: none !important; }
   .app-shell { display: block !important; }
   .app-content { padding: 0 !important; }
+  body.rental-agreement-print .app-content > :not(.rental-agreement-document) { display: none !important; }
+  .rental-agreement-document { display: block !important; max-width: none; margin: 0; padding: 0; border: 0 !important; box-shadow: none !important; }
+  .rental-agreement-parties section { border-color: #bbb; }
+  .rental-agreement-table th, .rental-agreement-table td { border-color: #bbb; }
 }
 @media (max-width: 991.98px) {
   .app-shell { grid-template-columns: 1fr; }

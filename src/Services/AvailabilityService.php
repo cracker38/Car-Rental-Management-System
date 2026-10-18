@@ -14,7 +14,7 @@ use PDO;
  *
  * Overlap: existing.pickup < requested.return AND existing.return > requested.pickup
  * Periods are treated as half-open [pickup, return): a return at 10:00 and a later pickup
- * at 10:00 do not overlap. Adjacent bookings are therefore allowed.
+ * at 10:00 do not overlap when no turnaround buffer is configured.
  * Turnaround applies between either pair of adjacent bookings, so a buffer is respected
  * both after an existing booking and before a later booking.
  */
@@ -61,7 +61,7 @@ final class AvailabilityService
         $sql = 'SELECT rental_number, status, actual_pickup_datetime, expected_return_datetime, actual_return_datetime
                 FROM rentals
                 WHERE vehicle_id = ?
-                  AND status IN (\'scheduled\',\'active\',\'overdue\')';
+                  AND status IN (\'scheduled\',\'active\',\'overdue\',\'returned\')';
         $params = [$vehicleId];
         if ($ignoreRentalId) {
             $sql .= ' AND rental_id <> ?';
@@ -71,7 +71,7 @@ final class AvailabilityService
             $start = $r['actual_pickup_datetime'] ?? null;
             $end = $r['actual_return_datetime'];
             if (!$end) {
-                $end = in_array($r['status'], ['active', 'overdue'], true)
+                $end = in_array($r['status'], ['active', 'overdue', 'returned'], true)
                     ? '9999-12-31 23:59:59'
                     : $r['expected_return_datetime'];
             }

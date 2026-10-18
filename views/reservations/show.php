@@ -55,7 +55,7 @@ if ($allowed && $mayTransition):
     <input type="hidden" name="reservation_id" value="<?= (int)$row['reservation_id'] ?>">
     <div class="panel-h">Rental agreement</div>
     <label class="form-label">Agreement terms</label>
-    <textarea class="form-control mb-2" name="agreement_terms" rows="6">Leave blank to use the standard Rwanda hire terms.</textarea>
+    <textarea class="form-control mb-2" name="agreement_terms" rows="6" placeholder="Leave blank to use the standard Rwanda hire terms."></textarea>
     <button class="btn btn-primary">Create rental agreement</button>
   </form>
 <?php elseif ($rental): ?>

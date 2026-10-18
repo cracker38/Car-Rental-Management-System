@@ -18,8 +18,74 @@
   <?php endif; ?>
 </section>
 <?php if ($row['agreement_terms'] && (can('rentals.manage') || can('rentals.view'))): ?>
-  <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-dark" type="button" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print agreement</button></div>
-  <pre class="bg-white p-3 border rounded small"><?= e($row['agreement_terms']) ?></pre>
+  <?php $agreementTotal = \Crms\Money::add(\Crms\Money::sub($row['estimated_amount'], $row['discount_amount']), $row['tax_amount']); ?>
+  <div class="d-flex justify-content-end mb-2 agreement-actions"><button class="btn btn-sm btn-outline-dark" type="button" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print agreement</button></div>
+  <article class="panel rental-agreement-document">
+    <header class="rental-agreement-header">
+      <div>
+        <p class="eyebrow mb-1">Vehicle rental agreement</p>
+        <h1><?= e($businessName ?? 'Rent Car Rwanda') ?></h1>
+        <p class="text-muted mb-0">Rental agreement and handover terms</p>
+      </div>
+      <dl class="rental-agreement-reference mb-0">
+        <div><dt>Agreement</dt><dd><?= e($row['rental_number']) ?></dd></div>
+        <div><dt>Reservation</dt><dd><?= e($row['reservation_code']) ?></dd></div>
+        <div><dt>Issued</dt><dd><?= e($row['created_at']) ?></dd></div>
+        <div><dt>Status</dt><dd><?= e(ucfirst($row['agreement_status'])) ?></dd></div>
+      </dl>
+    </header>
+
+    <div class="rental-agreement-parties">
+      <section>
+        <h2>Customer</h2>
+        <strong><?= e(trim($row['first_name'] . ' ' . $row['last_name'])) ?></strong>
+        <?php if (!empty($row['phone'])): ?><div><?= e($row['phone']) ?></div><?php endif; ?>
+        <?php if (!empty($row['email'])): ?><div><?= e($row['email']) ?></div><?php endif; ?>
+        <?php if (!empty($row['address'])): ?><div><?= e($row['address']) ?></div><?php endif; ?>
+        <?php if (!empty($row['driving_license_number'])): ?><div>Driving licence: <?= e($row['driving_license_number']) ?></div><?php endif; ?>
+      </section>
+      <section>
+        <h2>Rental vehicle</h2>
+        <strong><?= e(trim($row['make'] . ' ' . $row['model'])) ?></strong>
+        <div>Registration: <?= e($row['registration_no']) ?></div>
+        <?php if (!empty($row['vin'])): ?><div>VIN: <?= e($row['vin']) ?></div><?php endif; ?>
+        <div><?= e(trim(($row['manufacture_year'] ?? '') . ' ' . ($row['colour'] ?? '') . ' ' . ($row['transmission'] ?? '') . ' ' . ($row['fuel_type'] ?? ''))) ?></div>
+      </section>
+    </div>
+
+    <section class="rental-agreement-section">
+      <h2>Hire period and handover locations</h2>
+      <div class="table-responsive"><table class="table rental-agreement-table mb-0">
+        <tbody>
+          <tr><th scope="row">Scheduled pickup</th><td><?= e($row['booking_pickup_datetime']) ?></td><th scope="row">Pickup location</th><td><?= e($row['pickup_location'] ?: 'To be confirmed') ?></td></tr>
+          <tr><th scope="row">Scheduled return</th><td><?= e($row['booking_return_datetime']) ?></td><th scope="row">Return location</th><td><?= e($row['return_location'] ?: 'To be confirmed') ?></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="rental-agreement-section">
+      <h2>Agreed charges</h2>
+      <div class="table-responsive"><table class="table rental-agreement-table mb-0">
+        <tbody>
+          <tr><th scope="row">Hire length</th><td><?= (int) $row['estimated_days'] ?> billable day(s)</td><th scope="row">Agreed daily rate</th><td><?= e(\Crms\Money::format($row['agreed_daily_rate'])) ?></td></tr>
+          <tr><th scope="row">Rental subtotal</th><td><?= e(\Crms\Money::format($row['base_amount'])) ?></td><th scope="row">Discount</th><td><?= e(\Crms\Money::format($row['discount_amount'])) ?></td></tr>
+          <tr><th scope="row">Tax</th><td><?= e(\Crms\Money::format($row['tax_amount'])) ?></td><th scope="row">Security deposit</th><td><?= e(\Crms\Money::format($row['security_deposit'])) ?></td></tr>
+          <tr class="rental-agreement-total"><th scope="row">Agreed rental charge</th><td colspan="3"><?= e(\Crms\Money::format($agreementTotal)) ?> <small>Security deposit is held separately and is not included in this charge.</small></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="rental-agreement-section rental-agreement-terms">
+      <h2>Terms and conditions</h2>
+      <div><?= nl2br(e($row['agreement_terms'])) ?></div>
+    </section>
+
+    <section class="rental-agreement-signatures">
+      <div><strong>Customer acceptance</strong><span>Customer signature</span><span>Name</span><span>Date and time</span></div>
+      <div><strong>Rental officer</strong><span>Officer signature</span><span>Name</span><span>Date and time</span></div>
+    </section>
+    <footer class="rental-agreement-footer">Keep a copy of this agreement. Any extra mileage, late return, damage, cleaning, or other charges are assessed and invoiced under the approved business workflow.</footer>
+  </article>
 <?php endif; ?>
 
 <?php if (!empty($row['actual_pickup_datetime']) || !empty($row['actual_return_datetime'])): ?>
@@ -36,9 +102,11 @@
   </section>
 <?php endif; ?>
 
-<?php if ((float) $row['extra_mileage_fee'] > 0 || (float) $row['late_return_fee'] > 0 || (float) $row['damage_fee'] > 0 || (float) $row['cleaning_fee'] > 0 || (float) $row['other_charges'] > 0): ?>
+<?php $lateReturn = !empty($row['actual_return_datetime']) && $row['actual_return_datetime'] > $row['expected_return_datetime']; ?>
+<?php if ($lateReturn || (float) $row['extra_mileage_fee'] > 0 || (float) $row['late_return_fee'] > 0 || (float) $row['damage_fee'] > 0 || (float) $row['cleaning_fee'] > 0 || (float) $row['other_charges'] > 0): ?>
   <section class="panel mb-3">
     <div class="panel-h">Charges flagged for accountant review</div>
+    <?php if ($lateReturn): ?><p class="small text-warning-emphasis mb-2"><strong>Late return:</strong> actual return was after the expected return time.</p><?php endif; ?>
     <div class="kpi-row">
       <div><span>Extra mileage</span><strong><?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?></strong></div>
       <div><span>Late return</span><strong><?= e(\Crms\Money::format($row['late_return_fee'])) ?></strong></div>

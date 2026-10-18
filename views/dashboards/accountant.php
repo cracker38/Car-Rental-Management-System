@@ -27,7 +27,11 @@ require dirname(__DIR__) . '/partials/kpis.php';
       <?php if ($unbilledRentals): ?>
         <div class="manager-subsection-heading">Closed rentals without invoices</div>
         <?php foreach ($unbilledRentals as $rental): ?><div class="mini-row d-flex justify-content-between align-items-center gap-2">
-          <span><strong><?= e($rental['rental_number']) ?></strong><small class="d-block text-muted"><?= e($rental['first_name'] . ' ' . $rental['last_name']) ?> &middot; <?= e($rental['actual_return_datetime']) ?></small></span>
+          <span><strong><?= e($rental['rental_number']) ?></strong><small class="d-block text-muted"><?= e($rental['first_name'] . ' ' . $rental['last_name']) ?> &middot; <?= e($rental['actual_return_datetime']) ?></small>
+            <small class="d-block">Review charges: mileage <?= e(\Crms\Money::format($rental['extra_mileage_fee'])) ?>, late <?= e(\Crms\Money::format($rental['late_return_fee'])) ?>, damage <?= e(\Crms\Money::format($rental['damage_fee'])) ?>, cleaning <?= e(\Crms\Money::format($rental['cleaning_fee'])) ?>, other <?= e(\Crms\Money::format($rental['other_charges'])) ?></small>
+            <?php if (!empty($rental['return_notes'])): ?><small class="d-block text-muted">Handover notes: <?= e($rental['return_notes']) ?></small><?php endif; ?>
+            <?php if ($rental['actual_return_datetime'] > $rental['expected_return_datetime']): ?><span class="badge text-bg-warning mt-1">Late return review</span><?php endif; ?>
+          </span>
           <form method="post" action="<?= e(url('invoices/create')) ?>" class="m-0"><?= \Crms\Csrf::field() ?><input type="hidden" name="rental_id" value="<?= (int) $rental['rental_id'] ?>"><button class="btn btn-sm btn-outline-primary">Create draft</button></form>
         </div><?php endforeach; ?>
       <?php endif; ?>

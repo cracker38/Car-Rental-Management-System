@@ -7,6 +7,7 @@ use Crms\Auth;
 use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
+use Crms\Settings;
 use Crms\Upload;
 use Crms\View;
 use Crms\Services\RentalService;
@@ -53,7 +54,11 @@ final class RentalController
         Rbac::assertCustomerOwns('rental', $id);
         $row = Database::fetch(
             "SELECT rt.*, CASE WHEN rt.status = 'active' AND rt.expected_return_datetime < NOW() THEN 'overdue' ELSE rt.status END AS display_status,
-                    c.first_name, c.last_name, v.registration_no, v.make, v.model, r.reservation_code
+                    c.first_name, c.last_name, c.phone, c.email, c.address, c.driving_license_number,
+                    v.registration_no, v.vin, v.make, v.model, v.manufacture_year, v.colour, v.transmission, v.fuel_type,
+                    r.reservation_code, r.pickup_datetime AS booking_pickup_datetime,
+                    r.return_datetime AS booking_return_datetime, r.pickup_location, r.return_location,
+                    r.agreed_daily_rate, r.estimated_days, r.estimated_amount, r.security_deposit
              FROM rentals rt
              JOIN customers c ON c.customer_id = rt.customer_id
              JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
@@ -75,7 +80,14 @@ final class RentalController
         $invoice = Rbac::can('invoices.view')
             ? Database::fetch("SELECT * FROM invoices WHERE rental_id = ? AND status <> 'void'", [$id])
             : null;
-        View::render('rentals/show', ['title' => $row['rental_number'], 'row' => $row, 'inspections' => $inspections, 'invoice' => $invoice]);
+        View::render('rentals/show', [
+            'title' => $row['rental_number'],
+            'row' => $row,
+            'inspections' => $inspections,
+            'invoice' => $invoice,
+            'businessName' => Settings::get('business_name', 'Rent Car Rwanda'),
+            'printAgreement' => !empty($row['agreement_terms']) && ($canManage || $canView),
+        ]);
     }
 
     public function create(): void
@@ -86,7 +98,14 @@ final class RentalController
             Http::redirect('reservations');
         }
         try {
-            $rental = (new RentalService())->createFromReservation(Http::int('reservation_id'), Http::str('agreement_terms') ?: $this->defaultTerms());
+            $terms = Http::str('agreement_terms');
+            if ($terms === '' || $terms === 'Leave blank to use the standard Rwanda hire terms.') {
+                $terms = $this->defaultTerms();
+            }
+            if (strlen($terms) > 10000) {
+                throw new InvalidArgumentException('Agreement terms must be 10,000 characters or fewer.');
+            }
+            $rental = (new RentalService())->createFromReservation(Http::int('reservation_id'), $terms);
             Http::flash('success', 'Rental agreement created.');
             Http::redirect('rentals/show', ['id' => $rental['rental_id']]);
         } catch (InvalidArgumentException $e) {
