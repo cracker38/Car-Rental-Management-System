@@ -72,7 +72,7 @@ final class ReservationService
             $needConfirm = Settings::get('reservation_confirmation_required', 'true') === 'true';
             $confirmedBy = null;
             $confirmedAt = null;
-            if ($asStaff && !$needConfirm && (float) $quote['security_deposit'] <= 0 && (float) $quote['estimated_amount'] <= 0) {
+            if ($asStaff && !$needConfirm) {
                 $status = 'confirmed';
                 $confirmedBy = Auth::id();
                 $confirmedAt = date('Y-m-d H:i:s');
@@ -97,7 +97,18 @@ final class ReservationService
             $id = (int) Database::lastId();
             (new InvoiceService())->createFromReservation($id);
             if ($status === 'confirmed') {
+                (new InvoiceService())->issueBookingPrepayment($id);
                 $this->syncVehicleStatus($vehicleId);
+            }
+            $bookingInvoice = Database::fetch(
+                "SELECT invoice_number, total_amount FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' ORDER BY invoice_id DESC LIMIT 1",
+                [$id]
+            );
+            $customerMessage = 'Reservation ' . $code . ' is ' . $status . '. Pickup ' . $pickup . '.';
+            if ($status === 'confirmed' && !empty($bookingInvoice['invoice_number']) && (float) $bookingInvoice['total_amount'] > 0) {
+                $customerMessage .= ' Invoice ' . $bookingInvoice['invoice_number'] . ' is ready; pay it before the rental agreement and pickup.';
+            } elseif ($status === 'pending') {
+                $customerMessage .= ' The booking invoice will be issued after staff confirms the reservation.';
             }
             Audit::log('reservation.created', 'reservation', (string) $id, $code . ' ' . $status);
             $notifications = new NotificationService();
@@ -106,26 +117,37 @@ final class ReservationService
                 $customerId,
                 'reservation_created',
                 'Reservation ' . $code,
-                'Reservation ' . $code . ' is ' . $status . '.',
+                $customerMessage,
                 'reservation',
                 $id
             );
             $notifications->notifyRentalOfficers(
                 'reservation_created',
                 'Reservation ' . $code,
-                'A new reservation was created and is ' . $status . '.',
+                'A new reservation was created. ' . $customerMessage,
                 'reservation',
                 $id,
                 Auth::id()
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
+        $smsMessage = 'Reservation ' . $created['reservation_code'] . ' is ' . $created['status'] . '. Pickup ' . $created['pickup_datetime'] . '.';
+        if ($created['status'] === 'pending') {
+            $smsMessage .= ' The booking invoice will be issued after staff confirmation.';
+        } elseif ($created['status'] === 'confirmed') {
+            $bookingInvoice = Database::fetch(
+                "SELECT invoice_number, total_amount FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' ORDER BY invoice_id DESC LIMIT 1",
+                [(int) $created['reservation_id']]
+            );
+            if (!empty($bookingInvoice['invoice_number']) && (float) $bookingInvoice['total_amount'] > 0) {
+                $smsMessage .= ' Pay booking invoice ' . $bookingInvoice['invoice_number'] . ' before pickup.';
+            }
+        }
         (new SmsService())->sendToCustomer(
             (int) $created['customer_id'],
             'reservation_created',
             'Reservation ' . $created['reservation_code'],
-            'Reservation ' . $created['reservation_code'] . ' is ' . $created['status'] . '. Pickup ' . $created['pickup_datetime'] . '.'
-            ,
+            $smsMessage,
             'reservation',
             (int) $created['reservation_id']
         );
@@ -204,6 +226,9 @@ final class ReservationService
                 ]
             );
             (new InvoiceService())->createFromReservation($id);
+            if ($reservation['status'] === 'confirmed') {
+                (new InvoiceService())->issueBookingPrepayment($id);
+            }
             if ((int) $reservation['vehicle_id'] !== $vehicleId) {
                 $this->syncVehicleStatus((int) $reservation['vehicle_id']);
             }
@@ -301,8 +326,40 @@ final class ReservationService
                 if ($conflict) {
                     throw new InvalidArgumentException($conflict);
                 }
-                (new InvoiceService())->assertBookingPaid($id);
-                (new SecurityDepositService())->assertReservationPaid($id);
+            }
+            $paymentReviewRequired = false;
+            if (in_array($to, ['cancelled', 'rejected', 'no_show'], true)) {
+                $bookingInvoice = Database::fetch(
+                    "SELECT invoice_id FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' AND status <> 'void' ORDER BY invoice_id DESC LIMIT 1 FOR UPDATE",
+                    [$id]
+                );
+                $pending = Database::fetch(
+                    "SELECT COUNT(*) AS count FROM financial_transactions
+                     WHERE status = 'pending' AND (
+                       (transaction_type = 'deposit_received' AND reservation_id = ?)
+                       OR (transaction_type = 'payment' AND invoice_id = ?)
+                     )",
+                    [$id, $bookingInvoice['invoice_id'] ?? 0]
+                );
+                if ((int) ($pending['count'] ?? 0) > 0) {
+                    throw new InvalidArgumentException('A Mobile Money request is still pending. Check its status before cancelling or closing this reservation.');
+                }
+                $bookingPaid = Database::fetch(
+                    "SELECT COALESCE(SUM(amount),0) AS amount FROM financial_transactions
+                     WHERE status = 'completed' AND transaction_type = 'payment' AND invoice_id = ?",
+                    [$bookingInvoice['invoice_id'] ?? 0]
+                );
+                $deposit = (new SecurityDepositService())->reservationSummary($id);
+                $bookingPaidAmount = (float) ($bookingPaid['amount'] ?? 0);
+                $paymentReviewRequired = $bookingPaidAmount > 0 || $deposit['held'] > 0;
+                if ($bookingInvoice && $bookingPaidAmount <= 0) {
+                    (new InvoiceService())->voidInvoice((int) $bookingInvoice['invoice_id'], 'Reservation ' . $to . ' before payment.');
+                } elseif ($bookingInvoice && $bookingPaidAmount > 0) {
+                    Database::execute(
+                        'UPDATE invoices SET notes = CONCAT(COALESCE(notes, \'\'), ?) WHERE invoice_id = ?',
+                        ["\nReservation {$to}; review prepaid funds under the approved cancellation policy.", $bookingInvoice['invoice_id']]
+                    );
+                }
             }
             $sql = 'UPDATE reservations SET status = ?';
             $params = [$to];
@@ -317,6 +374,10 @@ final class ReservationService
             $sql .= ' WHERE reservation_id = ?';
             $params[] = $id;
             Database::execute($sql, $params);
+            $issuedBookingInvoice = null;
+            if ($to === 'confirmed') {
+                $issuedBookingInvoice = (new InvoiceService())->issueBookingPrepayment($id);
+            }
             $this->syncVehicleStatus((int) $res['vehicle_id']);
             Audit::log('reservation.status', 'reservation', (string) $id, "{$from} -> {$to}", ['status' => $from], ['status' => $to]);
             $assignedDriver = Database::fetch(
@@ -324,13 +385,29 @@ final class ReservationService
                 [$id]
             );
             $res['assigned_driver_user_id'] = !empty($assignedDriver['user_id']) ? (int)$assignedDriver['user_id'] : null;
+            $res['payment_review_required'] = $paymentReviewRequired;
+            $res['booking_invoice_number'] = $issuedBookingInvoice['invoice_number'] ?? null;
             return $res;
         });
         $message = 'Reservation ' . $before['reservation_code'] . ' is now ' . $to . '.';
+        if ($to === 'confirmed' && !empty($before['booking_invoice_number'])) {
+            $message .= ' Booking invoice ' . $before['booking_invoice_number'] . ' is ready. Pay it before the rental agreement and vehicle pickup.';
+        }
         if (in_array($to, ['cancelled', 'rejected'], true) && trim((string) $reason) !== '') {
             $message .= ' Reason: ' . trim((string) $reason);
         }
         $notifications = new NotificationService();
+        if (!empty($before['payment_review_required'])) {
+            $message .= ' Prepaid funds remain recorded and require refund or fee review under the approved policy; no refund was issued automatically.';
+            $notifications->notifyUsersWithPermission(
+                'transactions.manage',
+                'booking_payment_review',
+                'Payment review needed: ' . $before['reservation_code'],
+                'Reservation status changed to ' . $to . ' with prepaid funds on the ledger. Review any refund or fee under the approval workflow.',
+                'reservation',
+                $id
+            );
+        }
         $notifications->notifyUser(
             Auth::id(),
             (int) $before['customer_id'],

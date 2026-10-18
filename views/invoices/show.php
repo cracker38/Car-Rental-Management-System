@@ -1,4 +1,5 @@
 <div class="detail-grid">
+  <?php $bookingPaymentBlocked = strncmp((string) ($row['notes'] ?? ''), 'Booking prepayment:', 19) === 0 && ($row['reservation_status'] ?? '') !== 'confirmed'; ?>
   <section class="panel invoice-hero">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
@@ -18,7 +19,7 @@
     <?php endif; ?>
   </section>
 
-  <?php if (!in_array($row['status'], ['draft','void','paid'], true) && (float)($row['outstanding_balance'] ?? 0) > 0 && (can('transactions.manage') || \Crms\Auth::isCustomer())): ?>
+  <?php if (!in_array($row['status'], ['draft','void','paid'], true) && (float)($row['outstanding_balance'] ?? 0) > 0 && !$bookingPaymentBlocked && ($paymentRequestable ?? 0) > 0 && (can('transactions.manage') || \Crms\Auth::isCustomer())): ?>
   <form method="post" action="<?= e(url('payments/momo')) ?>" class="panel momo-card">
     <?= \Crms\Csrf::field() ?>
     <input type="hidden" name="invoice_id" value="<?= (int)$row['invoice_id'] ?>">
@@ -29,10 +30,14 @@
     <p class="text-muted">A prompt is sent to the phone. The invoice stays unpaid until HDEV confirms.</p>
     <div class="row g-3">
       <div class="col-md-5"><label class="form-label">MoMo phone</label><input class="form-control" name="phone" required value="<?= e((string)$row['phone']) ?>" placeholder="07xxxxxxxx" inputmode="tel"></div>
-      <div class="col-md-4"><label class="form-label">Amount (RWF)</label><input class="form-control" name="amount" required value="<?= e((string)((int)($row['outstanding_balance'] ?? 0))) ?>"></div>
+      <div class="col-md-4"><label class="form-label">Amount available (RWF)</label><input class="form-control" name="amount" required value="<?= e((string)((int)($paymentRequestable ?? 0))) ?>"></div>
       <div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100">Send prompt</button></div>
     </div>
   </form>
+  <?php elseif (!$bookingPaymentBlocked && (float) ($row['outstanding_balance'] ?? 0) > 0 && (float) ($pendingMomoAmount ?? 0) > 0): ?>
+    <section class="panel"><p class="mb-0">Mobile Money confirmation is pending for <?= e(\Crms\Money::format($pendingMomoAmount)) ?>. Use Check status below before starting another request.</p></section>
+  <?php elseif ($bookingPaymentBlocked && (float) ($row['outstanding_balance'] ?? 0) > 0): ?>
+    <section class="panel"><p class="mb-0">This booking invoice can be paid after the reservation is confirmed.</p></section>
   <?php endif; ?>
 </div>
 

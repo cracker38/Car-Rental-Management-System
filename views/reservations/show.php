@@ -22,19 +22,27 @@
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <div class="panel-h">Rental prepayment</div>
-        <p class="mb-1">Invoice <a href="<?= e(url('invoices/show', ['id' => $bookingInvoice['invoice_id']])) ?>"><?= e($bookingInvoice['invoice_number']) ?></a></p>
+        <p class="mb-1">Invoice <?php if (!\Crms\Auth::isCustomer() || $bookingInvoice['status'] !== 'draft'): ?><a href="<?= e(url('invoices/show', ['id' => $bookingInvoice['invoice_id']])) ?>"><?= e($bookingInvoice['invoice_number']) ?></a><?php else: ?><?= e($bookingInvoice['invoice_number']) ?><?php endif; ?></p>
         <p class="small text-muted mb-0">Estimated hire: <?= e(\Crms\Money::format($bookingInvoice['total_amount'])) ?> · Paid: <?= e(\Crms\Money::format($bookingInvoice['net_paid'] ?? 0)) ?> · Balance: <?= e(\Crms\Money::format($bookingInvoice['outstanding_balance'] ?? $bookingInvoice['total_amount'])) ?></p>
       </div>
       <?= status_badge((string) $bookingInvoice['status']) ?>
     </div>
     <?php if (\Crms\Auth::isCustomer() && (float) ($bookingInvoice['outstanding_balance'] ?? $bookingInvoice['total_amount']) > 0 && !in_array($bookingInvoice['status'], ['draft', 'void'], true)): ?>
-      <p class="small text-muted mt-2 mb-2">Pay the quoted hire charge before staff can confirm the booking. Approved extra charges, if any, are invoiced after return inspection.</p>
-      <a class="btn btn-primary" href="<?= e(url('invoices/show', ['id' => $bookingInvoice['invoice_id']])) ?>">Pay booking invoice</a>
+      <?php if ($row['status'] === 'confirmed'): ?>
+        <p class="small text-muted mt-2 mb-2">Pay the confirmed hire quote before the rental agreement is issued and before vehicle pickup. Approved extra charges, if any, are invoiced after return inspection.</p>
+        <a class="btn btn-primary" href="<?= e(url('invoices/show', ['id' => $bookingInvoice['invoice_id']])) ?>">Pay booking invoice</a>
+      <?php else: ?>
+        <p class="small text-muted mt-2 mb-0">Your request is awaiting staff confirmation. The booking invoice will be issued when the vehicle and dates are confirmed, and must be paid before a rental agreement or pickup.</p>
+      <?php endif; ?>
+    <?php elseif (\Crms\Auth::isCustomer() && $bookingInvoice['status'] === 'draft'): ?>
+      <p class="small text-muted mt-2 mb-0">Your booking invoice will be issued after the reservation is confirmed.</p>
     <?php elseif ((float) ($bookingInvoice['outstanding_balance'] ?? 0) <= 0): ?>
-      <p class="small text-success mt-2 mb-0">Booking prepayment received. Staff can now confirm the reservation.</p>
+      <p class="small text-success mt-2 mb-0"><?php if ((float) $bookingInvoice['total_amount'] <= 0): ?>No hire prepayment is due for this quote.<?php else: ?>Booking prepayment received.<?php endif; ?> The rental agreement can proceed once any required security deposit is settled.</p>
     <?php endif; ?>
     <?php if (\Crms\Auth::isCustomer() && in_array($row['status'], ['pending', 'confirmed'], true)): ?>
       <p class="small text-muted mt-2 mb-0">If you cancel a prepaid reservation, any refund follows the business approval workflow and is not issued automatically.</p>
+    <?php elseif (\Crms\Auth::isCustomer() && in_array($row['status'], ['cancelled', 'rejected', 'no_show'], true) && ((float) ($bookingInvoice['net_paid'] ?? 0) > 0 || (float) ($depositSummary['held'] ?? 0) > 0)): ?>
+      <p class="small text-warning-emphasis mt-2 mb-0">This reservation has prepaid funds. An accountant must review any refund or cancellation fee under the approval workflow.</p>
     <?php endif; ?>
   </section>
 <?php endif; ?>
@@ -56,13 +64,13 @@
       <span class="badge text-bg-warning">Deposit due <?= e(\Crms\Money::format($depositSummary['due'])) ?></span>
     <?php endif; ?>
   </div>
-  <?php if (\Crms\Auth::isCustomer() && in_array($row['status'], ['pending', 'confirmed'], true) && $depositSummary['requestable'] > 0): ?>
+  <?php if (\Crms\Auth::isCustomer() && $row['status'] === 'confirmed' && $depositSummary['requestable'] > 0): ?>
     <form method="post" action="<?= e(url('payments/momo')) ?>" class="mt-3">
       <?= \Crms\Csrf::field() ?>
       <input type="hidden" name="reservation_id" value="<?= (int) $row['reservation_id'] ?>">
       <input type="hidden" name="transaction_type" value="deposit_received">
       <input type="hidden" name="amount" value="<?= e((string) (int) round($depositSummary['requestable'])) ?>">
-      <p class="small text-muted">Pay the remaining security deposit with MTN or Airtel Mobile Money. The reservation stays pending until HDEV confirms payment and a staff member confirms the booking. The quoted hire charge is paid through the rental prepayment invoice above.</p>
+      <p class="small text-muted">Pay the remaining security deposit with MTN or Airtel Mobile Money. HDEV must confirm it before a rental agreement can be issued or the vehicle picked up. The quoted hire charge is paid through the rental prepayment invoice above.</p>
       <div class="row g-2 align-items-end">
         <div class="col-md-5"><label class="form-label" for="booking-momo-phone">MoMo phone</label><input class="form-control" id="booking-momo-phone" name="phone" required value="<?= e((string) $row['phone']) ?>" placeholder="07xxxxxxxx" inputmode="tel"></div>
         <div class="col-md-4"><label class="form-label">Amount due</label><input class="form-control" value="<?= e(\Crms\Money::format($depositSummary['requestable'])) ?>" readonly></div>
@@ -70,7 +78,7 @@
       </div>
     </form>
   <?php elseif ($depositSummary['requestable'] > 0 && $row['status'] === 'pending'): ?>
-    <p class="small text-muted mt-2 mb-0">The booking cannot be confirmed until the required deposit has been received.</p>
+    <p class="small text-muted mt-2 mb-0">The required deposit becomes payable after the reservation is confirmed.</p>
   <?php endif; ?>
   <?php if (!empty($depositTransactions)): ?>
     <div class="table-responsive mt-3"><table class="table table-sm mb-0"><thead><tr><th>Deposit request</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
@@ -120,7 +128,12 @@ if ($allowed && $mayTransition):
     <div class="panel-h">Rental agreement</div>
     <label class="form-label">Agreement terms</label>
     <textarea class="form-control mb-2" name="agreement_terms" rows="6" placeholder="Leave blank to use the standard Rwanda hire terms."></textarea>
-    <button class="btn btn-primary">Create rental agreement</button>
+    <?php if ((!$bookingInvoice || $bookingInvoice['status'] === 'paid') && (float) ($depositSummary['due'] ?? 0) <= 0): ?>
+      <button class="btn btn-primary">Create rental agreement</button>
+    <?php else: ?>
+      <button class="btn btn-primary" disabled>Payment required before agreement</button>
+      <p class="small text-muted mt-2 mb-0">Wait for the booking invoice and any configured security deposit to be confirmed.</p>
+    <?php endif; ?>
   </form>
 <?php elseif ($rental): ?>
   <p class="mt-3">Rental: <a href="<?= e(url('rentals/show', ['id' => $rental['rental_id']])) ?>"><?= e($rental['rental_number']) ?></a></p>

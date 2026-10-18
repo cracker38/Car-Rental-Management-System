@@ -49,7 +49,7 @@ final class SecurityDepositService
     {
         if ($this->reservationSummary($reservationId)['due'] > 0.001) {
             throw new InvalidArgumentException(
-                'The required security deposit must be confirmed before this reservation can be confirmed or the vehicle can be picked up.'
+                'The required security deposit must be confirmed before a rental agreement can be issued or the vehicle can be picked up.'
             );
         }
     }

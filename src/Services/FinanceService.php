@@ -78,6 +78,12 @@ final class FinanceService
                 if ((int) $invoice['customer_id'] !== $customerId) {
                     throw new InvalidArgumentException('The selected invoice does not belong to this customer.');
                 }
+                if ($type === 'payment' && strncmp((string) ($invoice['notes'] ?? ''), 'Booking prepayment:', 19) === 0) {
+                    $booking = Database::fetch('SELECT status FROM reservations WHERE reservation_id = ?', [(int) $invoice['reservation_id']]);
+                    if (!$booking || $booking['status'] !== 'confirmed') {
+                        throw new InvalidArgumentException('The booking invoice can be paid after the reservation is confirmed.');
+                    }
+                }
                 if (in_array($invoice['status'], ['draft', 'void'], true) && in_array($type, ['payment', 'adjustment'], true)) {
                     throw new InvalidArgumentException('Payments and invoice adjustments require an issued invoice.');
                 }
@@ -96,6 +102,12 @@ final class FinanceService
             }
             if ($type === 'adjustment' && !$invoiceId) {
                 throw new InvalidArgumentException('Invoice adjustments must be linked to an invoice.');
+            }
+            if ($type === 'deposit_received' && !empty($input['reservation_id'])) {
+                $booking = Database::fetch('SELECT status FROM reservations WHERE reservation_id = ?', [(int) $input['reservation_id']]);
+                if (!$booking || $booking['status'] !== 'confirmed') {
+                    throw new InvalidArgumentException('A reservation security deposit can be recorded after the reservation is confirmed.');
+                }
             }
 
             if ($type === 'payment_refund') {

@@ -48,9 +48,11 @@ final class InvoiceController
         Rbac::require('invoices.view');
         $id = Http::int('id');
         Rbac::assertCustomerOwns('invoice', $id);
-        $invoiceSql = 'SELECT i.*, c.first_name, c.last_name, c.phone, c.email, b.outstanding_balance, b.net_paid
+        $invoiceSql = 'SELECT i.*, c.first_name, c.last_name, c.phone, c.email, b.outstanding_balance, b.net_paid,
+                              r.status AS reservation_status
                        FROM invoices i
                        JOIN customers c ON c.customer_id = i.customer_id
+                       LEFT JOIN reservations r ON r.reservation_id = i.reservation_id
                        LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
                        WHERE i.invoice_id = ?';
         $invoiceParams = [$id];
@@ -73,7 +75,13 @@ final class InvoiceController
         }
         $txnsSql .= ' ORDER BY transaction_date';
         $txns = Database::fetchAll($txnsSql, $txnsParams);
-        View::render('invoices/show', ['title' => $row['invoice_number'], 'row' => $row, 'items' => $items, 'txns' => $txns]);
+        $pendingMomo = Database::fetch(
+            "SELECT COALESCE(SUM(amount),0) AS amount FROM financial_transactions
+             WHERE invoice_id = ? AND transaction_type = 'payment' AND payment_method = 'mobile_money' AND status = 'pending'",
+            [$id]
+        );
+        $paymentRequestable = max(0, (float) ($row['outstanding_balance'] ?? 0) - (float) ($pendingMomo['amount'] ?? 0));
+        View::render('invoices/show', ['title' => $row['invoice_number'], 'row' => $row, 'items' => $items, 'txns' => $txns, 'pendingMomoAmount' => (float) ($pendingMomo['amount'] ?? 0), 'paymentRequestable' => $paymentRequestable]);
     }
 
     public function issue(): void

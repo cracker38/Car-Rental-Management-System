@@ -33,7 +33,7 @@ final class InvoiceService
             $notes = 'Booking prepayment: estimated vehicle hire. Approved additional charges, if any, are invoiced after return inspection.';
             Database::execute(
                 'INSERT INTO invoices (invoice_number, customer_id, reservation_id, issued_by, issue_date, due_date, currency, status, notes)
-                 VALUES (?,?,?,?,CURDATE(),CURDATE(),\'RWF\',\'issued\',?)',
+                 VALUES (?,?,?,?,CURDATE(),NULL,\'RWF\',\'draft\',?)',
                 [$number, $reservation['customer_id'], $reservationId, Auth::id(), $notes]
             );
             $invoiceId = (int) Database::lastId();
@@ -45,10 +45,30 @@ final class InvoiceService
                 $this->addItemUnlocked($invoiceId, 'tax', 'Tax', 1, (float) $reservation['tax_amount']);
             }
             $this->recalculate($invoiceId);
-            Audit::log('invoice.created', 'invoice', (string) $invoiceId, $number . ' booking prepayment');
-            Audit::log('invoice.issued', 'invoice', (string) $invoiceId, $number . ' booking prepayment');
+            Audit::log('invoice.created', 'invoice', (string) $invoiceId, $number . ' booking prepayment quote');
             return Database::fetch('SELECT * FROM invoices WHERE invoice_id = ?', [$invoiceId]);
         });
+    }
+
+    public function issueBookingPrepayment(int $reservationId): ?array
+    {
+        $invoice = Database::fetch(
+            "SELECT * FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' ORDER BY invoice_id DESC LIMIT 1",
+            [$reservationId]
+        );
+        if (!$invoice || $invoice['status'] === 'void') {
+            $invoice = $this->createFromReservation($reservationId);
+        }
+        if (!$invoice || $invoice['status'] === 'void') {
+            return null;
+        }
+        if ($invoice['status'] === 'draft') {
+            Database::execute('UPDATE invoices SET issue_date = CURDATE(), due_date = CURDATE() WHERE invoice_id = ? AND status = \'draft\'', [$invoice['invoice_id']]);
+            $this->issue((int) $invoice['invoice_id']);
+            $invoice = Database::fetch('SELECT * FROM invoices WHERE invoice_id = ?', [$invoice['invoice_id']]);
+        }
+        Audit::log('invoice.booking_issued', 'invoice', (string) $invoice['invoice_id'], $invoice['invoice_number']);
+        return $invoice;
     }
 
     public function assertBookingPaid(int $reservationId): void
@@ -64,14 +84,14 @@ final class InvoiceService
             return; // Keep reservations created before booking prepayment was introduced compatible.
         }
         if ($invoice['status'] === 'void' || $invoice['status'] !== 'paid' || (float) $invoice['outstanding_balance'] > 0.001) {
-            throw new InvalidArgumentException('The booking invoice must be fully paid and confirmed before this reservation can be confirmed or the vehicle can be picked up.');
+            throw new InvalidArgumentException('The booking invoice must be fully paid before a rental agreement can be issued or the vehicle can be picked up.');
         }
     }
 
     public function replaceUnpaidBookingInvoice(int $reservationId, string $reason): void
     {
         $invoice = Database::fetch(
-            "SELECT invoice_id FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' AND status <> 'void' ORDER BY invoice_id DESC LIMIT 1",
+            "SELECT invoice_id FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' AND status <> 'void' ORDER BY invoice_id DESC LIMIT 1 FOR UPDATE",
             [$reservationId]
         );
         if (!$invoice) {
@@ -187,6 +207,7 @@ final class InvoiceService
             }
             $this->recalculate($invoiceId);
             Database::execute("UPDATE invoices SET status = 'issued' WHERE invoice_id = ?", [$invoiceId]);
+            $this->refreshPaymentStatus($invoiceId);
             Audit::log('invoice.issued', 'invoice', (string) $invoiceId, $inv['invoice_number']);
         });
     }
@@ -195,7 +216,7 @@ final class InvoiceService
     {
         Database::transaction(function (PDO $pdo) use ($invoiceId, $reason) {
             $inv = $this->lockInvoice($pdo, $invoiceId);
-            if (in_array($inv['status'], ['paid', 'refunded'], true)) {
+            if (in_array($inv['status'], ['paid', 'refunded'], true) && (float) $inv['total_amount'] > 0.001) {
                 throw new InvalidArgumentException('Paid invoices cannot be voided; post a refund instead.');
             }
             Database::execute("UPDATE invoices SET status = 'void', notes = CONCAT(COALESCE(notes,''), ?) WHERE invoice_id = ?", ["\nVoid: " . $reason, $invoiceId]);

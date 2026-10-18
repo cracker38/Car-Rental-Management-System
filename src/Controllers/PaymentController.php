@@ -42,7 +42,7 @@ final class PaymentController
         } elseif (Auth::isCustomer() && $reservationId && Http::str('transaction_type') === 'deposit_received') {
             Rbac::assertCustomerOwns('reservation', $reservationId);
             $reservation = Database::fetch('SELECT reservation_id, customer_id, status FROM reservations WHERE reservation_id = ?', [$reservationId]);
-            if (!$reservation || !in_array($reservation['status'], ['pending', 'confirmed'], true)) {
+            if (!$reservation || $reservation['status'] !== 'confirmed') {
                 Http::flash('danger', 'This reservation is not eligible for a security deposit payment.');
                 Http::redirect('reservations/show', ['id' => $reservationId]);
             }
@@ -64,7 +64,7 @@ final class PaymentController
             ]);
             (new HdevPaymentService())->notifyIfCompleted(['status' => 'pending'], $row);
             if (($row['status'] ?? '') === 'completed') {
-                Http::flash('success', $reservationId ? 'Security deposit confirmed. The reservation can now be reviewed for confirmation.' : 'Mobile Money payment confirmed. The invoice and ledger are up to date.');
+                Http::flash('success', $reservationId ? 'Security deposit confirmed. The ledger is up to date.' : 'Mobile Money payment confirmed. The invoice and ledger are up to date.');
             } elseif (($row['status'] ?? '') === 'failed') {
                 Http::flash('danger', 'HDEV rejected or failed the request. Check the phone number and try again.');
             } else {
@@ -168,9 +168,12 @@ final class PaymentController
         Auth::requireLogin();
         $id = Http::int('id');
         $row = Database::fetch(
-            'SELECT ft.*, c.first_name, c.last_name, c.phone, c.email, i.invoice_number
+            'SELECT ft.*, c.first_name, c.last_name, c.phone, c.email, i.invoice_number, r.reservation_code
              FROM financial_transactions ft JOIN customers c ON c.customer_id=ft.customer_id
-             LEFT JOIN invoices i ON i.invoice_id=ft.invoice_id AND i.customer_id=ft.customer_id WHERE ft.transaction_id=?',
+             LEFT JOIN invoices i ON i.invoice_id=ft.invoice_id AND i.customer_id=ft.customer_id
+             LEFT JOIN rentals rt ON rt.rental_id=ft.rental_id AND rt.customer_id=ft.customer_id
+             LEFT JOIN reservations r ON r.reservation_id=COALESCE(ft.reservation_id,i.reservation_id,rt.reservation_id) AND r.customer_id=ft.customer_id
+             WHERE ft.transaction_id=?',
             [$id]
         );
         if (!$row) {

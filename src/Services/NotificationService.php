@@ -32,6 +32,20 @@ final class NotificationService
         }
     }
 
+    public function notifyUsersWithPermission(string $permissionKey, string $type, string $subject, string $message, ?string $entity = null, ?int $entityId = null): void
+    {
+        $users = Database::fetchAll(
+            'SELECT DISTINCT u.user_id FROM users u
+             JOIN role_permissions rp ON rp.role_id = u.role_id
+             JOIN permissions p ON p.permission_id = rp.permission_id
+             WHERE p.permission_key = ? AND u.status = \'active\'',
+            [$permissionKey]
+        );
+        foreach ($users as $user) {
+            $this->notifyUser((int) $user['user_id'], null, $type, $subject, $message, $entity, $entityId);
+        }
+    }
+
     public function markRead(int $id, ?int $userId, ?int $customerId): void
     {
         Database::execute(

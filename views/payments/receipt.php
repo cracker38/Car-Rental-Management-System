@@ -15,6 +15,7 @@
     <div><dt>Customer</dt><dd><?= e($row['first_name'] . ' ' . $row['last_name']) ?></dd></div>
     <div><dt>Phone</dt><dd><?= e($row['phone']) ?></dd></div>
     <?php if ($row['invoice_number']): ?><div><dt>Invoice</dt><dd><?= e($row['invoice_number']) ?></dd></div><?php endif; ?>
+    <?php if (!empty($row['reservation_code'])): ?><div><dt>Reservation</dt><dd><?= e($row['reservation_code']) ?></dd></div><?php endif; ?>
     <div><dt>Transaction type</dt><dd><?= e(ucwords(str_replace('_', ' ', $row['transaction_type']))) ?></dd></div>
     <?php if ($row['transaction_type'] === 'adjustment' && $row['adjustment_direction']): ?><div><dt>Adjustment direction</dt><dd><?= e(ucfirst($row['adjustment_direction'])) ?></dd></div><?php endif; ?>
     <div><dt>Payment method</dt><dd><?= e(ucwords(str_replace('_', ' ', (string)($row['payment_method'] ?: 'Not recorded')))) ?></dd></div>

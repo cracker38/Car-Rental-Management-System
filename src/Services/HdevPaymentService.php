@@ -49,8 +49,8 @@ final class HdevPaymentService
                 if (!$reservation || (int) $reservation['customer_id'] !== (int) ($input['customer_id'] ?? 0)) {
                     throw new InvalidArgumentException('The selected reservation does not belong to this customer.');
                 }
-                if (!in_array($reservation['status'], ['pending', 'confirmed'], true)) {
-                    throw new InvalidArgumentException('A security deposit can only be paid for a pending or confirmed reservation.');
+                if ($reservation['status'] !== 'confirmed') {
+                    throw new InvalidArgumentException('Pay the security deposit after the reservation is confirmed.');
                 }
                 $deposit = (new SecurityDepositService())->reservationSummary($reservationId);
                 if ($deposit['required'] <= 0 || $deposit['requestable'] <= 0) {
@@ -69,6 +69,12 @@ final class HdevPaymentService
                 }
                 if ((int) $invoice['customer_id'] !== (int) ($input['customer_id'] ?? 0)) {
                     throw new InvalidArgumentException('The selected invoice does not belong to this customer.');
+                }
+                if ($type === 'payment' && strncmp((string) ($invoice['notes'] ?? ''), 'Booking prepayment:', 19) === 0) {
+                    $booking = Database::fetch('SELECT status FROM reservations WHERE reservation_id = ?', [(int) $invoice['reservation_id']]);
+                    if (!$booking || $booking['status'] !== 'confirmed') {
+                        throw new InvalidArgumentException('The booking invoice can be paid after the reservation is confirmed.');
+                    }
                 }
                 if (in_array($invoice['status'], ['draft', 'void'], true) && $type === 'payment') {
                     throw new InvalidArgumentException('Payments can only be requested against issued invoices.');
