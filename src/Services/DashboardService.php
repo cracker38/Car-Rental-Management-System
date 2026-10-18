@@ -41,10 +41,21 @@ final class DashboardService
     public function data(array $user): array
     {
         $role = (string) ($user['role_name'] ?? '');
-        $notes = $role === 'System Administrator' ? [] : Database::fetchAll(
-            'SELECT * FROM notifications WHERE user_id = ? OR customer_id = ? ORDER BY created_at DESC LIMIT 8',
-            [Auth::id(), Auth::customerId()]
-        );
+        if ($role === 'System Administrator') {
+            $notes = [];
+        } elseif ($role === 'Rental Officer') {
+            $notes = Database::fetchAll(
+                "SELECT * FROM notifications
+                 WHERE user_id = ? AND (related_entity_type = 'reservation' OR notification_type LIKE 'reservation_%')
+                 ORDER BY created_at DESC LIMIT 8",
+                [Auth::id()]
+            );
+        } else {
+            $notes = Database::fetchAll(
+                'SELECT * FROM notifications WHERE user_id = ? OR customer_id = ? ORDER BY created_at DESC LIMIT 8',
+                [Auth::id(), Auth::customerId()]
+            );
+        }
         $base = [
             'user' => $user,
             'notes' => $notes,
@@ -88,12 +99,12 @@ final class DashboardService
                 ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'Outstanding payments', 'hint' => 'Review unpaid invoice balances'],
             ],
             'Rental Officer' => [
-                ['route' => 'reservations/form', 'icon' => 'bi-plus-circle', 'label' => 'New booking', 'hint' => 'Create a reservation'],
-                ['route' => 'reservations', 'icon' => 'bi-calendar3', 'label' => 'Reservations', 'hint' => 'Confirm and update trips'],
-                ['route' => 'customers', 'icon' => 'bi-people', 'label' => 'Customers', 'hint' => 'Profiles and documents'],
-                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Vehicles', 'hint' => 'Fleet and availability'],
-                ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Handovers', 'hint' => 'Pickup and return'],
-                ['route' => 'drivers', 'icon' => 'bi-person-badge', 'label' => 'Drivers', 'hint' => 'Assign chauffeurs'],
+                ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Find available vehicles', 'hint' => 'Check dates, category, model and features'],
+                ['route' => 'reservations/form', 'icon' => 'bi-plus-circle', 'label' => 'New reservation', 'hint' => 'Create a booking request'],
+                ['route' => 'reservations', 'icon' => 'bi-calendar3', 'label' => 'Reservations', 'hint' => 'Review and update bookings'],
+                ['route' => 'customers', 'icon' => 'bi-people', 'label' => 'Customers', 'hint' => 'Register and update customer records'],
+                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Vehicles', 'hint' => 'Register vehicles and permitted details'],
+                ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Pickups and returns', 'hint' => 'Agreements and handover records'],
             ],
             'Vehicle Inspector/Maintenance Staff' => [
                 ['route' => 'rentals', 'icon' => 'bi-clipboard-check', 'label' => 'Inspections', 'hint' => 'Returned vehicles'],
@@ -141,11 +152,16 @@ final class DashboardService
                 'Review business trends to support decisions',
             ],
             'Rental Officer' => [
-                'Register customers and keep permitted vehicle details current',
-                'Search availability and create, confirm, edit or cancel bookings',
-                'Prevent overlapping confirmed hire for the same vehicle',
-                'Generate agreements and record pickup, return, mileage and fuel',
-                'Flag late returns, damage and extra charges for finance',
+                'Register and update customer records',
+                'Register vehicles and update permitted vehicle details',
+                'Search available vehicles by dates, category, model, price, fuel and transmission',
+                'Create, review, confirm, update and cancel reservations according to business rules',
+                'Prevent overlapping confirmed bookings for the same vehicle',
+                'Generate rental agreements',
+                'Record vehicle pickup and return details',
+                'Record mileage, fuel levels and handover information',
+                'Flag late returns, damage and additional charges for processing',
+                'View upcoming pickups, returns and reservation notifications',
             ],
             'Accountant/Cashier' => [
                 'View invoices and rental charges',
@@ -184,7 +200,7 @@ final class DashboardService
         return match ($role) {
             'System Administrator' => 'Do not automatically approve financial transactions or refunds. Approve them only when explicitly authorized by business policy.',
             'Business Manager' => 'Do not manage system security settings or change payment records without an explicitly assigned permission.',
-            'Rental Officer' => 'You cannot open system administration or post unauthorised refunds or ledger adjustments.',
+            'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
             'Vehicle Inspector/Maintenance Staff' => 'You cannot delete financial records or confirm reservations. Flag a vehicle instead of changing hire status.',
             'Customer' => 'You can only open your own account, bookings, invoices and receipts. Changing a URL or ID will not show someone else’s records.',
@@ -337,26 +353,28 @@ final class DashboardService
     {
         return [
             'kpis' => [
-                ['label' => 'To confirm', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'pending'"), 'hint' => 'Awaiting confirmation', 'href' => url('reservations')],
-                ['label' => 'Pickups today', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'confirmed' AND DATE(pickup_datetime) = CURDATE()"), 'hint' => 'Confirmed today', 'href' => url('reservations')],
-                ['label' => 'Returns today', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND DATE(expected_return_datetime) = CURDATE()"), 'hint' => 'Due back', 'href' => url('rentals')],
-                ['label' => 'Live hires', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue')"), 'hint' => 'Vehicles out', 'href' => url('rentals')],
+                ['label' => 'Reservations to review', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'pending'"), 'hint' => 'Awaiting a decision', 'href' => url('reservations')],
+                ['label' => 'Pickups this week', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'confirmed' AND pickup_datetime >= NOW() AND pickup_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Confirmed reservations', 'href' => url('reservations')],
+                ['label' => 'Returns this week', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('scheduled','active','overdue') AND expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Due back or overdue', 'href' => url('rentals')],
+                ['label' => 'Late returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Needs follow-up', 'href' => url('rentals')],
             ],
             'pending' => Database::fetchAll(
                 "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, c.first_name, c.last_name, v.registration_no
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
                  WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 8"
             ),
-            'today' => Database::fetchAll(
+            'upcomingPickups' => Database::fetchAll(
                 "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.status, c.first_name, c.last_name, v.registration_no
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
-                 WHERE r.status = 'confirmed' AND DATE(r.pickup_datetime) = CURDATE() ORDER BY r.pickup_datetime"
+                 WHERE r.status = 'confirmed' AND r.pickup_datetime >= NOW() AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)
+                 ORDER BY r.pickup_datetime LIMIT 10"
             ),
-            'returnsToday' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, v.registration_no, c.first_name, c.last_name
+            'upcomingReturns' => Database::fetchAll(
+                "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status, v.registration_no, c.first_name, c.last_name
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id JOIN customers c ON c.customer_id = rt.customer_id
-                 WHERE rt.status IN ('active','overdue') AND DATE(rt.expected_return_datetime) = CURDATE()
-                 ORDER BY rt.expected_return_datetime"
+                 WHERE rt.status IN ('scheduled','active','overdue')
+                   AND (rt.expected_return_datetime < NOW() OR rt.expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))
+                 ORDER BY rt.expected_return_datetime LIMIT 10"
             ),
         ];
     }

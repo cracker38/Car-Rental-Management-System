@@ -3,7 +3,7 @@
   <?php if (!empty($duties)): ?>
   <div class="<?= !empty($restriction) ? 'col-lg-8' : 'col-12' ?>">
     <section class="panel h-100">
-      <div class="panel-h">What you can do here</div>
+      <div class="panel-h"><?= e($dashboardDutiesHeading ?? 'What you can do here') ?></div>
       <ul class="duties-list mb-0">
         <?php foreach ($duties as $duty): ?><li><?= e($duty) ?></li><?php endforeach; ?>
       </ul>
@@ -13,7 +13,7 @@
   <?php if (!empty($restriction)): ?>
   <div class="<?= !empty($duties) ? 'col-lg-4' : 'col-12' ?>">
     <section class="panel h-100">
-      <div class="panel-h">Limits</div>
+      <div class="panel-h"><?= e($dashboardRestrictionHeading ?? 'Limits') ?></div>
       <p class="mb-0"><?= e($restriction) ?></p>
     </section>
   </div>

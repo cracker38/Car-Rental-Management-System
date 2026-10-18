@@ -72,9 +72,9 @@
 <?php endif; ?>
 
 <?php if ($row['status'] === 'inspected' && can('rentals.manage') && !\Crms\Auth::isCustomer()): ?>
-<form method="post" action="<?= e(url('rentals/close', ['id' => $row['rental_id']])) ?>" data-confirm="Close this rental and generate the invoice?">
+<form method="post" action="<?= e(url('rentals/close', ['id' => $row['rental_id']])) ?>" data-confirm="Close this rental? Recorded charges will be ready for the accountant invoice workflow.">
   <?= \Crms\Csrf::field() ?>
-  <button class="btn btn-success">Close rental &amp; generate invoice</button>
+  <button class="btn btn-success">Close rental and submit charges</button>
 </form>
 <?php endif; ?>
 

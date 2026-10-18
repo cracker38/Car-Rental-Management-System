@@ -9,7 +9,6 @@ use Crms\Http;
 use Crms\Rbac;
 use Crms\Upload;
 use Crms\View;
-use Crms\Services\InvoiceService;
 use Crms\Services\RentalService;
 use InvalidArgumentException;
 
@@ -72,7 +71,9 @@ final class RentalController
             return;
         }
         $inspections = Database::fetchAll('SELECT * FROM inspections WHERE rental_id = ? ORDER BY inspected_at', [$id]);
-        $invoice = Database::fetch("SELECT * FROM invoices WHERE rental_id = ? AND status <> 'void'", [$id]);
+        $invoice = Rbac::can('invoices.view')
+            ? Database::fetch("SELECT * FROM invoices WHERE rental_id = ? AND status <> 'void'", [$id])
+            : null;
         View::render('rentals/show', ['title' => $row['rental_number'], 'row' => $row, 'inspections' => $inspections, 'invoice' => $invoice]);
     }
 
@@ -162,12 +163,7 @@ final class RentalController
         Rbac::require('rentals.manage');
         try {
             (new RentalService())->close(Http::int('id'));
-            $rentalId = Http::int('id');
-            $existing = Database::fetch("SELECT invoice_id FROM invoices WHERE rental_id = ? AND status <> 'void'", [$rentalId]);
-            if (!$existing) {
-                (new InvoiceService())->createFromRental($rentalId);
-            }
-            Http::flash('success', 'Rental closed and invoice generated from server-side totals.');
+            Http::flash('success', 'Rental closed. Recorded charges are ready for the accountant invoice workflow.');
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
         }

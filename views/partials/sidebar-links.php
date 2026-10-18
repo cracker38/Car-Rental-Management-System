@@ -2,6 +2,7 @@
 $role = $user['role_name'] ?? '';
 $isCustomer = $role === 'Customer';
 $isDriver = $role === 'Driver';
+$isRentalOfficer = $role === 'Rental Officer';
 $isSystemAdmin = $role === 'System Administrator';
 ?>
 <div class="nav-label"><?= $isSystemAdmin ? 'Platform' : 'Workspace' ?></div>
@@ -14,6 +15,12 @@ $isSystemAdmin = $role === 'System Administrator';
   <a class="nav-link <?= nav_active('customers/profile') ?>" href="<?= e(url('customers/profile')) ?>"><i class="bi bi-person"></i> My profile</a>
 <?php elseif ($isDriver): ?>
   <?php if (can('drivers.schedule')): ?><a class="nav-link <?= nav_active('drivers/schedule') ?>" href="<?= e(url('drivers/schedule')) ?>"><i class="bi bi-calendar2-week"></i> My schedule</a><?php endif; ?>
+<?php elseif ($isRentalOfficer): ?>
+  <a class="nav-link <?= nav_active('search') ?>" href="<?= e(url('search')) ?>"><i class="bi bi-search"></i> Find available vehicles</a>
+  <?php if (can('vehicles.view')): ?><a class="nav-link <?= nav_active('vehicles') ?>" href="<?= e(url('vehicles')) ?>"><i class="bi bi-car-front"></i> Vehicles</a><?php endif; ?>
+  <?php if (can('customers.view')): ?><a class="nav-link <?= nav_active('customers') ?>" href="<?= e(url('customers')) ?>"><i class="bi bi-people"></i> Customers</a><?php endif; ?>
+  <?php if (can('reservations.view')): ?><a class="nav-link <?= nav_active('reservations') ?>" href="<?= e(url('reservations')) ?>"><i class="bi bi-calendar3"></i> Reservations</a><?php endif; ?>
+  <?php if (can('rentals.manage') || can('rentals.view')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-key"></i> Pickups &amp; Returns</a><?php endif; ?>
 <?php elseif ($isSystemAdmin): ?>
   <div class="nav-label">Administration</div>
   <?php if (can('users.manage')): ?><a class="nav-link <?= nav_active('admin/users') ?>" href="<?= e(url('admin/users')) ?>"><i class="bi bi-people"></i> Users</a><?php endif; ?>
