@@ -42,6 +42,8 @@ final class RentalService
             if ($res['status'] !== 'confirmed') {
                 throw new InvalidArgumentException('Only confirmed reservations can become rentals.');
             }
+            (new InvoiceService())->assertBookingPaid($reservationId);
+            (new SecurityDepositService())->assertReservationPaid($reservationId);
             if ($res['return_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
                 throw new InvalidArgumentException('The reservation return time has passed. Update or close out the reservation before creating an agreement.');
             }
@@ -72,6 +74,10 @@ final class RentalService
                 ]
             );
             $id = (int) Database::lastId();
+            Database::execute(
+                "UPDATE invoices SET rental_id = ? WHERE reservation_id = ? AND rental_id IS NULL AND notes LIKE 'Booking prepayment:%' AND status <> 'void'",
+                [$id, $reservationId]
+            );
             Audit::log('rental.created', 'rental', (string) $id, $number);
             return Database::fetch('SELECT * FROM rentals WHERE rental_id = ?', [$id]);
         });
@@ -85,6 +91,8 @@ final class RentalService
                 throw new InvalidArgumentException('Pickup is only allowed from scheduled rentals.');
             }
             $reservation = Database::fetch('SELECT pickup_datetime FROM reservations WHERE reservation_id = ?', [(int) $rental['reservation_id']]);
+            (new InvoiceService())->assertBookingPaid((int) $rental['reservation_id']);
+            (new SecurityDepositService())->assertReservationPaid((int) $rental['reservation_id']);
             $actualPickup = (string) ($data['actual_pickup_datetime'] ?? '');
             $this->availability->assertValidPeriod($actualPickup, (string) $rental['expected_return_datetime']);
             if (!$reservation || $actualPickup < (string) $reservation['pickup_datetime']) {

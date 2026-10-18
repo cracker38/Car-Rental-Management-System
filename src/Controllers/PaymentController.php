@@ -20,7 +20,12 @@ final class PaymentController
             Http::redirect('finance');
         }
         $invoiceId = Http::int('invoice_id');
+        $reservationId = Http::int('reservation_id');
         $customerId = Http::int('customer_id');
+        if ($invoiceId && $reservationId) {
+            Http::flash('danger', 'A payment request can only apply to one invoice or reservation at a time.');
+            Http::redirect('reservations/show', ['id' => $reservationId]);
+        }
         if ($invoiceId) {
             Rbac::assertCustomerOwns('invoice', $invoiceId);
             $invoice = Database::fetch('SELECT * FROM invoices WHERE invoice_id = ?', [$invoiceId]);
@@ -34,6 +39,14 @@ final class PaymentController
             } else {
                 Rbac::require('invoices.view');
             }
+        } elseif (Auth::isCustomer() && $reservationId && Http::str('transaction_type') === 'deposit_received') {
+            Rbac::assertCustomerOwns('reservation', $reservationId);
+            $reservation = Database::fetch('SELECT reservation_id, customer_id, status FROM reservations WHERE reservation_id = ?', [$reservationId]);
+            if (!$reservation || !in_array($reservation['status'], ['pending', 'confirmed'], true)) {
+                Http::flash('danger', 'This reservation is not eligible for a security deposit payment.');
+                Http::redirect('reservations/show', ['id' => $reservationId]);
+            }
+            $customerId = (int) $reservation['customer_id'];
         } else {
             Rbac::require('transactions.manage');
         }
@@ -42,15 +55,16 @@ final class PaymentController
             $row = (new HdevPaymentService())->initiate([
                 'customer_id' => $customerId,
                 'invoice_id' => $invoiceId ?: null,
-                'reservation_id' => Http::int('reservation_id') ?: null,
+                'reservation_id' => $reservationId ?: null,
                 'rental_id' => Http::int('rental_id') ?: null,
                 'transaction_type' => Http::str('transaction_type') ?: 'payment',
                 'amount' => Http::str('amount'),
                 'phone' => Http::str('phone'),
                 'reason' => Http::str('reason') ?: 'HDEV mobile money',
             ]);
+            (new HdevPaymentService())->notifyIfCompleted(['status' => 'pending'], $row);
             if (($row['status'] ?? '') === 'completed') {
-                Http::flash('success', 'Mobile Money payment confirmed. The invoice and ledger are up to date.');
+                Http::flash('success', $reservationId ? 'Security deposit confirmed. The reservation can now be reviewed for confirmation.' : 'Mobile Money payment confirmed. The invoice and ledger are up to date.');
             } elseif (($row['status'] ?? '') === 'failed') {
                 Http::flash('danger', 'HDEV rejected or failed the request. Check the phone number and try again.');
             } else {
@@ -61,6 +75,9 @@ final class PaymentController
         }
         if ($invoiceId) {
             Http::redirect('invoices/show', ['id' => $invoiceId]);
+        }
+        if ($reservationId) {
+            Http::redirect('reservations/show', ['id' => $reservationId]);
         }
         Http::redirect('finance');
     }
@@ -103,6 +120,9 @@ final class PaymentController
         }
         if (!empty($row['invoice_id'])) {
             Http::redirect('invoices/show', ['id' => $row['invoice_id']]);
+        }
+        if (!empty($row['reservation_id'])) {
+            Http::redirect('reservations/show', ['id' => $row['reservation_id']]);
         }
         Http::redirect('finance');
     }

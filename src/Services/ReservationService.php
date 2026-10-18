@@ -72,7 +72,7 @@ final class ReservationService
             $needConfirm = Settings::get('reservation_confirmation_required', 'true') === 'true';
             $confirmedBy = null;
             $confirmedAt = null;
-            if ($asStaff && !$needConfirm) {
+            if ($asStaff && !$needConfirm && (float) $quote['security_deposit'] <= 0 && (float) $quote['estimated_amount'] <= 0) {
                 $status = 'confirmed';
                 $confirmedBy = Auth::id();
                 $confirmedAt = date('Y-m-d H:i:s');
@@ -95,6 +95,7 @@ final class ReservationService
                 ]
             );
             $id = (int) Database::lastId();
+            (new InvoiceService())->createFromReservation($id);
             if ($status === 'confirmed') {
                 $this->syncVehicleStatus($vehicleId);
             }
@@ -189,6 +190,7 @@ final class ReservationService
                 ? (string) ($input['discount_amount'] ?? '0')
                 : ($isRentalOfficer ? (string) $reservation['discount_amount'] : '0');
             $quote = $this->pricing->quoteRates($vehicle, $pickup, $returnAt, $discount);
+            (new InvoiceService())->replaceUnpaidBookingInvoice($id, 'Reservation updated before payment.');
             Database::execute(
                 'UPDATE reservations SET vehicle_id = ?, pickup_datetime = ?, return_datetime = ?,
                     pickup_location = ?, return_location = ?, agreed_daily_rate = ?, estimated_days = ?,
@@ -201,6 +203,7 @@ final class ReservationService
                     $input['customer_notes'] ?? null, $asStaff ? ($input['internal_notes'] ?? null) : $reservation['internal_notes'], $id,
                 ]
             );
+            (new InvoiceService())->createFromReservation($id);
             if ((int) $reservation['vehicle_id'] !== $vehicleId) {
                 $this->syncVehicleStatus((int) $reservation['vehicle_id']);
             }
@@ -298,6 +301,8 @@ final class ReservationService
                 if ($conflict) {
                     throw new InvalidArgumentException($conflict);
                 }
+                (new InvoiceService())->assertBookingPaid($id);
+                (new SecurityDepositService())->assertReservationPaid($id);
             }
             $sql = 'UPDATE reservations SET status = ?';
             $params = [$to];

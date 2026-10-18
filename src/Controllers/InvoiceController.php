@@ -30,8 +30,13 @@ final class InvoiceController
         $unbilledRentals = Rbac::can('invoices.manage') ? Database::fetchAll(
             "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, c.first_name, c.last_name
              FROM rentals rt JOIN customers c ON c.customer_id = rt.customer_id
-             WHERE rt.status = 'closed' AND NOT EXISTS (
-               SELECT 1 FROM invoices i WHERE i.rental_id = rt.rental_id AND i.status <> 'void'
+             WHERE rt.status = 'closed' AND (
+               (NOT EXISTS (SELECT 1 FROM invoices i WHERE i.rental_id = rt.rental_id AND i.status <> 'void')
+                AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.reservation_id = rt.reservation_id AND i.notes LIKE 'Booking prepayment:%' AND i.status <> 'void'))
+               OR
+               (EXISTS (SELECT 1 FROM invoices bi WHERE bi.rental_id = rt.rental_id AND bi.notes LIKE 'Booking prepayment:%' AND bi.status <> 'void')
+                AND (rt.extra_mileage_fee + rt.late_return_fee + rt.damage_fee + rt.cleaning_fee + rt.other_charges) > 0
+                AND NOT EXISTS (SELECT 1 FROM invoices si WHERE si.rental_id = rt.rental_id AND si.notes LIKE 'Additional rental charges:%' AND si.status <> 'void'))
              )
              ORDER BY rt.actual_return_datetime DESC LIMIT 50"
         ) : [];

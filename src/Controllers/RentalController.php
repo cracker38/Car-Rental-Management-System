@@ -82,7 +82,7 @@ final class RentalController
         if (Rbac::can('invoices.view')) {
             $invoiceStatusFilter = Auth::isCustomer() ? "status NOT IN ('draft','void')" : "status <> 'void'";
             $invoice = Database::fetch(
-                'SELECT * FROM invoices WHERE rental_id = ? AND customer_id = ? AND ' . $invoiceStatusFilter,
+                'SELECT * FROM invoices WHERE rental_id = ? AND customer_id = ? AND ' . $invoiceStatusFilter . ' ORDER BY invoice_id DESC LIMIT 1',
                 [$id, Auth::isCustomer() ? (Auth::customerId() ?: 0) : (int) $row['customer_id']]
             );
         }

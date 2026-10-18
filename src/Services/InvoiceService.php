@@ -12,6 +12,82 @@ use PDO;
 
 final class InvoiceService
 {
+    public function createFromReservation(int $reservationId): array
+    {
+        return Database::transaction(function (PDO $pdo) use ($reservationId) {
+            $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
+            $stmt->execute([$reservationId]);
+            $reservation = $stmt->fetch();
+            if (!$reservation) {
+                throw new InvalidArgumentException('Reservation not found.');
+            }
+            $existing = Database::fetch(
+                "SELECT * FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' AND status <> 'void' ORDER BY invoice_id DESC LIMIT 1",
+                [$reservationId]
+            );
+            if ($existing) {
+                return $existing;
+            }
+
+            $number = (new ReservationService())->nextCode('INV');
+            $notes = 'Booking prepayment: estimated vehicle hire. Approved additional charges, if any, are invoiced after return inspection.';
+            Database::execute(
+                'INSERT INTO invoices (invoice_number, customer_id, reservation_id, issued_by, issue_date, due_date, currency, status, notes)
+                 VALUES (?,?,?,?,CURDATE(),CURDATE(),\'RWF\',\'issued\',?)',
+                [$number, $reservation['customer_id'], $reservationId, Auth::id(), $notes]
+            );
+            $invoiceId = (int) Database::lastId();
+            $this->addItemUnlocked($invoiceId, 'rental', 'Estimated vehicle hire — booking prepayment', 1, (float) $reservation['estimated_amount']);
+            if ((float) $reservation['discount_amount'] > 0) {
+                $this->addItemUnlocked($invoiceId, 'discount', 'Booking discount', 1, (float) $reservation['discount_amount']);
+            }
+            if ((float) $reservation['tax_amount'] > 0) {
+                $this->addItemUnlocked($invoiceId, 'tax', 'Tax', 1, (float) $reservation['tax_amount']);
+            }
+            $this->recalculate($invoiceId);
+            Audit::log('invoice.created', 'invoice', (string) $invoiceId, $number . ' booking prepayment');
+            Audit::log('invoice.issued', 'invoice', (string) $invoiceId, $number . ' booking prepayment');
+            return Database::fetch('SELECT * FROM invoices WHERE invoice_id = ?', [$invoiceId]);
+        });
+    }
+
+    public function assertBookingPaid(int $reservationId): void
+    {
+        $invoice = Database::fetch(
+            "SELECT i.invoice_id, i.status, COALESCE(b.outstanding_balance, i.total_amount) AS outstanding_balance
+             FROM invoices i LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+             WHERE i.reservation_id = ? AND i.notes LIKE 'Booking prepayment:%'
+             ORDER BY i.invoice_id DESC LIMIT 1",
+            [$reservationId]
+        );
+        if (!$invoice) {
+            return; // Keep reservations created before booking prepayment was introduced compatible.
+        }
+        if ($invoice['status'] === 'void' || $invoice['status'] !== 'paid' || (float) $invoice['outstanding_balance'] > 0.001) {
+            throw new InvalidArgumentException('The booking invoice must be fully paid and confirmed before this reservation can be confirmed or the vehicle can be picked up.');
+        }
+    }
+
+    public function replaceUnpaidBookingInvoice(int $reservationId, string $reason): void
+    {
+        $invoice = Database::fetch(
+            "SELECT invoice_id FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' AND status <> 'void' ORDER BY invoice_id DESC LIMIT 1",
+            [$reservationId]
+        );
+        if (!$invoice) {
+            return;
+        }
+        $activity = Database::fetch(
+            "SELECT COUNT(*) AS count FROM financial_transactions
+             WHERE invoice_id = ? AND status IN ('pending','completed','awaiting_approval')",
+            [$invoice['invoice_id']]
+        );
+        if ((int) ($activity['count'] ?? 0) > 0) {
+            throw new InvalidArgumentException('This reservation has payment activity. Contact the rental office before changing a paid or pending booking invoice.');
+        }
+        $this->voidInvoice((int) $invoice['invoice_id'], $reason);
+    }
+
     public function createFromRental(int $rentalId): array
     {
         return Database::transaction(function (PDO $pdo) use ($rentalId) {
@@ -24,20 +100,35 @@ final class InvoiceService
             if ($rental['status'] !== 'closed') {
                 throw new InvalidArgumentException('Invoices can only be generated from closed rentals after the return inspection is complete.');
             }
-            $existing = Database::fetch("SELECT invoice_id FROM invoices WHERE rental_id = ? AND status <> 'void'", [$rentalId]);
-            if ($existing) {
-                throw new InvalidArgumentException('An invoice already exists for this rental.');
+            $bookingInvoice = Database::fetch(
+                "SELECT invoice_id, invoice_number FROM invoices WHERE rental_id = ? AND notes LIKE 'Booking prepayment:%' AND status <> 'void' ORDER BY invoice_id DESC LIMIT 1",
+                [$rentalId]
+            );
+            if (!$bookingInvoice) {
+                $existing = Database::fetch("SELECT invoice_id FROM invoices WHERE rental_id = ? AND status <> 'void'", [$rentalId]);
+                if ($existing) {
+                    throw new InvalidArgumentException('An invoice already exists for this rental.');
+                }
+            } else {
+                $existingSupplement = Database::fetch(
+                    "SELECT invoice_id FROM invoices WHERE rental_id = ? AND notes LIKE 'Additional rental charges:%' AND status <> 'void' LIMIT 1",
+                    [$rentalId]
+                );
+                if ($existingSupplement) {
+                    throw new InvalidArgumentException('An additional-charge invoice already exists for this rental.');
+                }
             }
             $number = (new ReservationService())->nextCode('INV');
+            $invoiceNotes = $bookingInvoice
+                ? 'Additional rental charges: supplement to booking prepayment invoice ' . $bookingInvoice['invoice_number'] . '.'
+                : null;
             Database::execute(
-                'INSERT INTO invoices (invoice_number, customer_id, reservation_id, rental_id, issued_by, issue_date, due_date, currency, status)
-                 VALUES (?,?,?,?,?,CURDATE(),DATE_ADD(CURDATE(), INTERVAL 7 DAY),\'RWF\',\'draft\')',
-                [$number, $rental['customer_id'], $rental['reservation_id'], $rentalId, Auth::id()]
+                'INSERT INTO invoices (invoice_number, customer_id, reservation_id, rental_id, issued_by, issue_date, due_date, currency, status, notes)
+                 VALUES (?,?,?,?,?,CURDATE(),DATE_ADD(CURDATE(), INTERVAL 7 DAY),\'RWF\',\'draft\',?)',
+                [$number, $rental['customer_id'], $rental['reservation_id'], $rentalId, Auth::id(), $invoiceNotes]
             );
             $invoiceId = (int) Database::lastId();
-            $items = [
-                ['rental', 'Vehicle hire', 1, $rental['base_amount']],
-            ];
+            $items = $bookingInvoice ? [] : [['rental', 'Vehicle hire', 1, $rental['base_amount']]];
             if ((float) $rental['extra_mileage_fee'] > 0) {
                 $items[] = ['extra_mileage', 'Extra mileage', 1, $rental['extra_mileage_fee']];
             }
@@ -53,11 +144,14 @@ final class InvoiceService
             if ((float) $rental['other_charges'] > 0) {
                 $items[] = ['other', 'Other charges', 1, $rental['other_charges']];
             }
-            if ((float) $rental['discount_amount'] > 0) {
+            if (!$bookingInvoice && (float) $rental['discount_amount'] > 0) {
                 $items[] = ['discount', 'Discount', 1, $rental['discount_amount']];
             }
-            if ((float) $rental['tax_amount'] > 0) {
+            if (!$bookingInvoice && (float) $rental['tax_amount'] > 0) {
                 $items[] = ['tax', 'Tax', 1, $rental['tax_amount']];
+            }
+            if ($bookingInvoice && !$items) {
+                throw new InvalidArgumentException('No additional charges were recorded. The booking invoice already covers the rental amount.');
             }
             foreach ($items as [$type, $desc, $qty, $price]) {
                 $this->addItemUnlocked($invoiceId, $type, $desc, (float) $qty, (float) $price);

@@ -93,9 +93,9 @@ final class ReservationController
                     Http::flash('success', 'Reservation updated. Availability and pricing were rechecked.');
                     Http::redirect('reservations/show', ['id' => $reservationId]);
                 }
-                $svc->create($input, !Auth::isCustomer());
-                Http::flash('success', 'Reservation saved. Availability was locked and rechecked in a database transaction.');
-                Http::redirect('reservations');
+                $created = $svc->create($input, !Auth::isCustomer());
+                Http::flash('success', 'Reservation saved. Review its booking deposit and payment status to continue.');
+                Http::redirect('reservations/show', ['id' => $created['reservation_id']]);
             } catch (InvalidArgumentException $e) {
                 Http::flash('danger', $e->getMessage());
             } catch (\Throwable) {
@@ -133,6 +133,23 @@ final class ReservationController
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
+        $depositSummary = (new \Crms\Services\SecurityDepositService())->reservationSummary($id);
+        $depositTransactions = Database::fetchAll(
+            "SELECT transaction_id, transaction_number, amount, status, external_reference, transaction_date
+             FROM financial_transactions
+             WHERE (reservation_id = ? OR rental_id = (SELECT rental_id FROM rentals WHERE reservation_id = ? LIMIT 1))
+               AND transaction_type = 'deposit_received'
+             ORDER BY transaction_id DESC LIMIT 10",
+            [$id, $id]
+        );
+        $bookingInvoice = Database::fetch(
+            "SELECT i.invoice_id, i.invoice_number, i.status, i.total_amount, b.outstanding_balance, b.net_paid,
+                    EXISTS(SELECT 1 FROM financial_transactions ft WHERE ft.invoice_id = i.invoice_id AND ft.status IN ('pending','completed','awaiting_approval')) AS payment_activity
+             FROM invoices i LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+             WHERE i.reservation_id = ? AND i.notes LIKE 'Booking prepayment:%'
+             ORDER BY i.invoice_id DESC LIMIT 1",
+            [$id]
+        );
         $rentalSql = 'SELECT * FROM rentals WHERE reservation_id = ?';
         $rentalParams = [$id];
         if (Auth::isCustomer()) {
@@ -150,7 +167,7 @@ final class ReservationController
             $drivers = Database::fetchAll("SELECT * FROM drivers WHERE status='active' ORDER BY last_name,first_name");
             $assignment = Database::fetch('SELECT * FROM driver_assignments WHERE reservation_id=?', [$id]);
         }
-        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'canEditConfirmedStaffBooking' => $canEditConfirmedStaffBooking, 'drivers' => $drivers, 'assignment' => $assignment]);
+        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'depositSummary' => $depositSummary, 'depositTransactions' => $depositTransactions, 'bookingInvoice' => $bookingInvoice, 'canEditConfirmedStaffBooking' => $canEditConfirmedStaffBooking, 'drivers' => $drivers, 'assignment' => $assignment]);
     }
 
     public function transition(): void

@@ -35,8 +35,30 @@ final class HdevPaymentService
         $txRef = 'CRMS-' . strtoupper(bin2hex(random_bytes(6)));
         $row = Database::transaction(function (PDO $pdo) use ($input, $type, $amount, $txRef) {
             $invoiceId = !empty($input['invoice_id']) ? (int) $input['invoice_id'] : null;
+            $reservationId = !empty($input['reservation_id']) ? (int) $input['reservation_id'] : null;
             if ($type === 'payment' && !$invoiceId) {
                 throw new InvalidArgumentException('Select an issued invoice for a Mobile Money payment.');
+            }
+            if ($type === 'deposit_received') {
+                if ($invoiceId || !$reservationId) {
+                    throw new InvalidArgumentException('Select a reservation to pay its security deposit.');
+                }
+                $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
+                $stmt->execute([$reservationId]);
+                $reservation = $stmt->fetch();
+                if (!$reservation || (int) $reservation['customer_id'] !== (int) ($input['customer_id'] ?? 0)) {
+                    throw new InvalidArgumentException('The selected reservation does not belong to this customer.');
+                }
+                if (!in_array($reservation['status'], ['pending', 'confirmed'], true)) {
+                    throw new InvalidArgumentException('A security deposit can only be paid for a pending or confirmed reservation.');
+                }
+                $deposit = (new SecurityDepositService())->reservationSummary($reservationId);
+                if ($deposit['required'] <= 0 || $deposit['requestable'] <= 0) {
+                    throw new InvalidArgumentException('There is no security deposit balance available for payment on this reservation.');
+                }
+                if ((float) $amount > $deposit['requestable'] + 0.001) {
+                    throw new InvalidArgumentException('Payment exceeds the remaining security deposit after completed and pending requests.');
+                }
             }
             if ($invoiceId) {
                 $stmt = $pdo->prepare('SELECT * FROM invoices WHERE invoice_id = ? FOR UPDATE');
@@ -78,8 +100,8 @@ final class HdevPaymentService
                     $number,
                     $input['customer_id'],
                     $invoiceId,
-                    $input['reservation_id'] ?? null,
-                    $input['rental_id'] ?? null,
+                    $reservationId,
+                    $type === 'deposit_received' ? null : ($input['rental_id'] ?? null),
                     $type,
                     $amount,
                     'mobile_money',

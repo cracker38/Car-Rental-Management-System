@@ -1,7 +1,7 @@
 <?php if (!empty($unbilledRentals) && can('invoices.manage')): ?>
   <section class="panel table-panel mb-3">
-    <div class="panel-h">Closed rentals without invoices</div>
-    <p class="small text-muted">Generate draft invoices from completed rental charges, then review and issue them through the invoice workflow.</p>
+    <div class="panel-h">Rental charges ready for invoicing</div>
+    <p class="small text-muted">Generate a draft for completed rental charges. If the hire amount was prepaid at booking, this invoice covers approved additional charges only.</p>
     <div class="table-responsive"><table class="table align-middle mb-0">
       <thead><tr><th>Rental</th><th>Customer</th><th>Returned</th><th></th></tr></thead>
       <tbody><?php foreach ($unbilledRentals as $rental): ?><tr>
