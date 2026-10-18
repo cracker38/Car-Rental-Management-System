@@ -29,6 +29,9 @@ final class HdevPaymentService
             throw new InvalidArgumentException('Enter a valid Rwanda mobile number for MoMo (07xxxxxxxx).');
         }
 
+        // Validate local configuration before creating a pending ledger row.
+        HdevClient::paymentReady();
+
         $txRef = 'CRMS-' . strtoupper(bin2hex(random_bytes(6)));
         $row = Database::transaction(function (PDO $pdo) use ($input, $type, $amount, $txRef) {
             $invoiceId = !empty($input['invoice_id']) ? (int) $input['invoice_id'] : null;
@@ -90,7 +93,6 @@ final class HdevPaymentService
             return Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [Database::lastId()]);
         });
 
-        HdevClient::paymentReady();
         $cfg = HdevClient::config();
         $callback = trim($cfg['callback_url']);
         if ($callback === '') {

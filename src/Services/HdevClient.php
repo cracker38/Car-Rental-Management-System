@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Crms\Services;
 
 use Crms\Settings;
+use InvalidArgumentException;
 
 final class HdevClient
 {
@@ -27,10 +28,13 @@ final class HdevClient
 
     public static function paymentReady(): void
     {
+        $c = self::config();
+        if (trim($c['payment_api_id']) === '' || trim($c['payment_api_key']) === '') {
+            throw new InvalidArgumentException('HDEV payment credentials are not configured in the server environment.');
+        }
         if (!class_exists('hdev_payment', false)) {
             require dirname(__DIR__, 2) . '/lib/hdev/pay_parse.php';
         }
-        $c = self::config();
         \hdev_payment::api_id($c['payment_api_id']);
         \hdev_payment::api_key($c['payment_api_key']);
         \hdev_payment::endpoint($c['payment_endpoint']);
@@ -38,10 +42,13 @@ final class HdevClient
 
     public static function smsReady(): void
     {
+        $c = self::config();
+        if (trim($c['sms_api_id']) === '' || trim($c['sms_api_key']) === '') {
+            throw new InvalidArgumentException('HDEV SMS credentials are not configured in the server environment.');
+        }
         if (!class_exists('hdev_sms', false)) {
             require dirname(__DIR__, 2) . '/lib/hdev/sms_parse.php';
         }
-        $c = self::config();
         \hdev_sms::api_id($c['sms_api_id']);
         \hdev_sms::api_key($c['sms_api_key']);
         \hdev_sms::endpoint($c['sms_endpoint']);
