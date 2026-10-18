@@ -17,13 +17,14 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
 <div class="row g-3">
   <div class="col-xl-6">
     <section class="panel table-panel h-100">
-      <div class="panel-h d-flex justify-content-between">Reservations to review <a class="small fw-normal" href="<?= e(url('reservations')) ?>">All reservations</a></div>
-      <?php if (!$pending): ?><p class="text-muted mb-0">No bookings are waiting for confirmation.</p><?php else: ?>
+      <div class="panel-h d-flex justify-content-between">Pending reservation approvals <a class="small fw-normal" href="<?= e(url('reservations')) ?>">All reservations</a></div>
+      <?php if (!$pending): ?><p class="text-muted mb-0">No reservations are waiting for a booking decision.</p><?php else: ?>
         <div class="table-responsive"><table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Pickup</th></tr></thead>
+          <thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Pickup</th><th></th></tr></thead>
           <tbody><?php foreach ($pending as $item): ?><tr>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
             <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td><td><?= e($item['registration_no']) ?></td><td><?= e($item['pickup_datetime']) ?></td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>">Review &amp; decide</a></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>

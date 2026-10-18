@@ -14,6 +14,25 @@
 <?php $kpiColClass = count($kpis) >= 6 ? 'col-6 col-md-4 col-xl-2' : 'col-6 col-lg-3'; require dirname(__DIR__) . '/partials/kpis.php'; ?>
 <?php require dirname(__DIR__) . '/partials/dashboard-shortcuts.php'; ?>
 
+<section class="panel table-panel mb-3">
+  <div class="panel-h d-flex flex-wrap align-items-baseline justify-content-between gap-2">
+    <span>Pending reservation approvals</span>
+    <a class="small fw-normal" href="<?= e(url('reservations')) ?>">All reservations</a>
+  </div>
+  <?php if (!$pendingReservations): ?><p class="text-muted mb-0">No reservations are waiting for a booking decision.</p><?php else: ?>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+      <thead><tr><th scope="col">Booking</th><th scope="col">Customer</th><th scope="col">Vehicle</th><th scope="col">Pickup</th><th scope="col"></th></tr></thead>
+      <tbody><?php foreach ($pendingReservations as $item): ?><tr>
+        <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
+        <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td>
+        <td><?= e($item['registration_no']) ?></td>
+        <td><?= e($item['pickup_datetime']) ?></td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>">Review &amp; decide</a></td>
+      </tr><?php endforeach; ?></tbody>
+    </table></div>
+  <?php endif; ?>
+</section>
+
 <?php
 $maxBookings = max(1, ...array_column($trends, 'bookings'));
 $maxRentals = max(1, ...array_column($trends, 'rentals'));

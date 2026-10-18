@@ -113,6 +113,7 @@ final class DashboardService
                 ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Reports & exports', 'hint' => 'Review permitted business reports'],
                 ['route' => 'reservations', 'icon' => 'bi-calendar3', 'label' => 'Reservations', 'hint' => 'Booking pipeline and performance'],
                 ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Rentals & returns', 'hint' => 'Active hires and upcoming returns'],
+                ['route' => 'drivers', 'icon' => 'bi-person-badge', 'label' => 'Drivers', 'hint' => 'View driver records and manage assignments'],
                 ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Fleet availability', 'hint' => 'Utilization and vehicle status'],
                 ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Maintenance alerts', 'hint' => 'Open service and repair work'],
                 ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'Outstanding payments', 'hint' => 'Review unpaid invoice balances'],
@@ -341,9 +342,18 @@ final class DashboardService
         if (Rbac::can('transactions.approve')) {
             $kpis[] = ['label' => 'Finance approvals', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status = 'awaiting_approval'"), 'hint' => 'Independent review required', 'href' => url('finance/approvals')];
         }
+        $pendingReservations = $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'pending'");
+        $kpis[] = ['label' => 'Reservations to approve', 'value' => $pendingReservations, 'hint' => 'Awaiting a booking decision', 'href' => url('reservations')];
         $kpis[] = ['label' => 'Returns due / overdue', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE ' . $dueCondition), 'hint' => 'Overdue or due within 7 days', 'href' => url('rentals')];
         return [
             'kpis' => $kpis,
+            'pendingReservations' => Database::fetchAll(
+                "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
+                        c.first_name, c.last_name, v.registration_no
+                 FROM reservations r JOIN customers c ON c.customer_id = r.customer_id
+                 JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+                 WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 8"
+            ),
             'trends' => $trends,
             'canViewFinancial' => $canViewFinancial,
             'officers' => Database::fetchAll(
@@ -388,7 +398,7 @@ final class DashboardService
     {
         return [
             'kpis' => [
-                ['label' => 'Reservations to review', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'pending'"), 'hint' => 'Awaiting a decision', 'href' => url('reservations')],
+                ['label' => 'Reservations to approve', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'pending'"), 'hint' => 'Awaiting a booking decision', 'href' => url('reservations')],
                 ['label' => 'Pickups this week', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'confirmed' AND pickup_datetime >= NOW() AND pickup_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Confirmed reservations', 'href' => url('reservations')],
                 ['label' => 'Returns this week', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Due back or overdue', 'href' => url('rentals')],
                 ['label' => 'Late returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Needs follow-up', 'href' => url('rentals')],
