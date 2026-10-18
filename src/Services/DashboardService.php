@@ -26,13 +26,13 @@ final class DashboardService
     public static function pageTitle(string $roleName): string
     {
         return match ($roleName) {
-            'System Administrator' => 'Control center',
-            'Business Manager' => 'Operations overview',
-            'Rental Officer' => 'Front desk',
-            'Accountant/Cashier' => 'Finance desk',
-            'Vehicle Inspector/Maintenance Staff' => 'Workshop',
-            'Customer' => 'My account',
-            'Driver' => 'My trips',
+            'System Administrator' => 'System Overview',
+            'Business Manager' => 'Business Performance',
+            'Rental Officer' => 'Rental Operations',
+            'Accountant/Cashier' => 'Financial Management',
+            'Vehicle Inspector/Maintenance Staff' => 'Fleet Inspection and Maintenance',
+            'Customer' => 'My Account',
+            'Driver' => 'My Trips',
             default => 'Dashboard',
         };
     }
@@ -49,6 +49,8 @@ final class DashboardService
             'notes' => $notes,
             'role' => $role,
             'shortcuts' => $this->shortcuts($role),
+            'duties' => $this->duties($role),
+            'restriction' => $this->restriction($role),
         ];
         return match ($role) {
             'System Administrator' => $base + $this->admin(),
@@ -66,12 +68,12 @@ final class DashboardService
     {
         return match ($role) {
             'System Administrator' => [
-                ['route' => 'admin/users', 'icon' => 'bi-people', 'label' => 'Users & roles', 'hint' => 'Accounts and permissions'],
-                ['route' => 'admin/settings', 'icon' => 'bi-sliders', 'label' => 'Settings', 'hint' => 'Pricing, SMS and HDEV'],
-                ['route' => 'admin/audit', 'icon' => 'bi-shield-check', 'label' => 'Audit log', 'hint' => 'Security activity'],
-                ['route' => 'admin/backup', 'icon' => 'bi-hdd', 'label' => 'Backups', 'hint' => 'SQL exports'],
-                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Fleet', 'hint' => 'Photos, rates, status'],
-                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Reports', 'hint' => 'Ops and finance'],
+                ['route' => 'admin/users', 'icon' => 'bi-people', 'label' => 'Users & roles', 'hint' => 'Create, activate and assign roles'],
+                ['route' => 'admin/settings', 'icon' => 'bi-sliders', 'label' => 'Settings', 'hint' => 'Configuration, SMS and HDEV'],
+                ['route' => 'admin/audit', 'icon' => 'bi-shield-check', 'label' => 'Audit log', 'hint' => 'Security and user activity'],
+                ['route' => 'admin/backup', 'icon' => 'bi-hdd', 'label' => 'Backup', 'hint' => 'SQL export and recovery files'],
+                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'System records', 'hint' => 'Vehicles, bookings and rentals'],
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'System reports', 'hint' => 'Company-wide figures'],
             ],
             'Business Manager' => [
                 ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Reports', 'hint' => 'Hire and revenue'],
@@ -104,16 +106,82 @@ final class DashboardService
             ],
             'Customer' => [
                 ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Find a car', 'hint' => 'Search dates and book'],
-                ['route' => 'fleet', 'icon' => 'bi-car-front', 'label' => 'Browse fleet', 'hint' => 'See rates and photos'],
-                ['route' => 'reservations', 'icon' => 'bi-journal-text', 'label' => 'My trips', 'hint' => 'Bookings and status'],
-                ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'My invoices', 'hint' => 'Pay with MoMo'],
-                ['route' => 'contact', 'icon' => 'bi-telephone', 'label' => 'Contact us', 'hint' => 'Kigali support'],
+                ['route' => 'fleet', 'icon' => 'bi-car-front', 'label' => 'Browse fleet', 'hint' => 'Photos and daily rates'],
+                ['route' => 'reservations', 'icon' => 'bi-journal-text', 'label' => 'My trips', 'hint' => 'Status and booking details'],
+                ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'My invoices', 'hint' => 'Pay, receipts and deposits'],
+                ['route' => 'customers/profile', 'icon' => 'bi-person', 'label' => 'My profile', 'hint' => 'Update your contact details'],
             ],
             'Driver' => [
-                ['route' => 'drivers/schedule', 'icon' => 'bi-calendar2-week', 'label' => 'Full schedule', 'hint' => 'Assigned chauffeur trips'],
-                ['route' => 'dashboard', 'icon' => 'bi-geo-alt', 'label' => 'Today’s run', 'hint' => 'Next pickup and customer'],
+                ['route' => 'drivers/schedule', 'icon' => 'bi-calendar2-week', 'label' => 'My schedule', 'hint' => 'Only your assigned trips'],
+                ['route' => 'dashboard', 'icon' => 'bi-geo-alt', 'label' => 'Today’s run', 'hint' => 'Pickup, customer and vehicle'],
             ],
             default => [],
+        };
+    }
+
+    /** @return list<string> */
+    private function duties(string $role): array
+    {
+        return match ($role) {
+            'System Administrator' => [
+                'Create, edit, activate and deactivate user accounts',
+                'Assign roles and review permissions',
+                'Manage system settings, backups and recovery files',
+                'View vehicles, reservations, rentals, payments and maintenance',
+                'Review audit logs, security events and system-wide reports',
+            ],
+            'Business Manager' => [
+                'Monitor KPIs, revenue, bookings, live rentals and utilisation',
+                'Review operational and financial reports, including CSV export',
+                'Watch outstanding invoices, upcoming returns and maintenance alerts',
+                'Review reservation performance and rental officer activity',
+            ],
+            'Rental Officer' => [
+                'Register customers and keep permitted vehicle details current',
+                'Search availability and create, confirm, edit or cancel bookings',
+                'Prevent overlapping confirmed hire for the same vehicle',
+                'Generate agreements and record pickup, return, mileage and fuel',
+                'Flag late returns, damage and extra charges for finance',
+            ],
+            'Accountant/Cashier' => [
+                'Issue invoices and record full or partial payments',
+                'Record method, reference, date and status, then print receipts',
+                'Track outstanding and overdue balances',
+                'Record deposits, deductions and audited refunds',
+                'Reconcile the ledger and generate finance reports',
+            ],
+            'Vehicle Inspector/Maintenance Staff' => [
+                'Inspect returned vehicles and attach condition photos',
+                'Record damage, fuel, mileage and inspection notes',
+                'Create servicing records with costs and next service dates',
+                'Flag unsafe cars and review certificates due',
+            ],
+            'Customer' => [
+                'Search cars, view photos and rates, and request a booking',
+                'Follow reservation status and change eligible pending trips',
+                'View your own invoices, payments, receipts and deposits',
+                'Update your contact details and receive SMS updates',
+            ],
+            'Driver' => [
+                'View only your assigned trips, times and locations',
+                'See the authorised vehicle and customer contact for each trip',
+                'Update trip progress and report delays or incidents',
+            ],
+            default => [],
+        };
+    }
+
+    private function restriction(string $role): string
+    {
+        return match ($role) {
+            'System Administrator' => 'Payments and refunds are never auto-approved. Financial postings stay in the ledger and audit log.',
+            'Business Manager' => 'You cannot change security settings or edit posted payments. Reports are view and export only.',
+            'Rental Officer' => 'You cannot open system administration or post unauthorised refunds or ledger adjustments.',
+            'Accountant/Cashier' => 'Refunds, reversals and adjustments require a reason and are written to the audit log. Posted rows are never deleted.',
+            'Vehicle Inspector/Maintenance Staff' => 'You cannot delete financial records or confirm reservations. Flag a vehicle instead of changing hire status.',
+            'Customer' => 'You can only open your own account, bookings, invoices and receipts. Changing a URL or ID will not show someone else’s records.',
+            'Driver' => 'You cannot see other drivers’ trips, the full customer list, or financial reports.',
+            default => '',
         };
     }
 
@@ -126,6 +194,8 @@ final class DashboardService
                 ['label' => 'Open bookings', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status IN ('pending','confirmed')"), 'hint' => 'Pending + confirmed', 'href' => url('reservations')],
                 ['label' => 'Live rentals', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue')"), 'hint' => 'On the road', 'href' => url('rentals')],
             ],
+            'paymentsView' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed'")),
+            'openMaint' => $this->count("SELECT COUNT(*) c FROM maintenance_records WHERE status IN ('scheduled','in_progress')"),
             'users' => Database::fetchAll('SELECT u.first_name, u.last_name, u.email, u.status, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.created_at DESC LIMIT 8'),
             'audit' => Database::fetchAll('SELECT action, entity_type, result, created_at FROM audit_logs ORDER BY created_at DESC LIMIT 8'),
             'fleet' => Database::fetchAll('SELECT status, COUNT(*) c FROM vehicles GROUP BY status'),
@@ -140,13 +210,27 @@ final class DashboardService
                     COALESCE(SUM(CASE WHEN transaction_type='payment_refund' AND status='completed' THEN amount END),0) refunds
              FROM financial_transactions"
         );
+        $fleetSize = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'");
+        $onHire = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'rented'");
+        $util = $fleetSize > 0 ? (string) round(($onHire / $fleetSize) * 100) . '%' : '—';
         return [
             'kpis' => [
-                ['label' => 'Fleet', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'"), 'hint' => 'Operational cars', 'href' => url('vehicles')],
-                ['label' => 'Confirmed', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'confirmed'"), 'hint' => 'Upcoming hire', 'href' => url('reservations')],
+                ['label' => 'Revenue received', 'value' => Money::format($fin['payments'] ?? 0), 'hint' => 'Completed payments', 'href' => url('reports')],
+                ['label' => 'Utilisation', 'value' => $util, 'hint' => $onHire . ' of ' . $fleetSize . ' cars on hire', 'href' => url('vehicles')],
                 ['label' => 'Overdue returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Need follow-up', 'href' => url('rentals')],
                 ['label' => 'Outstanding', 'value' => Money::format($this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances')), 'hint' => 'Unpaid invoices', 'href' => url('invoices')],
             ],
+            'officers' => Database::fetchAll(
+                "SELECT u.first_name, u.last_name, COUNT(*) c FROM reservations r
+                 JOIN users u ON u.user_id = r.created_by JOIN roles ro ON ro.role_id = u.role_id
+                 WHERE ro.role_name = 'Rental Officer' AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                 GROUP BY u.user_id, u.first_name, u.last_name ORDER BY c DESC LIMIT 6"
+            ),
+            'maintAlerts' => Database::fetchAll(
+                "SELECT m.title, m.status, v.registration_no FROM maintenance_records m
+                 JOIN vehicles v ON v.vehicle_id = m.vehicle_id
+                 WHERE m.status IN ('scheduled','in_progress') ORDER BY m.start_date LIMIT 6"
+            ),
             'payments' => $fin['payments'] ?? 0,
             'refunds' => $fin['refunds'] ?? 0,
             'due' => Database::fetchAll(
@@ -211,6 +295,19 @@ final class DashboardService
                 "SELECT transaction_id, transaction_number, amount, external_reference, status, transaction_date, invoice_id
                  FROM financial_transactions WHERE status = 'pending' ORDER BY created_at DESC LIMIT 8"
             ),
+            'overdue' => Database::fetchAll(
+                "SELECT i.invoice_id, i.invoice_number, i.due_date, b.outstanding_balance, c.first_name, c.last_name
+                 FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
+                 LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                 WHERE i.status IN ('overdue','issued','partially_paid') AND i.due_date IS NOT NULL AND i.due_date < CURDATE()
+                   AND COALESCE(b.outstanding_balance, i.total_amount) > 0
+                 ORDER BY i.due_date ASC LIMIT 8"
+            ),
+            'deposits' => Money::format($this->sum(
+                "SELECT COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount
+                    WHEN transaction_type IN ('deposit_refund','deposit_deduction') AND status='completed' THEN -amount END),0) s
+                 FROM financial_transactions"
+            )),
         ];
     }
 
@@ -238,6 +335,12 @@ final class DashboardService
                  FROM vehicles
                  WHERE inspection_expiry_date IS NOT NULL AND inspection_expiry_date <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) AND status <> 'inactive'
                  ORDER BY inspection_expiry_date LIMIT 8"
+            ),
+            'nextService' => Database::fetchAll(
+                "SELECT v.registration_no, m.next_service_date, m.title FROM maintenance_records m
+                 JOIN vehicles v ON v.vehicle_id = m.vehicle_id
+                 WHERE m.next_service_date IS NOT NULL AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 21 DAY)
+                 ORDER BY m.next_service_date LIMIT 6"
             ),
         ];
     }
@@ -267,6 +370,20 @@ final class DashboardService
                 "SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id
                  WHERE v.status NOT IN ('inactive','maintenance') ORDER BY v.daily_rate ASC LIMIT 6"
             ),
+            'deposit' => Money::format($this->sum(
+                "SELECT COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount
+                    WHEN transaction_type IN ('deposit_refund','deposit_deduction') AND status='completed' THEN -amount END),0) s
+                 FROM financial_transactions WHERE customer_id = ?",
+                [$cid]
+            )),
+            'upcomingReturn' => Database::fetch(
+                "SELECT rt.expected_return_datetime, v.registration_no FROM rentals rt
+                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
+                 WHERE rt.customer_id = ? AND rt.status IN ('scheduled','active','overdue')
+                 ORDER BY rt.expected_return_datetime ASC LIMIT 1",
+                [$cid]
+            ),
+            'profile' => Database::fetch('SELECT * FROM customers WHERE customer_id = ?', [$cid]),
         ];
     }
 
@@ -274,7 +391,8 @@ final class DashboardService
     {
         $userId = Auth::id() ?: 0;
         $assignments = Database::fetchAll(
-            "SELECT da.assignment_id, da.notes AS assignment_notes, r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
+            "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report,
+                    r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
                     r.pickup_location, r.return_location, r.status AS reservation_status,
                     c.first_name, c.last_name, c.phone, v.registration_no, v.make, v.model
              FROM drivers d JOIN driver_assignments da ON da.driver_id = d.driver_id
@@ -295,6 +413,7 @@ final class DashboardService
             ],
             'assignments' => $assignments,
             'nextTrip' => $assignments[0] ?? null,
+            'profile' => Database::fetch('SELECT * FROM drivers WHERE user_id = ?', [$userId]),
         ];
     }
 

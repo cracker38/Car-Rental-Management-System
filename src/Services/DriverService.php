@@ -104,4 +104,42 @@ final class DriverService
             (new NotificationService())->notifyUser($notify['user_id'], null, 'driver_assignment', 'Chauffeur trip assigned', 'You have been assigned to reservation ' . $notify['code'] . '.', 'reservation', $reservationId);
         }
     }
+
+    public function updateTrip(int $assignmentId, string $status, string $incident = ''): void
+    {
+        $allowed = ['assigned', 'en_route', 'on_site', 'completed', 'delayed'];
+        if (!in_array($status, $allowed, true)) {
+            throw new InvalidArgumentException('Choose a valid trip status.');
+        }
+        $driver = Database::fetch('SELECT driver_id FROM drivers WHERE user_id = ?', [Auth::id()]);
+        if (!$driver) {
+            throw new InvalidArgumentException('Your user account is not linked to a driver record.');
+        }
+        $row = Database::fetch(
+            'SELECT da.*, r.reservation_code FROM driver_assignments da
+             JOIN reservations r ON r.reservation_id = da.reservation_id
+             WHERE da.assignment_id = ? AND da.driver_id = ?',
+            [$assignmentId, $driver['driver_id']]
+        );
+        if (!$row) {
+            throw new InvalidArgumentException('That trip is not assigned to you.');
+        }
+        Database::execute(
+            'UPDATE driver_assignments SET trip_status = ?, incident_report = ?, status_updated_at = NOW() WHERE assignment_id = ?',
+            [$status, $incident !== '' ? $incident : ($row['incident_report'] ?? null), $assignmentId]
+        );
+        Audit::log('driver.trip_status', 'driver_assignment', (string) $assignmentId, $row['reservation_code'] . ' -> ' . $status);
+        if ($incident !== '') {
+            $reservation = Database::fetch('SELECT customer_id FROM reservations WHERE reservation_id = ?', [$row['reservation_id']]);
+            (new NotificationService())->notifyUser(
+                $row['assigned_by'] ? (int) $row['assigned_by'] : Auth::id(),
+                $reservation ? (int) $reservation['customer_id'] : null,
+                'driver_incident',
+                'Driver report ' . $row['reservation_code'],
+                $incident,
+                'reservation',
+                (int) $row['reservation_id']
+            );
+        }
+    }
 }
