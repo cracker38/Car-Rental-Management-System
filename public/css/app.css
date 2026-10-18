@@ -27,6 +27,9 @@ a { color: var(--teal); }
   font-weight: 700; font-size: .85rem;
 }
 .site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
   background: var(--navy);
   padding: .7rem 0;
 }
@@ -188,13 +191,15 @@ a { color: var(--teal); }
 .site-body { background: var(--rcr-paper); color: var(--rcr-ink); }
 .home-body { overflow-x: hidden; }
 .home-nav {
-  position: absolute;
+  position: fixed;
   inset: 0 0 auto;
-  z-index: 20;
+  z-index: 1030;
   width: 100%;
   padding: 1.25rem 0;
   background: transparent;
+  transition: background-color .2s ease, box-shadow .2s ease, backdrop-filter .2s ease;
 }
+.home-nav.is-scrolled { background: rgba(27,29,31,.97); box-shadow: 0 8px 24px rgba(0,0,0,.16); backdrop-filter: blur(12px); }
 .home-nav .container { max-width: 1700px; padding-inline: clamp(1.25rem, 5vw, 5rem); }
 .home-nav .navbar-brand { gap: .7rem; color: #fff; }
 .home-nav .brand-mark, .footer-brand .brand-mark {
@@ -387,7 +392,7 @@ a { color: var(--teal); }
 }
 
 /* Consistent inner pages for About, Services, Contact, and the Rwanda Journal. */
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
 .public-info-page { background: var(--rcr-paper); }
 .info-hero { position: relative; overflow: hidden; min-height: 405px; display: flex; align-items: center; color: #fff; background: radial-gradient(ellipse at 78% 18%, rgba(244,122,8,.28), transparent 34%), linear-gradient(120deg, #191b1d, #272a2c); }
 .info-hero::after { position: absolute; top: 15%; right: 9%; width: 265px; height: 265px; content: ""; border: 1px solid rgba(255,255,255,.09); border-radius: 50%; box-shadow: 0 0 0 32px rgba(255,255,255,.025), 0 0 0 70px rgba(255,255,255,.02); }
@@ -617,12 +622,17 @@ html { scroll-behavior: smooth; }
   min-height: 100vh;
 }
 .app-shell > .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: .35rem;
   padding: 1.25rem 1rem 2rem;
   background: #141618;
+  height: 100vh;
   min-height: 100vh;
+  overflow-y: auto;
 }
 .app-shell .brand {
   display: flex;
@@ -647,6 +657,9 @@ html { scroll-behavior: smooth; }
 .app-shell .nav-link i { width: 1.1rem; color: var(--rcr-orange); }
 .app-main { display: flex; flex-direction: column; min-width: 0; }
 .app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
   display: flex;
   align-items: center;
   gap: 1rem;

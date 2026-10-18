@@ -7,6 +7,7 @@ use Crms\Auth;
 use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
+use Crms\Services\DriverAccess;
 use Crms\View;
 use Crms\Services\ReservationService;
 use InvalidArgumentException;
@@ -163,11 +164,18 @@ final class ReservationController
             && !$rental;
         $drivers = [];
         $assignment = null;
+        $protectedDriverAssignment = false;
         if (Rbac::can('drivers.manage') && in_array($row['status'], ['pending', 'confirmed'], true)) {
-            $drivers = Database::fetchAll("SELECT * FROM drivers WHERE status='active' ORDER BY last_name,first_name");
+            $drivers = Database::fetchAll(
+                "SELECT d.* FROM drivers d WHERE d.status='active' AND " . DriverAccess::scopeSql('d') . ' ORDER BY d.last_name,d.first_name'
+            );
             $assignment = Database::fetch('SELECT * FROM driver_assignments WHERE reservation_id=?', [$id]);
+            if ($assignment && !DriverAccess::canAccess((int) $assignment['driver_id'])) {
+                $assignment = null;
+                $protectedDriverAssignment = true;
+            }
         }
-        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'depositSummary' => $depositSummary, 'depositTransactions' => $depositTransactions, 'bookingInvoice' => $bookingInvoice, 'canEditConfirmedStaffBooking' => $canEditConfirmedStaffBooking, 'drivers' => $drivers, 'assignment' => $assignment]);
+        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'depositSummary' => $depositSummary, 'depositTransactions' => $depositTransactions, 'bookingInvoice' => $bookingInvoice, 'canEditConfirmedStaffBooking' => $canEditConfirmedStaffBooking, 'drivers' => $drivers, 'assignment' => $assignment, 'protectedDriverAssignment' => $protectedDriverAssignment]);
     }
 
     public function transition(): void

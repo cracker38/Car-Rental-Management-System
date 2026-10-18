@@ -39,10 +39,10 @@ final class DriverService
         return Database::transaction(function (PDO $pdo) use ($input, $id, $first, $last, $phone, $license, $status, $expiry, $userId) {
             $before = null;
             if ($id) {
-                $stmt = $pdo->prepare('SELECT * FROM drivers WHERE driver_id=? FOR UPDATE');
+                $stmt = $pdo->prepare('SELECT d.* FROM drivers d WHERE d.driver_id=? AND ' . DriverAccess::scopeSql('d') . ' FOR UPDATE');
                 $stmt->execute([$id]);
                 $before = $stmt->fetch();
-                if (!$before) throw new InvalidArgumentException('Driver record not found.');
+                if (!$before) throw new InvalidArgumentException('Driver record not found or is not available to your role.');
                 if ($status === 'inactive' && $before['status'] !== 'inactive') {
                     $future = Database::fetch("SELECT r.reservation_code FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id WHERE da.driver_id=? AND r.status IN ('pending','confirmed') AND r.return_datetime>NOW() LIMIT 1", [$id]);
                     if ($future) throw new InvalidArgumentException('Remove upcoming assignments before marking this driver inactive.');
@@ -73,6 +73,9 @@ final class DriverService
                 throw new InvalidArgumentException('Drivers can only be assigned to pending or confirmed reservations.');
             }
             $current = Database::fetch('SELECT * FROM driver_assignments WHERE reservation_id=? FOR UPDATE', [$reservationId]);
+            if ($current && !DriverAccess::canAccess((int) $current['driver_id'])) {
+                throw new InvalidArgumentException('This driver assignment is managed by the System Administrator.');
+            }
             $oldDriver = $current
                 ? Database::fetch('SELECT user_id FROM drivers WHERE driver_id=? FOR UPDATE', [(int)$current['driver_id']])
                 : null;
@@ -93,10 +96,10 @@ final class DriverService
                 }
                 return $messages;
             }
-            $stmt = $pdo->prepare('SELECT * FROM drivers WHERE driver_id=? FOR UPDATE');
+            $stmt = $pdo->prepare('SELECT d.* FROM drivers d WHERE d.driver_id=? AND ' . DriverAccess::scopeSql('d') . ' FOR UPDATE');
             $stmt->execute([$driverId]);
             $driver = $stmt->fetch();
-            if (!$driver || $driver['status'] !== 'active') throw new InvalidArgumentException('Choose an active driver.');
+            if (!$driver || $driver['status'] !== 'active') throw new InvalidArgumentException('Choose an active driver available to your role.');
             if (!empty($driver['license_expiry_date']) && $driver['license_expiry_date'] < date('Y-m-d')) {
                 throw new InvalidArgumentException('The selected driver licence has expired.');
             }

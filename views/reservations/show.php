@@ -114,12 +114,16 @@ if ($allowed && $mayTransition):
   </div>
 <?php endif; ?>
 <?php if (can('drivers.manage') && in_array($row['status'], ['pending', 'confirmed'], true)): ?>
+  <?php if (!empty($protectedDriverAssignment)): ?>
+    <section class="panel mb-3"><div class="panel-h">Chauffeur assignment</div><p class="text-muted mb-0">This driver assignment is managed by the System Administrator.</p></section>
+  <?php else: ?>
   <form method="post" action="<?= e(url('drivers/assign')) ?>" class="panel mb-3">
     <?= \Crms\Csrf::field() ?><input type="hidden" name="reservation_id" value="<?= (int)$row['reservation_id'] ?>">
     <div class="panel-h">Chauffeur assignment</div>
     <div class="row g-2 align-items-end"><div class="col-md-5"><label class="form-label" for="reservation-driver">Driver</label><select class="form-select" id="reservation-driver" name="driver_id"><option value="">No driver assigned</option><?php foreach (($drivers ?? []) as $driver): ?><option value="<?= (int)$driver['driver_id'] ?>" <?= (int)($assignment['driver_id'] ?? 0) === (int)$driver['driver_id'] ? 'selected' : '' ?>><?= e($driver['first_name'] . ' ' . $driver['last_name']) ?> · <?= e($driver['phone']) ?></option><?php endforeach; ?></select></div><div class="col-md-5"><label class="form-label" for="driver-assignment-notes">Notes</label><input class="form-control" id="driver-assignment-notes" name="notes" value="<?= e($assignment['notes'] ?? '') ?>" placeholder="Pickup instructions"></div><div class="col-md-2 d-grid"><button class="btn btn-outline-primary">Save</button></div></div>
     <small class="text-muted mt-2">A driver cannot be assigned to another overlapping reservation.</small>
   </form>
+  <?php endif; ?>
 <?php endif; ?>
 <?php if ($row['status'] === 'confirmed' && !$rental && can('rentals.manage') && !\Crms\Auth::isCustomer()): ?>
   <form method="post" action="<?= e(url('rentals/create')) ?>" class="panel">

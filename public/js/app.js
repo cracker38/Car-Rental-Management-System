@@ -17,6 +17,16 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach(function (button) {
   });
 });
 
+var homeNav = document.querySelector('.home-nav');
+if (homeNav) {
+  var updateHomeNav = function () {
+    homeNav.classList.toggle('is-scrolled', window.scrollY > 24);
+  };
+  window.addEventListener('scroll', updateHomeNav, { passive: true });
+  window.addEventListener('pageshow', updateHomeNav);
+  updateHomeNav();
+}
+
 document.querySelectorAll('input[type="datetime-local"][data-min-now]').forEach(function (el) {
   if (!el.value) {
     var n = new Date();

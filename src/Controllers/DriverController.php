@@ -7,6 +7,7 @@ use Crms\Auth;
 use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
+use Crms\Services\DriverAccess;
 use Crms\Services\DriverService;
 use Crms\View;
 use InvalidArgumentException;
@@ -17,7 +18,8 @@ final class DriverController
     {
         Rbac::require('drivers.manage');
         $rows = Database::fetchAll(
-            'SELECT d.*, u.email AS account_email FROM drivers d LEFT JOIN users u ON u.user_id=d.user_id ORDER BY d.status,d.last_name,d.first_name'
+            'SELECT d.*, u.email AS account_email FROM drivers d LEFT JOIN users u ON u.user_id=d.user_id
+             WHERE ' . DriverAccess::scopeSql('d') . ' ORDER BY d.status,d.last_name,d.first_name'
         );
         View::render('drivers/index', ['title' => 'Drivers', 'rows' => $rows]);
     }
@@ -26,7 +28,7 @@ final class DriverController
     {
         Rbac::require('drivers.manage');
         $id = Http::int('id');
-        $driver = $id ? Database::fetch('SELECT * FROM drivers WHERE driver_id=?', [$id]) : null;
+        $driver = $id ? Database::fetch('SELECT d.* FROM drivers d WHERE d.driver_id=? AND ' . DriverAccess::scopeSql('d'), [$id]) : null;
         if ($id && !$driver) {
             http_response_code(404);
             View::render('errors/404', ['title' => 'Not found']);
@@ -35,7 +37,7 @@ final class DriverController
         $users = Database::fetchAll(
             "SELECT u.user_id,u.first_name,u.last_name,u.email FROM users u JOIN roles r ON r.role_id=u.role_id
              LEFT JOIN drivers d ON d.user_id=u.user_id WHERE r.role_name='Driver' AND u.status='active'
-             AND (d.driver_id IS NULL OR d.driver_id=?) ORDER BY u.last_name,u.first_name",
+             AND (d.driver_id IS NULL OR (d.driver_id=? AND " . DriverAccess::scopeSql('d') . ")) ORDER BY u.last_name,u.first_name",
             [$id ?: 0]
         );
         if (Http::isPost()) {
@@ -75,6 +77,10 @@ final class DriverController
         if (!$canManage) {
             $driver = Database::fetch('SELECT driver_id FROM drivers WHERE user_id=?', [Auth::id()]);
             $driverId = (int)($driver['driver_id'] ?? 0);
+        } elseif ($driverId > 0 && !DriverAccess::canAccess($driverId)) {
+            http_response_code(404);
+            View::render('errors/404', ['title' => 'Not found']);
+            return;
         }
         $rows = $driverId ? Database::fetchAll(
             "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report, da.status_updated_at,
@@ -88,7 +94,9 @@ final class DriverController
                       CASE WHEN r.pickup_datetime >= NOW() THEN r.pickup_datetime ELSE r.return_datetime END ASC LIMIT 200",
             [$driverId]
         ) : [];
-        $drivers = $canManage ? Database::fetchAll("SELECT driver_id,first_name,last_name FROM drivers ORDER BY last_name,first_name") : [];
+        $drivers = $canManage ? Database::fetchAll(
+            'SELECT d.driver_id,d.first_name,d.last_name FROM drivers d WHERE ' . DriverAccess::scopeSql('d') . ' ORDER BY d.last_name,d.first_name'
+        ) : [];
         View::render('drivers/schedule', ['title' => $canManage ? 'Driver schedule' : 'My schedule', 'rows' => $rows, 'drivers' => $drivers, 'driverId' => $driverId, 'canManage' => $canManage]);
     }
 
