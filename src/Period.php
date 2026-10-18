@@ -12,7 +12,7 @@ final class Period
         $es = new DateTimeImmutable($existStart);
         $ee = (new DateTimeImmutable($existEnd))->modify('+' . $bufferMinutes . ' minutes');
         $rs = new DateTimeImmutable($reqStart);
-        $re = new DateTimeImmutable($reqEnd);
+        $re = (new DateTimeImmutable($reqEnd))->modify('+' . $bufferMinutes . ' minutes');
         return $es < $re && $ee > $rs;
     }
 }

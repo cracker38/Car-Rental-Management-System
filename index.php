@@ -55,6 +55,7 @@ $routes = [
     'rentals/return' => [RentalController::class, 'returnVehicle'],
     'rentals/inspect' => [RentalController::class, 'inspect'],
     'rentals/close' => [RentalController::class, 'close'],
+    'rentals/cancel' => [RentalController::class, 'cancel'],
     'invoices' => [InvoiceController::class, 'index'],
     'invoices/show' => [InvoiceController::class, 'show'],
     'invoices/create' => [InvoiceController::class, 'create'],

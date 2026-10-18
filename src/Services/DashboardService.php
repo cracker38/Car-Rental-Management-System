@@ -355,7 +355,7 @@ final class DashboardService
             'kpis' => [
                 ['label' => 'Reservations to review', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'pending'"), 'hint' => 'Awaiting a decision', 'href' => url('reservations')],
                 ['label' => 'Pickups this week', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status = 'confirmed' AND pickup_datetime >= NOW() AND pickup_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Confirmed reservations', 'href' => url('reservations')],
-                ['label' => 'Returns this week', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('scheduled','active','overdue') AND expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Due back or overdue', 'href' => url('rentals')],
+                ['label' => 'Returns this week', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Due back or overdue', 'href' => url('rentals')],
                 ['label' => 'Late returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Needs follow-up', 'href' => url('rentals')],
             ],
             'pending' => Database::fetchAll(
@@ -370,9 +370,11 @@ final class DashboardService
                  ORDER BY r.pickup_datetime LIMIT 10"
             ),
             'upcomingReturns' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status, v.registration_no, c.first_name, c.last_name
+                "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status,
+                        CASE WHEN rt.status = 'active' AND rt.expected_return_datetime < NOW() THEN 'overdue' ELSE rt.status END AS display_status,
+                        v.registration_no, c.first_name, c.last_name
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id JOIN customers c ON c.customer_id = rt.customer_id
-                 WHERE rt.status IN ('scheduled','active','overdue')
+                 WHERE rt.status IN ('active','overdue')
                    AND (rt.expected_return_datetime < NOW() OR rt.expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))
                  ORDER BY rt.expected_return_datetime LIMIT 10"
             ),

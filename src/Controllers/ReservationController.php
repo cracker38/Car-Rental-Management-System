@@ -16,7 +16,8 @@ final class ReservationController
     public function index(): void
     {
         Rbac::require('reservations.view');
-        $sql = 'SELECT r.*, c.first_name, c.last_name, v.registration_no, v.make, v.model
+        $sql = 'SELECT r.*, EXISTS(SELECT 1 FROM rentals rt WHERE rt.reservation_id = r.reservation_id) AS has_rental,
+                       c.first_name, c.last_name, v.registration_no, v.make, v.model
                 FROM reservations r
                 JOIN customers c ON c.customer_id = r.customer_id
                 JOIN vehicles v ON v.vehicle_id = r.vehicle_id';
@@ -47,8 +48,12 @@ final class ReservationController
                 View::render('errors/404', ['title' => 'Not found']);
                 return;
             }
-            if ($reservation['status'] !== 'pending') {
-                Http::flash('warning', 'Only pending reservations can be edited.');
+            $canEditConfirmedStaffBooking = !Auth::isCustomer()
+                && $reservation['status'] === 'confirmed'
+                && $reservation['pickup_datetime'] > date('Y-m-d H:i:s')
+                && !Database::fetch('SELECT rental_id FROM rentals WHERE reservation_id = ?', [$reservationId]);
+            if ($reservation['status'] !== 'pending' && !$canEditConfirmedStaffBooking) {
+                Http::flash('warning', 'Only pending reservations or eligible future confirmed staff bookings can be edited.');
                 Http::redirect('reservations/show', ['id' => $reservationId]);
             }
         }
@@ -84,7 +89,7 @@ final class ReservationController
                     'internal_notes' => Auth::isCustomer() ? null : Http::str('internal_notes'),
                 ];
                 if ($reservation) {
-                    $svc->updatePending($reservationId, $input, !Auth::isCustomer());
+                    $svc->update($reservationId, $input, !Auth::isCustomer());
                     Http::flash('success', 'Reservation updated. Availability and pricing were rechecked.');
                     Http::redirect('reservations/show', ['id' => $reservationId]);
                 }
@@ -127,13 +132,17 @@ final class ReservationController
             return;
         }
         $rental = Database::fetch('SELECT * FROM rentals WHERE reservation_id = ?', [$id]);
+        $canEditConfirmedStaffBooking = !Auth::isCustomer()
+            && $row['status'] === 'confirmed'
+            && $row['pickup_datetime'] > date('Y-m-d H:i:s')
+            && !$rental;
         $drivers = [];
         $assignment = null;
         if (Rbac::can('drivers.manage') && in_array($row['status'], ['pending', 'confirmed'], true)) {
             $drivers = Database::fetchAll("SELECT * FROM drivers WHERE status='active' ORDER BY last_name,first_name");
             $assignment = Database::fetch('SELECT * FROM driver_assignments WHERE reservation_id=?', [$id]);
         }
-        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'drivers' => $drivers, 'assignment' => $assignment]);
+        View::render('reservations/show', ['title' => $row['reservation_code'], 'row' => $row, 'rental' => $rental, 'canEditConfirmedStaffBooking' => $canEditConfirmedStaffBooking, 'drivers' => $drivers, 'assignment' => $assignment]);
     }
 
     public function transition(): void

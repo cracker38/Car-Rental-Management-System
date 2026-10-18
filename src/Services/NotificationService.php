@@ -16,6 +16,22 @@ final class NotificationService
         );
     }
 
+    public function notifyRentalOfficers(string $type, string $subject, string $message, ?string $entity = null, ?int $entityId = null, ?int $excludeUserId = null): void
+    {
+        $sql = "SELECT u.user_id FROM users u
+                JOIN roles r ON r.role_id = u.role_id
+                WHERE r.role_name = 'Rental Officer' AND u.status = 'active'";
+        $params = [];
+        if ($excludeUserId !== null) {
+            $sql .= ' AND u.user_id <> ?';
+            $params[] = $excludeUserId;
+        }
+
+        foreach (Database::fetchAll($sql, $params) as $officer) {
+            $this->notifyUser((int) $officer['user_id'], null, $type, $subject, $message, $entity, $entityId);
+        }
+    }
+
     public function markRead(int $id, ?int $userId, ?int $customerId): void
     {
         Database::execute(

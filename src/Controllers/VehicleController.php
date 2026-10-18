@@ -36,15 +36,45 @@ final class VehicleController
     public function form(): void
     {
         Rbac::require('vehicles.manage');
+        $rentalOfficer = (Auth::user()['role_name'] ?? '') === 'Rental Officer';
         $id = Http::int('id');
         $vehicle = $id ? Database::fetch('SELECT * FROM vehicles WHERE vehicle_id = ?', [$id]) : null;
         $categories = Database::fetchAll('SELECT * FROM vehicle_categories ORDER BY category_name');
         if (Http::isPost()) {
             $v = new Validator();
-            $v->require($_POST, ['category_id', 'registration_no', 'make', 'model', 'daily_rate']);
-            $v->in('status', Http::str('status'), ['available', 'reserved', 'rented', 'maintenance', 'inactive']);
-            $v->decimal('daily_rate', Http::str('daily_rate'));
+            $required = ['category_id', 'registration_no', 'make', 'model'];
+            if (!$rentalOfficer) {
+                $required[] = 'daily_rate';
+            }
+            $v->require($_POST, $required);
+            $categoryIds = array_map(static fn(array $category): string => (string) $category['category_id'], $categories);
+            $v->in('category_id', (string) Http::int('category_id'), $categoryIds);
+            if (!$rentalOfficer) {
+                $v->in('status', Http::str('status'), ['available', 'reserved', 'rented', 'maintenance', 'inactive']);
+                $v->decimal('daily_rate', Http::str('daily_rate'));
+                $v->decimal('weekly_rate', Http::str('weekly_rate'), true);
+                $v->decimal('monthly_rate', Http::str('monthly_rate'), true);
+            }
+            $fuelLevel = Http::str('fuel_level_percent');
+            if ($fuelLevel !== '' && (!is_numeric($fuelLevel) || (float) $fuelLevel < 0 || (float) $fuelLevel > 100)) {
+                $v->errors['fuel_level_percent'] = 'Fuel level must be between 0 and 100 percent.';
+            }
+            if (Http::int('current_mileage', 0) < 0) {
+                $v->errors['current_mileage'] = 'Mileage cannot be negative.';
+            }
             if ($v->ok()) {
+                $selectedCategory = null;
+                foreach ($categories as $category) {
+                    if ((int) $category['category_id'] === Http::int('category_id')) {
+                        $selectedCategory = $category;
+                        break;
+                    }
+                }
+                if (!$selectedCategory) {
+                    Http::flash('danger', 'Choose a valid vehicle category.');
+                    View::render('vehicles/form', ['title' => $vehicle ? 'Edit vehicle' : 'Add vehicle', 'vehicle' => $vehicle, 'categories' => $categories, 'rentalOfficer' => $rentalOfficer]);
+                    return;
+                }
                 $image = $vehicle['image_path'] ?? null;
                 try {
                     $uploaded = Upload::image($_FILES['image'] ?? ['error' => UPLOAD_ERR_NO_FILE], 'vehicles');
@@ -53,17 +83,34 @@ final class VehicleController
                     }
                 } catch (\Throwable $e) {
                     Http::flash('danger', $e->getMessage());
-                    View::render('vehicles/form', ['title' => 'Vehicle', 'vehicle' => $vehicle, 'categories' => $categories]);
+                    View::render('vehicles/form', ['title' => 'Vehicle', 'vehicle' => $vehicle, 'categories' => $categories, 'rentalOfficer' => $rentalOfficer]);
                     return;
+                }
+                if ($rentalOfficer) {
+                    if ($vehicle) {
+                        $dailyRate = $vehicle['daily_rate'];
+                        $weeklyRate = $vehicle['weekly_rate'];
+                        $monthlyRate = $vehicle['monthly_rate'];
+                        $status = $vehicle['status'];
+                    } else {
+                        $dailyRate = $selectedCategory['default_daily_rate'];
+                        $weeklyRate = $selectedCategory['default_weekly_rate'];
+                        $monthlyRate = $selectedCategory['default_monthly_rate'];
+                        $status = 'available';
+                    }
+                } else {
+                    $dailyRate = Http::str('daily_rate');
+                    $weeklyRate = Http::str('weekly_rate') !== '' ? Http::str('weekly_rate') : null;
+                    $monthlyRate = Http::str('monthly_rate') !== '' ? Http::str('monthly_rate') : null;
+                    $status = Http::str('status') ?: 'available';
                 }
                 $fields = [
                     Http::int('category_id'), Http::str('registration_no'), Http::str('vin') ?: null,
                     Http::str('make'), Http::str('model'), Http::str('manufacture_year') !== '' ? Http::int('manufacture_year') : null,
                     Http::str('colour') ?: null, Http::str('transmission') ?: 'manual', Http::str('fuel_type') ?: 'petrol',
-                    Http::str('daily_rate'), Http::str('weekly_rate') !== '' ? Http::str('weekly_rate') : null,
-                    Http::str('monthly_rate') !== '' ? Http::str('monthly_rate') : null,
+                    $dailyRate, $weeklyRate, $monthlyRate,
                     Http::int('current_mileage'), Http::str('fuel_level_percent') !== '' ? Http::str('fuel_level_percent') : null,
-                    $image, Http::str('status') ?: 'available',
+                    $image, $status,
                     Http::str('insurance_expiry_date') ?: null, Http::str('inspection_expiry_date') ?: null,
                     Http::str('description') ?: null,
                 ];
@@ -88,7 +135,7 @@ final class VehicleController
                 Http::flash('danger', 'Please correct the highlighted fields.');
             }
         }
-        View::render('vehicles/form', ['title' => $vehicle ? 'Edit vehicle' : 'Add vehicle', 'vehicle' => $vehicle, 'categories' => $categories]);
+        View::render('vehicles/form', ['title' => $vehicle ? 'Edit vehicle' : 'Add vehicle', 'vehicle' => $vehicle, 'categories' => $categories, 'rentalOfficer' => $rentalOfficer]);
     }
 
     public function show(): void

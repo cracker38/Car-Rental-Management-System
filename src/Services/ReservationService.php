@@ -18,7 +18,7 @@ final class ReservationService
     /** @var array<string,list<string>> */
     public const TRANSITIONS = [
         'pending' => ['confirmed', 'cancelled', 'rejected'],
-        'confirmed' => ['cancelled', 'completed', 'no_show'],
+        'confirmed' => ['cancelled', 'no_show'],
         'cancelled' => [],
         'rejected' => [],
         'completed' => [],
@@ -39,7 +39,8 @@ final class ReservationService
             $vehicleId = (int) $input['vehicle_id'];
             $pickup = $input['pickup_datetime'];
             $returnAt = $input['return_datetime'];
-            $discount = $input['discount_amount'] ?? '0';
+            $isRentalOfficer = (Auth::user()['role_name'] ?? '') === 'Rental Officer';
+            $discount = $asStaff && !$isRentalOfficer ? (string) ($input['discount_amount'] ?? '0') : '0';
 
             $customer = Database::fetch('SELECT * FROM customers WHERE customer_id = ? FOR UPDATE', [$customerId]);
             if (!$customer) {
@@ -95,12 +96,23 @@ final class ReservationService
                 $this->syncVehicleStatus($vehicleId);
             }
             Audit::log('reservation.created', 'reservation', (string) $id, $code . ' ' . $status);
-            (new NotificationService())->notifyUser(
+            $notifications = new NotificationService();
+            $notifications->notifyUser(
                 Auth::id(),
                 $customerId,
                 'reservation_created',
                 'Reservation ' . $code,
-                'Reservation ' . $code . ' is ' . $status . '.'
+                'Reservation ' . $code . ' is ' . $status . '.',
+                'reservation',
+                $id
+            );
+            $notifications->notifyRentalOfficers(
+                'reservation_created',
+                'Reservation ' . $code,
+                'A new reservation was created and is ' . $status . '.',
+                'reservation',
+                $id,
+                Auth::id()
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
@@ -116,8 +128,8 @@ final class ReservationService
         return $created;
     }
 
-    /** Update a pending booking while rechecking and locking its new availability. */
-    public function updatePending(int $id, array $input, bool $asStaff): array
+    /** Update a pending booking, or a future confirmed staff booking with no rental agreement. */
+    public function update(int $id, array $input, bool $asStaff): array
     {
         $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
         $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff) {
@@ -127,8 +139,16 @@ final class ReservationService
             if (!$reservation) {
                 throw new InvalidArgumentException('Reservation not found.');
             }
-            if ($reservation['status'] !== 'pending') {
-                throw new InvalidArgumentException('Only pending reservations can be edited.');
+            $editable = $reservation['status'] === 'pending';
+            if (!$editable && $asStaff && $reservation['status'] === 'confirmed') {
+                $now = (string) $pdo->query('SELECT NOW()')->fetchColumn();
+                $rentalStmt = $pdo->prepare('SELECT rental_id FROM rentals WHERE reservation_id = ?');
+                $rentalStmt->execute([$id]);
+                $hasRental = (bool) $rentalStmt->fetchColumn();
+                $editable = $reservation['pickup_datetime'] > $now && !$hasRental;
+            }
+            if (!$editable) {
+                throw new InvalidArgumentException('Only pending reservations, or future confirmed staff bookings without a rental, can be edited.');
             }
 
             $customerId = (int) $reservation['customer_id'];
@@ -158,7 +178,10 @@ final class ReservationService
             if ($conflict) {
                 throw new InvalidArgumentException($conflict);
             }
-            $discount = $asStaff ? (string) ($input['discount_amount'] ?? '0') : '0';
+            $isRentalOfficer = (Auth::user()['role_name'] ?? '') === 'Rental Officer';
+            $discount = $asStaff && !$isRentalOfficer
+                ? (string) ($input['discount_amount'] ?? '0')
+                : ($isRentalOfficer ? (string) $reservation['discount_amount'] : '0');
             $quote = $this->pricing->quoteRates($vehicle, $pickup, $returnAt, $discount);
             Database::execute(
                 'UPDATE reservations SET vehicle_id = ?, pickup_datetime = ?, return_datetime = ?,
@@ -177,9 +200,18 @@ final class ReservationService
             }
             $this->syncVehicleStatus($vehicleId);
             Audit::log('reservation.updated', 'reservation', (string) $id, $reservation['reservation_code'], $reservation, ['vehicle_id' => $vehicleId, 'pickup_datetime' => $pickup, 'return_datetime' => $returnAt]);
-            (new NotificationService())->notifyUser(
+            $notifications = new NotificationService();
+            $notifications->notifyUser(
                 Auth::id(), $customerId, 'reservation_updated', 'Reservation ' . $reservation['reservation_code'],
-                'Your pending reservation details have been updated.', 'reservation', $id
+                'Reservation details have been updated.', 'reservation', $id
+            );
+            $notifications->notifyRentalOfficers(
+                'reservation_updated',
+                'Reservation ' . $reservation['reservation_code'],
+                'Reservation ' . $reservation['reservation_code'] . ' was updated.',
+                'reservation',
+                $id,
+                Auth::id()
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
@@ -204,6 +236,29 @@ final class ReservationService
             $from = $res['status'];
             if (!in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
                 throw new InvalidArgumentException("Cannot change reservation from {$from} to {$to}.");
+            }
+            if (in_array($to, ['cancelled', 'rejected'], true) && trim((string) $reason) === '') {
+                throw new InvalidArgumentException('Enter a reason for cancelling or rejecting this reservation.');
+            }
+            if ($to === 'cancelled' && $from === 'confirmed') {
+                if ($res['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                    throw new InvalidArgumentException('The pickup time has passed. Record a no-show instead of cancelling this reservation.');
+                }
+                $rentalStmt = $pdo->prepare('SELECT rental_id FROM rentals WHERE reservation_id = ?');
+                $rentalStmt->execute([$id]);
+                if ($rentalStmt->fetchColumn()) {
+                    throw new InvalidArgumentException('A rental agreement exists. Cancel it from the scheduled rental record before pickup.');
+                }
+            }
+            if ($to === 'no_show') {
+                if ($res['pickup_datetime'] > (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                    throw new InvalidArgumentException('A reservation can be marked no-show only after its pickup time.');
+                }
+                $rentalStmt = $pdo->prepare('SELECT rental_id FROM rentals WHERE reservation_id = ?');
+                $rentalStmt->execute([$id]);
+                if ($rentalStmt->fetchColumn()) {
+                    throw new InvalidArgumentException('A rental agreement exists. Resolve the scheduled rental from its rental record.');
+                }
             }
             if ($to === 'confirmed') {
                 $vehicle = $this->availability->lockVehicle($pdo, (int) $res['vehicle_id']);
@@ -233,11 +288,33 @@ final class ReservationService
             Audit::log('reservation.status', 'reservation', (string) $id, "{$from} -> {$to}", ['status' => $from], ['status' => $to]);
             return $res;
         });
+        $message = 'Reservation ' . $before['reservation_code'] . ' is now ' . $to . '.';
+        if (in_array($to, ['cancelled', 'rejected'], true) && trim((string) $reason) !== '') {
+            $message .= ' Reason: ' . trim((string) $reason);
+        }
+        $notifications = new NotificationService();
+        $notifications->notifyUser(
+            Auth::id(),
+            (int) $before['customer_id'],
+            'reservation_status',
+            'Reservation ' . $before['reservation_code'],
+            $message,
+            'reservation',
+            $id
+        );
+        $notifications->notifyRentalOfficers(
+            'reservation_status',
+            'Reservation ' . $before['reservation_code'],
+            $message,
+            'reservation',
+            $id,
+            Auth::id()
+        );
         (new SmsService())->sendToCustomer(
             (int) $before['customer_id'],
             'reservation_status',
             'Reservation ' . $before['reservation_code'],
-            'Reservation ' . $before['reservation_code'] . ' is now ' . $to . '.',
+            $message,
             'reservation',
             $id
         );

@@ -15,7 +15,8 @@ use PDO;
  * Overlap: existing.pickup < requested.return AND existing.return > requested.pickup
  * Periods are treated as half-open [pickup, return): a return at 10:00 and a later pickup
  * at 10:00 do not overlap. Adjacent bookings are therefore allowed.
- * If turnaround_minutes > 0, the requested pickup is compared against existing.return + buffer.
+ * Turnaround applies between either pair of adjacent bookings, so a buffer is respected
+ * both after an existing booking and before a later booking.
  */
 final class AvailabilityService
 {
@@ -45,9 +46,9 @@ final class AvailabilityService
                 FROM reservations
                 WHERE vehicle_id = ?
                   AND status IN (\'confirmed\')
-                  AND pickup_datetime < ?
+                  AND pickup_datetime < DATE_ADD(?, INTERVAL ? MINUTE)
                   AND DATE_ADD(return_datetime, INTERVAL ? MINUTE) > ?';
-        $params = [$vehicleId, $returnAt, $buffer, $pickup];
+        $params = [$vehicleId, $returnAt, $buffer, $buffer, $pickup];
         if ($ignoreReservationId) {
             $sql .= ' AND reservation_id <> ?';
             $params[] = $ignoreReservationId;
@@ -57,7 +58,7 @@ final class AvailabilityService
             return 'Conflicts with confirmed reservation ' . $hit['reservation_code'] . '.';
         }
 
-        $sql = 'SELECT rental_number, actual_pickup_datetime, expected_return_datetime, actual_return_datetime
+        $sql = 'SELECT rental_number, status, actual_pickup_datetime, expected_return_datetime, actual_return_datetime
                 FROM rentals
                 WHERE vehicle_id = ?
                   AND status IN (\'scheduled\',\'active\',\'overdue\')';
@@ -68,7 +69,12 @@ final class AvailabilityService
         }
         foreach (Database::fetchAll($sql, $params) as $r) {
             $start = $r['actual_pickup_datetime'] ?? null;
-            $end = $r['actual_return_datetime'] ?: $r['expected_return_datetime'];
+            $end = $r['actual_return_datetime'];
+            if (!$end) {
+                $end = in_array($r['status'], ['active', 'overdue'], true)
+                    ? '9999-12-31 23:59:59'
+                    : $r['expected_return_datetime'];
+            }
             if (!$start) {
                 $res = Database::fetch(
                     'SELECT pickup_datetime FROM reservations rsv JOIN rentals rt ON rt.reservation_id = rsv.reservation_id WHERE rt.rental_number = ?',

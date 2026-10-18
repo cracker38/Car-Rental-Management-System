@@ -1,4 +1,4 @@
-<?php $reservation = $reservation ?? null; $editing = $reservation !== null; ?>
+<?php $reservation = $reservation ?? null; $editing = $reservation !== null; $rentalOfficer = (\Crms\Auth::user()['role_name'] ?? '') === 'Rental Officer'; ?>
 <form method="post" action="<?= e(url('reservations/form', $editing ? ['id' => $reservation['reservation_id']] : [])) ?>" class="card card-body">
   <?= \Crms\Csrf::field() ?>
   <div class="row g-3">
@@ -21,8 +21,13 @@
     <div class="col-md-6"><label class="form-label" for="reservation-return">Return</label><input class="form-control" id="reservation-return" type="datetime-local" name="return_datetime" required value="<?= e(str_replace(' ', 'T', substr($returnAt, 0, 16))) ?>"></div>
     <div class="col-md-6"><label class="form-label" for="reservation-pickup-location">Pickup location</label><input class="form-control" id="reservation-pickup-location" name="pickup_location" value="<?= e($reservation['pickup_location'] ?? '') ?>"></div>
     <div class="col-md-6"><label class="form-label" for="reservation-return-location">Return location</label><input class="form-control" id="reservation-return-location" name="return_location" value="<?= e($reservation['return_location'] ?? '') ?>"></div>
-    <?php if (!\Crms\Auth::isCustomer()): ?>
+    <?php if (!\Crms\Auth::isCustomer() && !$rentalOfficer): ?>
       <div class="col-md-4"><label class="form-label" for="reservation-discount">Discount (RWF)</label><input class="form-control" id="reservation-discount" type="number" min="0" step="100" name="discount_amount" value="<?= e($reservation['discount_amount'] ?? '0') ?>"></div>
+      <div class="col-12"><label class="form-label" for="reservation-internal-notes">Internal notes</label><textarea class="form-control" id="reservation-internal-notes" name="internal_notes"><?= e($reservation['internal_notes'] ?? '') ?></textarea></div>
+    <?php elseif ($rentalOfficer): ?>
+      <div class="col-12"><p class="small text-muted mb-0">Reservation pricing uses the approved fleet rates. Discounts require authorized approval.</p></div>
+      <div class="col-12"><label class="form-label" for="reservation-internal-notes">Internal notes</label><textarea class="form-control" id="reservation-internal-notes" name="internal_notes"><?= e($reservation['internal_notes'] ?? '') ?></textarea></div>
+    <?php elseif (!\Crms\Auth::isCustomer()): ?>
       <div class="col-12"><label class="form-label" for="reservation-internal-notes">Internal notes</label><textarea class="form-control" id="reservation-internal-notes" name="internal_notes"><?= e($reservation['internal_notes'] ?? '') ?></textarea></div>
     <?php endif; ?>
     <div class="col-12"><label class="form-label" for="reservation-customer-notes">Customer notes</label><textarea class="form-control" id="reservation-customer-notes" name="customer_notes"><?= e($reservation['customer_notes'] ?? '') ?></textarea></div>

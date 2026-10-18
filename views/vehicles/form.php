@@ -28,18 +28,22 @@
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="col-md-2"><label class="form-label">Daily rate</label><input class="form-control" name="daily_rate" required value="<?= e((string)($vehicle['daily_rate'] ?? '')) ?>"></div>
-    <div class="col-md-2"><label class="form-label">Weekly</label><input class="form-control" name="weekly_rate" value="<?= e((string)($vehicle['weekly_rate'] ?? '')) ?>"></div>
-    <div class="col-md-2"><label class="form-label">Monthly</label><input class="form-control" name="monthly_rate" value="<?= e((string)($vehicle['monthly_rate'] ?? '')) ?>"></div>
+    <?php if (empty($rentalOfficer)): ?>
+      <div class="col-md-2"><label class="form-label">Daily rate</label><input class="form-control" name="daily_rate" required value="<?= e((string)($vehicle['daily_rate'] ?? '')) ?>"></div>
+      <div class="col-md-2"><label class="form-label">Weekly</label><input class="form-control" name="weekly_rate" value="<?= e((string)($vehicle['weekly_rate'] ?? '')) ?>"></div>
+      <div class="col-md-2"><label class="form-label">Monthly</label><input class="form-control" name="monthly_rate" value="<?= e((string)($vehicle['monthly_rate'] ?? '')) ?>"></div>
+    <?php else: ?>
+      <div class="col-12"><div class="alert alert-info mb-0">Pricing is controlled by approved category rates. New vehicles use the selected category’s default rates; existing rates cannot be changed here.</div></div>
+    <?php endif; ?>
     <div class="col-md-2"><label class="form-label">Mileage</label><input class="form-control" type="number" name="current_mileage" value="<?= e((string)($vehicle['current_mileage'] ?? '0')) ?>"></div>
     <div class="col-md-2"><label class="form-label">Fuel %</label><input class="form-control" name="fuel_level_percent" value="<?= e((string)($vehicle['fuel_level_percent'] ?? '')) ?>"></div>
-    <div class="col-md-3"><label class="form-label">Status</label>
+    <?php if (empty($rentalOfficer)): ?><div class="col-md-3"><label class="form-label">Status</label>
       <select class="form-select" name="status">
         <?php foreach (['available','reserved','rented','maintenance','inactive'] as $t): ?>
           <option value="<?= $t ?>" <?= ($vehicle['status'] ?? 'available') === $t ? 'selected' : '' ?>><?= $t ?></option>
         <?php endforeach; ?>
       </select>
-    </div>
+    </div><?php endif; ?>
     <div class="col-md-3"><label class="form-label">Insurance expiry</label><input class="form-control" type="date" name="insurance_expiry_date" value="<?= e($vehicle['insurance_expiry_date'] ?? '') ?>"></div>
     <div class="col-md-3"><label class="form-label">Inspection expiry</label><input class="form-control" type="date" name="inspection_expiry_date" value="<?= e($vehicle['inspection_expiry_date'] ?? '') ?>"></div>
     <div class="col-md-6"><label class="form-label">Photo</label><input class="form-control" type="file" name="image" accept="image/jpeg,image/png,image/webp"></div>

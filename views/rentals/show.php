@@ -5,7 +5,7 @@
       <h2><?= e($row['rental_number']) ?></h2>
       <p class="mb-0 text-muted"><?= e($row['reservation_code']) ?> · <?= e($row['first_name'] . ' ' . $row['last_name']) ?> · <?= e($row['registration_no']) ?></p>
     </div>
-    <?= status_badge((string)$row['status']) ?>
+    <?= status_badge((string)($row['display_status'] ?? $row['status'])) ?>
   </div>
   <?php if (can('rentals.manage') || can('rentals.view')): ?>
     <div class="kpi-row">
@@ -18,7 +18,36 @@
   <?php endif; ?>
 </section>
 <?php if ($row['agreement_terms'] && (can('rentals.manage') || can('rentals.view'))): ?>
+  <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-dark" type="button" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print agreement</button></div>
   <pre class="bg-white p-3 border rounded small"><?= e($row['agreement_terms']) ?></pre>
+<?php endif; ?>
+
+<?php if (!empty($row['actual_pickup_datetime']) || !empty($row['actual_return_datetime'])): ?>
+  <section class="panel mb-3">
+    <div class="panel-h">Handover record</div>
+    <div class="row g-3">
+      <?php if (!empty($row['actual_pickup_datetime'])): ?>
+        <div class="col-md-6"><strong>Pickup</strong><div><?= e($row['actual_pickup_datetime']) ?> · <?= e((string) $row['pickup_mileage']) ?> km<?php if ($row['pickup_fuel_percent'] !== null): ?> · <?= e((string) $row['pickup_fuel_percent']) ?>% fuel<?php endif; ?></div><?php if (!empty($row['pickup_notes'])): ?><p class="small text-muted mb-0 mt-1"><?= nl2br(e($row['pickup_notes'])) ?></p><?php endif; ?></div>
+      <?php endif; ?>
+      <?php if (!empty($row['actual_return_datetime'])): ?>
+        <div class="col-md-6"><strong>Return</strong><div><?= e($row['actual_return_datetime']) ?> · <?= e((string) $row['return_mileage']) ?> km<?php if ($row['return_fuel_percent'] !== null): ?> · <?= e((string) $row['return_fuel_percent']) ?>% fuel<?php endif; ?></div><?php if (!empty($row['return_notes'])): ?><p class="small text-muted mb-0 mt-1"><?= nl2br(e($row['return_notes'])) ?></p><?php endif; ?></div>
+      <?php endif; ?>
+    </div>
+  </section>
+<?php endif; ?>
+
+<?php if ((float) $row['extra_mileage_fee'] > 0 || (float) $row['late_return_fee'] > 0 || (float) $row['damage_fee'] > 0 || (float) $row['cleaning_fee'] > 0 || (float) $row['other_charges'] > 0): ?>
+  <section class="panel mb-3">
+    <div class="panel-h">Charges flagged for accountant review</div>
+    <div class="kpi-row">
+      <div><span>Extra mileage</span><strong><?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?></strong></div>
+      <div><span>Late return</span><strong><?= e(\Crms\Money::format($row['late_return_fee'])) ?></strong></div>
+      <div><span>Damage</span><strong><?= e(\Crms\Money::format($row['damage_fee'])) ?></strong></div>
+      <div><span>Cleaning</span><strong><?= e(\Crms\Money::format($row['cleaning_fee'])) ?></strong></div>
+      <div><span>Other</span><strong><?= e(\Crms\Money::format($row['other_charges'])) ?></strong></div>
+    </div>
+    <p class="small text-muted mb-0">These are rental charge records. They do not post a payment or financial adjustment.</p>
+  </section>
 <?php endif; ?>
 
 <?php if ($row['status'] === 'scheduled' && can('rentals.manage') && !\Crms\Auth::isCustomer()): ?>
@@ -36,6 +65,15 @@
   </div>
   <button class="btn btn-primary mt-2">Record pickup</button>
 </form>
+<form method="post" action="<?= e(url('rentals/cancel', ['id' => $row['rental_id']])) ?>" class="panel mb-3" data-confirm="Cancel this agreement and release the vehicle booking?">
+  <?= \Crms\Csrf::field() ?>
+  <h3 class="h6">Cancel before pickup</h3>
+  <div class="row g-2 align-items-end">
+    <div class="col-md-9"><label class="form-label" for="rental-cancel-reason">Reason</label><input class="form-control" id="rental-cancel-reason" name="reason" maxlength="500" required></div>
+    <div class="col-md-3 d-grid"><button class="btn btn-outline-danger">Cancel agreement</button></div>
+  </div>
+  <div class="form-text">Only scheduled rentals can be cancelled here. Once pickup is recorded, complete a return instead.</div>
+</form>
 <?php endif; ?>
 
 <?php if (in_array($row['status'], ['active','overdue'], true) && can('rentals.manage') && !\Crms\Auth::isCustomer()): ?>
@@ -46,10 +84,10 @@
     <div class="col-md-4"><label class="form-label">Return time</label><input class="form-control" type="datetime-local" name="actual_return_datetime" required></div>
     <div class="col-md-4"><label class="form-label">Mileage</label><input class="form-control" type="number" name="return_mileage" required></div>
     <div class="col-md-4"><label class="form-label">Fuel %</label><input class="form-control" name="return_fuel_percent"></div>
-    <div class="col-md-4"><label class="form-label">Damage fee</label><input class="form-control" name="damage_fee" value="0"></div>
-    <div class="col-md-4"><label class="form-label">Cleaning fee</label><input class="form-control" name="cleaning_fee" value="0"></div>
-    <div class="col-md-4"><label class="form-label">Other</label><input class="form-control" name="other_charges" value="0"></div>
-    <div class="col-12"><textarea class="form-control" name="return_notes" placeholder="Notes"></textarea></div>
+    <div class="col-md-4"><label class="form-label">Proposed damage charge (RWF)</label><input class="form-control" type="number" min="0" step="100" name="damage_fee" value="0"></div>
+    <div class="col-md-4"><label class="form-label">Proposed cleaning charge (RWF)</label><input class="form-control" type="number" min="0" step="100" name="cleaning_fee" value="0"></div>
+    <div class="col-md-4"><label class="form-label">Proposed other charge (RWF)</label><input class="form-control" type="number" min="0" step="100" name="other_charges" value="0"></div>
+    <div class="col-12"><label class="form-label">Handover and charge notes</label><textarea class="form-control" name="return_notes" placeholder="Describe the return condition. Required when recording proposed damage, cleaning or other charges."></textarea><div class="form-text">Extra mileage and late fees are calculated from recorded mileage, times and approved rates. Proposed charges go to the accountant for invoice review.</div></div>
   </div>
   <button class="btn btn-primary mt-2">Record return</button>
 </form>

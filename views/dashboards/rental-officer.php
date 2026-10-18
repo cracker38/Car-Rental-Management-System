@@ -52,7 +52,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
           <tbody><?php foreach ($upcomingReturns as $item): ?><tr>
             <td><a href="<?= e(url('rentals/show', ['id' => $item['rental_id']])) ?>"><?= e($item['rental_number']) ?></a></td>
             <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td>
-            <td><?= e($item['registration_no']) ?></td><td><?= e($item['expected_return_datetime']) ?></td><td><?= status_badge((string) $item['status']) ?></td>
+            <td><?= e($item['registration_no']) ?></td><td><?= e($item['expected_return_datetime']) ?></td><td><?= status_badge((string) $item['display_status']) ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>

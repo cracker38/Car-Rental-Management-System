@@ -14,10 +14,13 @@
     <div><span>Hire</span><strong><?= e(\Crms\Money::format($row['estimated_amount'])) ?></strong></div>
     <div><span>Deposit</span><strong><?= e(\Crms\Money::format($row['security_deposit'])) ?></strong></div>
   </div>
-  <?php if ($row['status'] === 'pending' && (can('reservations.manage') || \Crms\Auth::isCustomer())): ?><a class="btn btn-outline-dark" href="<?= e(url('reservations/form', ['id' => $row['reservation_id']])) ?>">Edit reservation</a><?php endif; ?>
+  <?php if (($row['status'] === 'pending' && (can('reservations.manage') || \Crms\Auth::isCustomer())) || (!\Crms\Auth::isCustomer() && !empty($canEditConfirmedStaffBooking))): ?><a class="btn btn-outline-dark" href="<?= e(url('reservations/form', ['id' => $row['reservation_id']])) ?>">Edit reservation</a><?php endif; ?>
 </section>
 <?php
 $allowed = \Crms\Services\ReservationService::TRANSITIONS[$row['status']] ?? [];
+if ($rental && $row['status'] === 'confirmed') {
+  $allowed = array_values(array_diff($allowed, ['cancelled', 'no_show']));
+}
 $mayTransition = can('reservations.manage') || (\Crms\Auth::isCustomer() && in_array('cancelled', $allowed, true));
 if ($allowed && $mayTransition):
 ?>
@@ -30,7 +33,7 @@ if ($allowed && $mayTransition):
         <?= \Crms\Csrf::field() ?>
         <input type="hidden" name="status" value="<?= e($st) ?>">
         <?php if (in_array($st, ['cancelled','rejected'], true)): ?>
-          <input class="form-control form-control-sm" style="width:220px" name="reason" placeholder="Reason">
+          <input class="form-control form-control-sm" style="width:220px" name="reason" placeholder="Reason" maxlength="500" required>
         <?php endif; ?>
         <button class="btn btn-sm <?= $st === 'confirmed' ? 'btn-primary' : 'btn-outline-dark' ?>"><?= e(ucfirst($st)) ?></button>
       </form>

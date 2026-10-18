@@ -52,12 +52,13 @@ final class RentalController
         $id = Http::int('id');
         Rbac::assertCustomerOwns('rental', $id);
         $row = Database::fetch(
-            'SELECT rt.*, c.first_name, c.last_name, v.registration_no, v.make, v.model, r.reservation_code
+            "SELECT rt.*, CASE WHEN rt.status = 'active' AND rt.expected_return_datetime < NOW() THEN 'overdue' ELSE rt.status END AS display_status,
+                    c.first_name, c.last_name, v.registration_no, v.make, v.model, r.reservation_code
              FROM rentals rt
              JOIN customers c ON c.customer_id = rt.customer_id
              JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
              JOIN reservations r ON r.reservation_id = rt.reservation_id
-             WHERE rt.rental_id = ?',
+             WHERE rt.rental_id = ?",
             [$id]
         );
         if (!$row) {
@@ -127,7 +128,7 @@ final class RentalController
                 'cleaning_fee' => Http::str('cleaning_fee') ?: '0',
                 'other_charges' => Http::str('other_charges') ?: '0',
             ]);
-            Http::flash('success', 'Return recorded. Fees were calculated on the server.');
+            Http::flash('success', 'Return recorded. Mileage and late fees were calculated; damage and additional charges are flagged for accountant review.');
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
         }
@@ -164,6 +165,18 @@ final class RentalController
         try {
             (new RentalService())->close(Http::int('id'));
             Http::flash('success', 'Rental closed. Recorded charges are ready for the accountant invoice workflow.');
+        } catch (InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+        }
+        Http::redirect('rentals/show', ['id' => Http::int('id')]);
+    }
+
+    public function cancel(): void
+    {
+        Rbac::require('rentals.manage');
+        try {
+            (new RentalService())->cancelScheduled(Http::int('id'), Http::str('reason'));
+            Http::flash('success', 'Scheduled rental and its reservation were cancelled. The reason was recorded in the audit log.');
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
         }
