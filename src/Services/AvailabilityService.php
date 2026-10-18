@@ -137,7 +137,7 @@ final class AvailabilityService
     /** Browse currently available cars before the visitor enters rental dates. */
     public function browse(?int $categoryId = null, array $filters = [], string $sort = 'recommended'): array
     {
-        return array_slice($this->matchingVehicles("v.status = 'available'", $categoryId, $filters, $sort), 0, 60);
+        return $this->matchingVehicles("v.status = 'available'", $categoryId, $filters, $sort);
     }
 
     private function matchingVehicles(string $availability, ?int $categoryId, array $filters, string $sort): array

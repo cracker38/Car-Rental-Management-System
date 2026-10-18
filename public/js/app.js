@@ -25,7 +25,7 @@ document.querySelectorAll('input[type="datetime-local"][data-min-now]').forEach(
   }
 });
 
-document.querySelectorAll('.booking-panel').forEach(function (form) {
+document.querySelectorAll('.booking-panel, .hire-search-form').forEach(function (form) {
   var pickup = form.querySelector('[name="pickup_datetime"]');
   var returnAt = form.querySelector('[name="return_datetime"]');
   if (!pickup || !returnAt) return;
@@ -83,4 +83,22 @@ document.querySelectorAll('[data-payment-poll]').forEach(function (el) {
       .catch(function () {});
     if (tries >= 40) clearInterval(timer);
   }, 3000);
+});
+
+document.querySelectorAll('input[type="range"][data-range-label]').forEach(function (el) {
+  var output = document.getElementById(el.id + '-output');
+  if (!output) return;
+  function updateRangeOutput() {
+    var value = Number(el.value);
+    var max = Number(el.max);
+    output.textContent = 'RWF ' + value.toLocaleString() + (value >= max ? '+' : '');
+  }
+  el.addEventListener('input', updateRangeOutput);
+  updateRangeOutput();
+});
+
+document.querySelectorAll('[data-submit-on-change]').forEach(function (el) {
+  el.addEventListener('change', function () {
+    if (el.form && typeof el.form.requestSubmit === 'function') el.form.requestSubmit();
+  });
 });

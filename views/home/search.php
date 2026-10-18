@@ -9,7 +9,7 @@ $hasDates = $pickup !== '' && $returnAt !== '';
     <header class="hire-search-hero">
       <div class="container">
         <div class="hire-search-heading">
-          <p class="hire-kicker"><span></span> CAR HIRE IN RWANDA</p>
+          <p class="hire-kicker"><span></span> RENT A CAR IN RWANDA</p>
           <h1>Browse cars</h1>
           <p>Find and rent the right car for your next trip across Rwanda.</p>
         </div>
@@ -85,7 +85,6 @@ $hasDates = $pickup !== '' && $returnAt !== '';
                   </select>
                 </div>
               </fieldset>
-              <input type="hidden" name="sort" value="<?= e($sort ?? 'recommended') ?>">
               <button class="btn btn-primary w-100" type="submit">Apply filters</button>
             </div>
           </section>
@@ -96,13 +95,13 @@ $hasDates = $pickup !== '' && $returnAt !== '';
             <div>
               <p class="hire-results-eyebrow"><?= $hasDates ? 'Availability checked' : 'Ready for your trip' ?></p>
               <h2 id="hire-results-title">
-                <?= count($results) ?> <?= count($results) === 1 ? 'car' : 'cars' ?> <?= $hasDates ? 'available for your dates' : 'available now' ?>
+                <?php if ($error): ?>Review your search<?php else: ?><?= count($results) ?> <?= count($results) === 1 ? 'car' : 'cars' ?> <?= $hasDates ? 'available for your dates' : 'available now' ?><?php endif; ?>
               </h2>
               <?php if ($hasDates): ?><p class="hire-results-dates"><?= e($pickup) ?> <i class="bi bi-arrow-right" aria-hidden="true"></i> <?= e($returnAt) ?></p><?php else: ?><p class="hire-results-dates">Choose rental dates to check availability for your trip.</p><?php endif; ?>
             </div>
             <div class="hire-sort-control">
               <label for="hire-sort">Sort:</label>
-              <select id="hire-sort" name="sort" class="form-select" aria-label="Sort vehicles">
+              <select id="hire-sort" name="sort" class="form-select" aria-label="Sort vehicles" data-submit-on-change>
                 <option value="recommended" <?= ($sort ?? 'recommended') === 'recommended' ? 'selected' : '' ?>>Recommended</option>
                 <option value="price_low" <?= ($sort ?? '') === 'price_low' ? 'selected' : '' ?>>Price: low to high</option>
                 <option value="price_high" <?= ($sort ?? '') === 'price_high' ? 'selected' : '' ?>>Price: high to low</option>
@@ -110,7 +109,13 @@ $hasDates = $pickup !== '' && $returnAt !== '';
             </div>
           </div>
 
-          <?php if (!$results && !$error): ?>
+          <?php if ($error): ?>
+            <div class="hire-empty-state">
+              <span class="hire-empty-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span>
+              <h3>Check your search details</h3>
+              <p>Review the message above, then update your dates or filters and search again.</p>
+            </div>
+          <?php elseif (!$results): ?>
             <div class="hire-empty-state">
               <span class="hire-empty-icon"><i class="bi bi-car-front" aria-hidden="true"></i></span>
               <h3>No cars match these filters</h3>

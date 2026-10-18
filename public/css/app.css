@@ -850,3 +850,88 @@ html { scroll-behavior: smooth; }
   .admin-dashboard-heading, .admin-section-heading { align-items: start; flex-direction: column; }
   .admin-dashboard-heading .btn { align-self: stretch; }
 }
+
+/* Car hire browse layout. Keep the established charcoal, paper, and orange palette. */
+.hire-page { min-height: 70vh; background: var(--rcr-paper); }
+.hire-search-form { margin: 0; }
+.hire-search-hero { padding: 2.25rem 0 2rem; color: #fff; background: var(--rcr-ink); }
+.hire-search-heading { margin-bottom: 1.35rem; }
+.hire-search-heading h1 { margin: 0; font-size: clamp(1.8rem, 3vw, 2.35rem); font-weight: 800; letter-spacing: -.045em; }
+.hire-search-heading > p:last-child { margin: .35rem 0 0; color: rgba(255,255,255,.72); font-size: .95rem; }
+.hire-kicker { display: flex; align-items: center; gap: .5rem; margin: 0 0 .45rem; color: #ffad61; font-size: .68rem; font-weight: 800; letter-spacing: .13em; }
+.hire-kicker span { width: 7px; height: 7px; border-radius: 50%; background: var(--rcr-orange); box-shadow: 0 0 0 4px rgba(244,122,8,.16); }
+.hire-search-bar { display: flex; align-items: center; gap: .8rem; min-height: 58px; padding: .42rem; border: 1px solid rgba(255,255,255,.16); border-radius: .75rem; background: rgba(255,255,255,.97); box-shadow: 0 12px 28px rgba(0,0,0,.15); }
+.hire-search-bar > i { margin-left: .7rem; color: #777b80; font-size: 1.1rem; }
+.hire-search-bar input { min-width: 0; flex: 1; padding: .65rem .15rem; border: 0; outline: 0; background: transparent; color: var(--rcr-ink); font: inherit; }
+.hire-search-bar input::placeholder { color: #878b8f; }
+.hire-search-bar input:focus-visible { outline: 0; }
+.hire-search-bar .btn { min-height: 46px; padding-inline: 1.15rem; }
+.hire-search-content { padding-top: 2rem; padding-bottom: 4.5rem; }
+.hire-filter-panel { position: sticky; top: 1rem; overflow: hidden; border: 1px solid #e7e5e1; border-radius: .8rem; background: #fff; box-shadow: 0 8px 24px rgba(26,28,30,.045); }
+.hire-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem 1.1rem; border-bottom: 1px solid #eeece9; }
+.hire-filter-heading h2 { margin: 0; font-size: 1rem; font-weight: 800; }
+.hire-filter-heading a { color: #a95000; font-size: .76rem; font-weight: 700; text-decoration: none; }
+.hire-filter-fields { display: grid; gap: 0; padding: 0 1.1rem 1.1rem; }
+.hire-filter-group { min-width: 0; margin: 0; padding: 1rem 0; border: 0; border-bottom: 1px solid #eeece9; }
+.hire-filter-group legend { float: none; width: auto; margin: 0 0 .65rem; color: #303437; font-size: .82rem; font-weight: 800; }
+.hire-filter-group label { display: block; margin: 0 0 .32rem; color: #6e7377; font-size: .7rem; font-weight: 700; }
+.hire-filter-group .form-control, .hire-filter-group .form-select { min-height: 40px; border-color: #e6e4e1; font-size: .78rem; }
+.hire-filter-group > .form-control + label { margin-top: .65rem; }
+.hire-filter-group small { display: block; margin-top: .45rem; color: var(--rcr-muted); font-size: .69rem; line-height: 1.45; }
+.hire-filter-group .form-range { margin: .4rem 0 .1rem; accent-color: var(--rcr-orange); }
+.hire-min-price { margin-bottom: .8rem; }
+.hire-min-price .input-group-text { color: #6e7377; background: #f7f6f4; border-color: #e6e4e1; font-size: .72rem; }
+.hire-min-price-label { margin-top: .05rem !important; }
+.hire-range-label { display: flex !important; justify-content: space-between; gap: .5rem; margin-bottom: .1rem !important; color: #3b3e40 !important; font-size: .73rem !important; }
+.hire-range-label output { color: #a95000; font-weight: 800; }
+.hire-range-scale { display: flex; justify-content: space-between; color: #8a8e90; font-size: .65rem; font-weight: 600; }
+.hire-filter-pair > div + div { margin-top: .7rem; }
+.hire-filter-fields > .btn { margin-top: 1rem; }
+.hire-results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 0 1rem; }
+.hire-results-eyebrow { margin: 0 0 .18rem; color: #a95000; font-size: .64rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+.hire-results-toolbar h2 { margin: 0; font-size: 1.18rem; font-weight: 800; letter-spacing: -.02em; }
+.hire-results-dates { margin: .28rem 0 0; color: var(--rcr-muted); font-size: .75rem; }
+.hire-sort-control { display: flex; align-items: center; gap: .5rem; flex: 0 0 auto; }
+.hire-sort-control label { color: #777b80; font-size: .75rem; font-weight: 700; }
+.hire-sort-control .form-select { width: auto; min-width: 160px; min-height: 39px; border-color: #e7e5e1; background-color: #fff; font-size: .75rem; font-weight: 700; }
+.hire-car-card { height: 100%; overflow: hidden; border: 1px solid #e8e6e2; border-radius: .75rem; background: #fff; box-shadow: 0 7px 24px rgba(26,28,30,.045); transition: transform .2s ease, box-shadow .2s ease; }
+.hire-car-card:hover { transform: translateY(-3px); box-shadow: 0 15px 32px rgba(26,28,30,.1); }
+.hire-car-photo { position: relative; display: block; height: 180px; overflow: hidden; background: #e7e5e1; }
+.hire-car-photo.is-static { cursor: default; }
+.hire-car-photo img { width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease; }
+.hire-car-card:hover .hire-car-photo img { transform: scale(1.035); }
+.hire-car-badge { position: absolute; top: .75rem; left: .75rem; display: inline-flex; align-items: center; gap: .35rem; padding: .36rem .58rem; border: 1px solid rgba(255,255,255,.82); border-radius: 999px; color: #23573d; background: rgba(255,255,255,.94); font-size: .64rem; font-weight: 800; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.hire-car-badge i { color: #278957; }
+.hire-car-body { padding: .9rem .95rem .95rem; }
+.hire-car-category { margin-bottom: .16rem; color: #a95000; font-size: .64rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.hire-car-body h3 { margin: 0; color: var(--rcr-ink); font-size: .98rem; font-weight: 800; letter-spacing: -.02em; }
+.hire-car-body h3 span { color: #777b80; font-size: .86rem; font-weight: 600; }
+.hire-car-specs { display: flex; flex-wrap: wrap; gap: .8rem; margin: .58rem 0 .75rem; color: #777b80; font-size: .69rem; }
+.hire-car-specs span { display: inline-flex; align-items: center; gap: .32rem; }
+.hire-car-specs i { color: #a95000; }
+.hire-car-price { display: flex; align-items: baseline; gap: .35rem; min-height: 37px; padding-top: .55rem; border-top: 1px solid #eeece9; }
+.hire-car-price strong { color: var(--rcr-ink); font-size: 1.05rem; font-weight: 800; }
+.hire-car-price span { color: #777b80; font-size: .69rem; }
+.hire-car-actions { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .55rem; }
+.hire-car-actions .btn { min-height: 37px; padding: .45rem .78rem; font-size: .73rem; font-weight: 800; }
+.hire-details-link { display: inline-flex; align-items: center; gap: .3rem; color: #a95000; font-size: .72rem; font-weight: 800; text-decoration: none; }
+.hire-details-link:hover { color: #803d00; }
+.hire-empty-state { display: grid; justify-items: center; padding: 3rem 1.25rem; border: 1px dashed #d8d5d0; border-radius: .8rem; background: rgba(255,255,255,.55); text-align: center; }
+.hire-empty-icon { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 16px; color: #a95000; background: #fff1e4; font-size: 1.4rem; }
+.hire-empty-state h3 { margin: .9rem 0 .3rem; font-size: 1.05rem; font-weight: 800; }
+.hire-empty-state p { max-width: 400px; margin: 0 0 1rem; color: var(--rcr-muted); font-size: .83rem; }
+.hire-page a:focus-visible, .hire-page button:focus-visible, .hire-page input:focus-visible, .hire-page select:focus-visible { outline: 3px solid rgba(244,122,8,.55); outline-offset: 2px; }
+@media (max-width: 991.98px) {
+  .hire-filter-panel { position: static; }
+}
+@media (max-width: 575.98px) {
+  .hire-search-hero { padding: 1.65rem 0 1.5rem; }
+  .hire-search-bar { gap: .45rem; }
+  .hire-search-bar > i { margin-left: .45rem; }
+  .hire-search-bar .btn { padding-inline: .75rem; white-space: nowrap; }
+  .hire-search-content { padding-top: 1.2rem; }
+  .hire-results-toolbar { align-items: flex-start; flex-direction: column; }
+  .hire-sort-control { width: 100%; }
+  .hire-sort-control .form-select { flex: 1; }
+  .hire-car-photo { height: 195px; }
+}

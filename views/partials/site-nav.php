@@ -24,14 +24,14 @@ if (!function_exists('crms_nav_link')) {
           <a class="nav-link active" href="#home">Home</a>
           <a class="nav-link" href="<?= e(url('about')) ?>">About</a>
           <a class="nav-link" href="<?= e(url('services')) ?>">Services</a>
-          <a class="nav-link" href="#booking">Hire a car</a>
+          <a class="nav-link" href="#booking">Rent a car</a>
           <a class="nav-link" href="<?= e(url('blog')) ?>">Blog</a>
           <a class="nav-link" href="<?= e(url('contact')) ?>">Contact</a>
         <?php else: ?>
           <?php crms_nav_link('home', 'Home', $current); ?>
           <?php crms_nav_link('about', 'About', $current); ?>
           <a class="nav-link<?= $current === 'services' ? ' active' : '' ?>" href="<?= e(url('services')) ?>">Services</a>
-          <a class="nav-link<?= $current === 'search' ? ' active' : '' ?>" href="<?= e(url('search')) ?>">Hire a car</a>
+          <a class="nav-link<?= $current === 'search' ? ' active' : '' ?>" href="<?= e(url('search')) ?>">Rent a car</a>
           <a class="nav-link<?= $current === 'blog' ? ' active' : '' ?>" href="<?= e(url('blog')) ?>">Blog</a>
           <?php crms_nav_link('contact', 'Contact', $current); ?>
         <?php endif; ?>

@@ -9,7 +9,7 @@ $isSystemAdmin = $role === 'System Administrator';
 <div class="nav-label"><?= $isSystemAdmin ? 'Platform' : 'Workspace' ?></div>
 <a class="nav-link <?= nav_active('dashboard') ?>" href="<?= e(url('dashboard')) ?>"><i class="bi bi-grid-1x2"></i> <?= $isSystemAdmin ? 'Overview' : 'Dashboard' ?></a>
 <?php if ($isCustomer): ?>
-  <a class="nav-link <?= nav_active('search') ?>" href="<?= e(url('search')) ?>"><i class="bi bi-calendar2-check"></i> Book a car</a>
+  <a class="nav-link <?= nav_active('search') ?>" href="<?= e(url('search')) ?>"><i class="bi bi-calendar2-check"></i> Rent a car</a>
   <a class="nav-link <?= nav_active('fleet') ?>" href="<?= e(url('fleet')) ?>"><i class="bi bi-car-front"></i> Browse fleet</a>
   <a class="nav-link <?= nav_active('reservations') ?>" href="<?= e(url('reservations')) ?>"><i class="bi bi-journal-text"></i> My trips</a>
   <a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-key"></i> My rentals &amp; agreements</a>
