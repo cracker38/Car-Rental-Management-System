@@ -174,6 +174,9 @@ final class VehicleController
         if (!Rbac::can('inspections.manage') && !Rbac::can('maintenance.manage')) {
             Rbac::require('inspections.manage');
         }
+        if (!Http::isPost()) {
+            Http::redirect('vehicles');
+        }
         $id = Http::int('id');
         $vehicle = Database::fetch('SELECT vehicle_id, registration_no, status FROM vehicles WHERE vehicle_id = ?', [$id]);
         if (!$vehicle) {
@@ -185,9 +188,13 @@ final class VehicleController
             Http::flash('danger', 'Inactive vehicles cannot be flagged.');
             Http::redirect('vehicles/show', ['id' => $id]);
         }
-        $note = Http::str('flag_note');
+        $note = trim(Http::str('flag_note'));
+        if ($note === '' || strlen($note) > 250) {
+            Http::flash('danger', 'Enter a safety reason of 250 characters or fewer.');
+            Http::redirect('vehicles/show', ['id' => $id]);
+        }
         Database::execute("UPDATE vehicles SET status = 'maintenance' WHERE vehicle_id = ?", [$id]);
-        Audit::log('vehicle.flagged_unsafe', 'vehicle', (string) $id, trim($vehicle['registration_no'] . ' ' . $note));
+        Audit::log('vehicle.flagged_unsafe', 'vehicle', (string) $id, $vehicle['registration_no'], ['status' => $vehicle['status']], ['status' => 'maintenance', 'reason' => $note]);
         Http::flash('success', $vehicle['registration_no'] . ' is flagged unavailable until maintenance is cleared.');
         Http::redirect('vehicles/show', ['id' => $id]);
     }

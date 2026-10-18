@@ -123,7 +123,19 @@ final class RentalService
                 'UPDATE vehicles SET status = \'rented\', current_mileage = ?, fuel_level_percent = ? WHERE vehicle_id = ?',
                 [$mileage, $fuel !== '' ? $fuel : $vehicle['fuel_level_percent'], $rental['vehicle_id']]
             );
-            $this->addInspection($rentalId, 'pickup', $mileage, $data['pickup_fuel_percent'] ?? null, $data);
+            $this->savePickupInspection(
+                $pdo,
+                $rentalId,
+                $mileage,
+                $fuel !== '' ? $fuel : null,
+                [
+                    'exterior_condition' => $data['exterior_condition'] ?? null,
+                    'interior_condition' => $data['interior_condition'] ?? null,
+                    'cleanliness' => $data['cleanliness'] ?? null,
+                    'notes' => $data['pickup_notes'] ?? null,
+                ],
+                false
+            );
             Audit::log('rental.pickup', 'rental', (string) $rentalId, $rental['rental_number']);
         });
     }
@@ -299,10 +311,46 @@ final class RentalService
             if ($rental['status'] !== 'returned') {
                 throw new InvalidArgumentException('Return inspection is recorded after the vehicle is returned.');
             }
-            $this->addInspection($rentalId, 'return', isset($data['odometer_reading']) ? (int) $data['odometer_reading'] : null, $data['fuel_level_percent'] ?? null, $data);
+            $this->validateInspectionData($data);
+            [$odometer, $fuel] = $this->validatedInspectionReadings($data, (int) ($rental['return_mileage'] ?? 0));
+            $this->addInspection($rentalId, 'return', $odometer, $fuel, $data);
+            Database::execute(
+                'UPDATE vehicles SET current_mileage = GREATEST(current_mileage, ?), fuel_level_percent = ? WHERE vehicle_id = ?',
+                [$odometer, $fuel, $rental['vehicle_id']]
+            );
             Database::execute("UPDATE rentals SET status = 'inspected' WHERE rental_id = ?", [$rentalId]);
             $this->reservations->syncVehicleStatus((int) $rental['vehicle_id']);
-            Audit::log('rental.inspected', 'rental', (string) $rentalId, $rental['rental_number']);
+            Audit::log('rental.inspected', 'rental', (string) $rentalId, $rental['rental_number'], null, [
+                'inspection_type' => 'return', 'odometer_reading' => $odometer, 'fuel_level_percent' => $fuel,
+                'damage_notes' => $data['damage_notes'] ?? null,
+            ]);
+        });
+    }
+
+    public function recordPickupInspection(int $rentalId, array $data): void
+    {
+        Database::transaction(function (PDO $pdo) use ($rentalId, $data) {
+            $rental = $this->lockRental($pdo, $rentalId);
+            if (!in_array($rental['status'], ['scheduled', 'active', 'overdue'], true)) {
+                throw new InvalidArgumentException('Pickup condition checks are available before pickup or while a rental is active.');
+            }
+            if (in_array($rental['status'], ['active', 'overdue'], true) && empty($rental['actual_pickup_datetime'])) {
+                throw new InvalidArgumentException('This rental has no recorded pickup time.');
+            }
+            $this->validateInspectionData($data);
+            $vehicle = $this->availability->lockVehicle($pdo, (int) $rental['vehicle_id']);
+            $minimumOdometer = max((int) $vehicle['current_mileage'], (int) ($rental['pickup_mileage'] ?? 0));
+            [$odometer, $fuel] = $this->validatedInspectionReadings($data, $minimumOdometer);
+
+            $this->savePickupInspection($pdo, $rentalId, $odometer, $fuel, $data, true);
+            Database::execute(
+                'UPDATE vehicles SET current_mileage = GREATEST(current_mileage, ?), fuel_level_percent = ? WHERE vehicle_id = ?',
+                [$odometer, $fuel, $rental['vehicle_id']]
+            );
+            Audit::log('rental.pickup_inspected', 'rental', (string) $rentalId, $rental['rental_number'], null, [
+                'inspection_type' => 'pickup', 'odometer_reading' => $odometer, 'fuel_level_percent' => $fuel,
+                'damage_notes' => $data['damage_notes'] ?? null,
+            ]);
         });
     }
 
@@ -343,5 +391,73 @@ final class RentalService
                 $data['image_path'] ?? null, $data['notes'] ?? null,
             ]
         );
+    }
+
+    private function savePickupInspection(PDO $pdo, int $rentalId, int $odometer, ?string $fuel, array $data, bool $replace): void
+    {
+        $stmt = $pdo->prepare("SELECT inspection_id FROM inspections WHERE rental_id = ? AND inspection_type = 'pickup' ORDER BY inspection_id DESC LIMIT 1 FOR UPDATE");
+        $stmt->execute([$rentalId]);
+        $inspectionId = $stmt->fetchColumn();
+        if ($inspectionId && !$replace) {
+            Database::execute(
+                "UPDATE inspections SET inspected_by = ?, inspected_at = NOW(), odometer_reading = ?, fuel_level_percent = ?,
+                    exterior_condition = COALESCE(?, exterior_condition), interior_condition = COALESCE(?, interior_condition),
+                    cleanliness = COALESCE(?, cleanliness), notes = COALESCE(?, notes)
+                 WHERE inspection_id = ?",
+                [Auth::id(), $odometer, $fuel, $data['exterior_condition'] ?? null, $data['interior_condition'] ?? null,
+                 $data['cleanliness'] ?? null, $data['notes'] ?? null, $inspectionId]
+            );
+            return;
+        }
+        if ($inspectionId) {
+            Database::execute(
+                "UPDATE inspections SET inspected_by = ?, inspected_at = NOW(), odometer_reading = ?, fuel_level_percent = ?,
+                    exterior_condition = ?, interior_condition = ?, cleanliness = ?, damage_notes = ?,
+                    image_path = COALESCE(?, image_path), notes = ?
+                 WHERE inspection_id = ?",
+                [Auth::id(), $odometer, $fuel, $data['exterior_condition'] ?? null, $data['interior_condition'] ?? null,
+                 $data['cleanliness'] ?? null, $data['damage_notes'] ?? null, $data['image_path'] ?? null,
+                 $data['notes'] ?? null, $inspectionId]
+            );
+            return;
+        }
+        $this->addInspection($rentalId, 'pickup', $odometer, $fuel, $data);
+    }
+
+    /** @return array{0:int,1:string} */
+    private function validatedInspectionReadings(array $data, int $minimumOdometer): array
+    {
+        $odometerInput = trim((string) ($data['odometer_reading'] ?? ''));
+        if (!preg_match('/^\d{1,10}$/', $odometerInput) || (float) $odometerInput > 4294967295) {
+            throw new InvalidArgumentException('Enter a valid whole-number inspection odometer reading.');
+        }
+        $odometer = (int) $odometerInput;
+        if ($odometer < $minimumOdometer) {
+            throw new InvalidArgumentException('Inspection mileage cannot be below the latest recorded vehicle odometer.');
+        }
+        $fuel = trim((string) ($data['fuel_level_percent'] ?? ''));
+        if (!preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', $fuel) || (float) $fuel < 0 || (float) $fuel > 100) {
+            throw new InvalidArgumentException('Enter a fuel level between 0 and 100 percent.');
+        }
+        return [$odometer, $fuel];
+    }
+
+    private function validateInspectionData(array $data): void
+    {
+        foreach (['exterior_condition', 'interior_condition'] as $field) {
+            $value = trim((string) ($data[$field] ?? ''));
+            if (!in_array($value, ['excellent', 'good', 'fair', 'poor'], true)) {
+                throw new InvalidArgumentException('Select an exterior and interior condition for the inspection.');
+            }
+        }
+        $cleanliness = trim((string) ($data['cleanliness'] ?? ''));
+        if ($cleanliness !== '' && !in_array($cleanliness, ['clean', 'acceptable', 'needs_cleaning'], true)) {
+            throw new InvalidArgumentException('Choose a valid cleanliness condition.');
+        }
+        foreach (['damage_notes', 'notes'] as $field) {
+            if (strlen((string) ($data[$field] ?? '')) > 10000) {
+                throw new InvalidArgumentException('Inspection notes and damage details must be 10,000 characters or fewer.');
+            }
+        }
     }
 }

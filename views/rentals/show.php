@@ -161,16 +161,37 @@
 </form>
 <?php endif; ?>
 
+<?php if (in_array($row['status'], ['scheduled','active','overdue'], true) && can('inspections.manage')): ?>
+<form method="post" action="<?= e(url('rentals/inspect-pickup', ['id' => $row['rental_id']])) ?>" class="panel mb-3" enctype="multipart/form-data">
+  <?= \Crms\Csrf::field() ?>
+  <h3 class="h6">Pickup condition inspection</h3>
+  <p class="small text-muted">Record the pre-handover condition or update the pickup inspection. Saving this inspection does not change the rental status.</p>
+  <div class="row g-2">
+    <div class="col-md-3"><label class="form-label">Odometer (km)</label><input class="form-control" type="number" name="odometer_reading" min="0" step="1" required></div>
+    <div class="col-md-3"><label class="form-label">Fuel (%)</label><input class="form-control" type="number" name="fuel_level_percent" min="0" max="100" step="0.01" required></div>
+    <div class="col-md-3"><label class="form-label">Exterior</label><select class="form-select" name="exterior_condition" required><option value="">Select condition</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
+    <div class="col-md-3"><label class="form-label">Interior</label><select class="form-select" name="interior_condition" required><option value="">Select condition</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
+    <div class="col-md-3"><label class="form-label">Cleanliness</label><select class="form-select" name="cleanliness"><option value="">Select condition</option><option>clean</option><option>acceptable</option><option>needs_cleaning</option></select></div>
+    <div class="col-12"><label class="form-label">Existing or new damage</label><textarea class="form-control" name="damage_notes" rows="2" maxlength="10000"></textarea></div>
+    <div class="col-md-6"><label class="form-label">Inspection notes</label><textarea class="form-control" name="notes" rows="2" maxlength="10000"></textarea></div>
+    <div class="col-md-6"><label class="form-label">Condition photo</label><input class="form-control" type="file" name="photo" accept="image/jpeg,image/png,image/webp"></div>
+  </div>
+  <button class="btn btn-primary mt-2">Save pickup inspection</button>
+</form>
+<?php endif; ?>
+
 <?php if ($row['status'] === 'returned' && can('inspections.manage')): ?>
 <form method="post" action="<?= e(url('rentals/inspect', ['id' => $row['rental_id']])) ?>" class="panel mb-3" enctype="multipart/form-data">
   <?= \Crms\Csrf::field() ?>
   <h3 class="h6">Return inspection</h3>
   <div class="row g-2">
-    <div class="col-md-3"><input class="form-control" name="odometer_reading" placeholder="Odometer"></div>
-    <div class="col-md-3"><input class="form-control" name="fuel_level_percent" placeholder="Fuel %"></div>
-    <div class="col-md-3"><select class="form-select" name="exterior_condition"><option value="">Exterior</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
-    <div class="col-md-3"><select class="form-select" name="interior_condition"><option value="">Interior</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
-    <div class="col-12"><textarea class="form-control" name="damage_notes" placeholder="Damage notes"></textarea></div>
+    <div class="col-md-3"><label class="form-label">Odometer (km)</label><input class="form-control" type="number" name="odometer_reading" min="0" step="1" required></div>
+    <div class="col-md-3"><label class="form-label">Fuel (%)</label><input class="form-control" type="number" name="fuel_level_percent" min="0" max="100" step="0.01" required></div>
+    <div class="col-md-3"><label class="form-label">Exterior</label><select class="form-select" name="exterior_condition" required><option value="">Select condition</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
+    <div class="col-md-3"><label class="form-label">Interior</label><select class="form-select" name="interior_condition" required><option value="">Select condition</option><option>excellent</option><option>good</option><option>fair</option><option>poor</option></select></div>
+    <div class="col-md-4"><label class="form-label">Cleanliness</label><select class="form-select" name="cleanliness"><option value="">Select condition</option><option>clean</option><option>acceptable</option><option>needs_cleaning</option></select></div>
+    <div class="col-12"><label class="form-label">Existing or new damage</label><textarea class="form-control" name="damage_notes" rows="2" maxlength="10000"></textarea></div>
+    <div class="col-md-6"><label class="form-label">Inspection notes</label><textarea class="form-control" name="notes" rows="2" maxlength="10000"></textarea></div>
     <div class="col-md-6"><label class="form-label">Condition photo</label><input class="form-control" type="file" name="photo" accept="image/jpeg,image/png,image/webp"></div>
   </div>
   <button class="btn btn-primary mt-2">Save inspection</button>
@@ -194,3 +215,13 @@
     <li><?= e($i['inspection_type']) ?> · <?= e($i['inspected_at']) ?> · <?= e((string)$i['odometer_reading']) ?> km<?php if (!empty($i['image_path'])): ?> · <a href="<?= e(asset($i['image_path'])) ?>" target="_blank" rel="noopener">Photo</a><?php endif; ?></li>
   <?php endforeach; ?>
 </ul>
+<?php foreach ($inspections as $i): ?>
+  <?php if (!empty($i['damage_notes']) || !empty($i['notes'])): ?>
+    <div class="small text-muted mb-2">
+      <strong><?= e(ucfirst($i['inspection_type'])) ?> details:</strong>
+      <?php if ($i['fuel_level_percent'] !== null): ?> Fuel: <?= e((string)$i['fuel_level_percent']) ?>%<?php endif; ?>
+      <?php if (!empty($i['damage_notes'])): ?> Damage: <?= nl2br(e($i['damage_notes'])) ?><?php endif; ?>
+      <?php if (!empty($i['notes'])): ?> <?= nl2br(e($i['notes'])) ?><?php endif; ?>
+    </div>
+  <?php endif; ?>
+<?php endforeach; ?>

@@ -23,20 +23,21 @@ final class RentalController
         if (!$canManage && !$canView && !$canInspect) {
             Rbac::require('rentals.view');
         }
-        $sql = 'SELECT rt.*, c.first_name, c.last_name, v.registration_no
+        $sql = 'SELECT rt.*, c.first_name, c.last_name, v.registration_no, r.pickup_datetime
                 FROM rentals rt
                 JOIN customers c ON c.customer_id = rt.customer_id
+                JOIN reservations r ON r.reservation_id = rt.reservation_id
                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id';
         $params = [];
         if (!$canManage && !$canView && $canInspect) {
-            $sql .= " WHERE rt.status = 'returned'";
+            $sql .= " WHERE rt.status IN ('scheduled','active','overdue','returned')";
         } elseif (Auth::isCustomer()) {
             $sql .= ' WHERE rt.customer_id = ?';
             $params[] = Auth::customerId() ?: 0;
         }
         $sql .= ' ORDER BY rt.created_at DESC LIMIT 200';
         View::render('rentals/index', [
-            'title' => ($canManage || $canView) ? 'Rentals' : 'Return inspections',
+            'title' => ($canManage || $canView) ? 'Rentals' : 'Pickup and return inspections',
             'rows' => Database::fetchAll($sql, $params),
             'inspectOnly' => !$canManage && !$canView && $canInspect,
         ]);
@@ -71,7 +72,7 @@ final class RentalController
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
-        if (!$canManage && !$canView && !in_array($row['status'], ['returned', 'inspected'], true)) {
+        if (!$canManage && !$canView && !in_array($row['status'], ['scheduled', 'active', 'overdue', 'returned', 'inspected'], true)) {
             http_response_code(403);
             View::render('errors/403', ['title' => 'Forbidden']);
             return;
@@ -87,6 +88,7 @@ final class RentalController
             'invoice' => $invoice,
             'businessName' => Settings::get('business_name', 'Rent Car Rwanda'),
             'printAgreement' => !empty($row['agreement_terms']) && ($canManage || $canView),
+            'inspectionOnly' => !$canManage && !$canView && $canInspect,
         ]);
     }
 
@@ -170,6 +172,30 @@ final class RentalController
                 'image_path' => $image,
             ]);
             Http::flash('success', 'Return inspection saved.');
+        } catch (InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+        } catch (\RuntimeException $e) {
+            Http::flash('danger', $e->getMessage());
+        }
+        Http::redirect('rentals/show', ['id' => Http::int('id')]);
+    }
+
+    public function inspectPickup(): void
+    {
+        Rbac::require('inspections.manage');
+        try {
+            $image = Upload::image($_FILES['photo'] ?? ['error' => UPLOAD_ERR_NO_FILE], 'inspections');
+            (new RentalService())->recordPickupInspection(Http::int('id'), [
+                'odometer_reading' => Http::str('odometer_reading'),
+                'fuel_level_percent' => Http::str('fuel_level_percent'),
+                'exterior_condition' => Http::str('exterior_condition') ?: null,
+                'interior_condition' => Http::str('interior_condition') ?: null,
+                'cleanliness' => Http::str('cleanliness') ?: null,
+                'damage_notes' => Http::str('damage_notes'),
+                'notes' => Http::str('notes'),
+                'image_path' => $image,
+            ]);
+            Http::flash('success', 'Pickup condition inspection saved. Rental status was not changed.');
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
         } catch (\RuntimeException $e) {

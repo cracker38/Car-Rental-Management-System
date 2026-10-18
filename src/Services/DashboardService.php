@@ -107,10 +107,9 @@ final class DashboardService
                 ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Pickups and returns', 'hint' => 'Agreements and handover records'],
             ],
             'Vehicle Inspector/Maintenance Staff' => [
-                ['route' => 'rentals', 'icon' => 'bi-clipboard-check', 'label' => 'Inspections', 'hint' => 'Returned vehicles'],
-                ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Maintenance', 'hint' => 'Workshop jobs'],
-                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Fleet status', 'hint' => 'Cars in the workshop'],
-                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Ops reports', 'hint' => 'Fleet availability'],
+                ['route' => 'rentals', 'icon' => 'bi-clipboard-check', 'label' => 'Pickup and return inspections', 'hint' => 'Record vehicle condition and damage'],
+                ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Servicing and maintenance', 'hint' => 'Schedule jobs and update permitted statuses'],
+                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Permitted vehicle records', 'hint' => 'Review fleet condition and flag unsafe vehicles'],
             ],
             'Customer' => [
                 ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Find a car', 'hint' => 'Search dates and book'],
@@ -175,10 +174,15 @@ final class DashboardService
                 'Generate revenue, payment, deposit and refund reports',
             ],
             'Vehicle Inspector/Maintenance Staff' => [
-                'Inspect returned vehicles and attach condition photos',
-                'Record damage, fuel, mileage and inspection notes',
-                'Create servicing records with costs and next service dates',
-                'Flag unsafe cars and review certificates due',
+                'View assigned or permitted vehicle records',
+                'Conduct pickup and return condition inspections',
+                'Record existing and new damage, fuel level, mileage and inspection notes',
+                'Attach inspection photographs when supported',
+                'Create maintenance and servicing records',
+                'Record service dates, work performed, costs and next service dates',
+                'Update permitted maintenance statuses',
+                'Flag unsafe or unavailable vehicles',
+                'View upcoming servicing and overdue maintenance',
             ],
             'Customer' => [
                 'Search cars, view photos and rates, and request a booking',
@@ -202,7 +206,7 @@ final class DashboardService
             'Business Manager' => 'Do not manage system security settings or change payment records without an explicitly assigned permission.',
             'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
-            'Vehicle Inspector/Maintenance Staff' => 'You cannot delete financial records or confirm reservations. Flag a vehicle instead of changing hire status.',
+            'Vehicle Inspector/Maintenance Staff' => 'Must not delete financial transactions or confirm rentals unless specifically authorized.',
             'Customer' => 'You can only open your own account, bookings, invoices and receipts. Changing a URL or ID will not show someone else’s records.',
             'Driver' => 'You cannot see other drivers’ trips, the full customer list, or financial reports.',
             default => '',
@@ -445,20 +449,31 @@ final class DashboardService
     {
         return [
             'kpis' => [
-                ['label' => 'Awaiting inspection', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status = 'returned'"), 'hint' => 'Returned cars', 'href' => url('rentals')],
+                ['label' => 'Pickup checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id WHERE rt.status = 'scheduled' AND r.pickup_datetime >= NOW() AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY) AND NOT EXISTS (SELECT 1 FROM inspections i WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup')"), 'hint' => 'Next 14 days', 'href' => url('rentals')],
+                ['label' => 'Return checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status = 'returned'"), 'hint' => 'Returned vehicles', 'href' => url('rentals')],
                 ['label' => 'Open maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records WHERE status IN ('scheduled','in_progress')"), 'hint' => 'Blocking hire', 'href' => url('maintenance')],
-                ['label' => 'In workshop', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'maintenance'"), 'hint' => 'Vehicle status', 'href' => url('vehicles')],
-                ['label' => 'Checks due', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE inspection_expiry_date IS NOT NULL AND inspection_expiry_date <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) AND status <> 'inactive'"), 'hint' => 'Next 14 days', 'href' => url('vehicles')],
+                ['label' => 'Overdue maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM (SELECT vehicle_id FROM maintenance_records WHERE status IN ('scheduled','in_progress') AND expected_completion_date < CURDATE() UNION SELECT m.vehicle_id FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date < CURDATE() AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.maintenance_id > m.maintenance_id)) due"), 'hint' => 'Late jobs or service due', 'href' => url('maintenance')],
+                ['label' => 'Upcoming service', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date >= CURDATE() AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.maintenance_id > m.maintenance_id)"), 'hint' => 'Next 30 days', 'href' => url('maintenance')],
+                ['label' => 'Unavailable vehicles', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'maintenance'"), 'hint' => 'Unsafe or in service', 'href' => url('vehicles')],
             ],
+            'pickupChecks' => Database::fetchAll(
+                "SELECT rt.rental_id, rt.rental_number, r.pickup_datetime, v.registration_no, v.make, v.model
+                 FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id
+                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
+                 WHERE rt.status = 'scheduled' AND r.pickup_datetime >= NOW()
+                   AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY)
+                   AND NOT EXISTS (SELECT 1 FROM inspections i WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup')
+                 ORDER BY r.pickup_datetime LIMIT 10"
+            ),
             'returns' => Database::fetchAll(
                 "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, v.registration_no, v.make, v.model
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
                  WHERE rt.status = 'returned' ORDER BY rt.updated_at DESC LIMIT 10"
             ),
             'maint' => Database::fetchAll(
-                "SELECT m.maintenance_id, m.maintenance_number, m.title, m.status, m.start_date, v.registration_no
+                "SELECT m.maintenance_id, m.maintenance_number, m.title, m.status, m.start_date, m.expected_completion_date, v.registration_no
                  FROM maintenance_records m JOIN vehicles v ON v.vehicle_id = m.vehicle_id
-                 WHERE m.status IN ('scheduled','in_progress') ORDER BY m.start_date LIMIT 10"
+                 WHERE m.status IN ('scheduled','in_progress') ORDER BY CASE WHEN m.expected_completion_date < CURDATE() THEN 0 ELSE 1 END, m.expected_completion_date, m.start_date LIMIT 10"
             ),
             'dueChecks' => Database::fetchAll(
                 "SELECT vehicle_id, registration_no, make, model, inspection_expiry_date
@@ -466,11 +481,15 @@ final class DashboardService
                  WHERE inspection_expiry_date IS NOT NULL AND inspection_expiry_date <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) AND status <> 'inactive'
                  ORDER BY inspection_expiry_date LIMIT 8"
             ),
-            'nextService' => Database::fetchAll(
-                "SELECT v.registration_no, m.next_service_date, m.title FROM maintenance_records m
+            'serviceSchedule' => Database::fetchAll(
+                "SELECT v.vehicle_id, v.registration_no, m.next_service_date, m.title,
+                        CASE WHEN m.next_service_date < CURDATE() THEN 'overdue' ELSE 'upcoming' END AS due_state
+                 FROM maintenance_records m
                  JOIN vehicles v ON v.vehicle_id = m.vehicle_id
-                 WHERE m.next_service_date IS NOT NULL AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 21 DAY)
-                 ORDER BY m.next_service_date LIMIT 6"
+                 WHERE m.status = 'completed' AND m.next_service_date IS NOT NULL
+                   AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+                   AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.maintenance_id > m.maintenance_id)
+                 ORDER BY m.next_service_date LIMIT 10"
             ),
         ];
     }

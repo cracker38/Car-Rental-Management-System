@@ -453,8 +453,15 @@ WHERE r.role_name='Accountant/Cashier';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
-('vehicles.view','maintenance.manage','inspections.manage','reports.operational')
+('vehicles.view','maintenance.manage','inspections.manage')
 WHERE r.role_name='Vehicle Inspector/Maintenance Staff';
+
+DELETE FROM role_permissions
+WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Vehicle Inspector/Maintenance Staff')
+  AND permission_id NOT IN (
+    SELECT permission_id FROM permissions WHERE permission_key IN
+      ('vehicles.view','maintenance.manage','inspections.manage')
+  );
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
