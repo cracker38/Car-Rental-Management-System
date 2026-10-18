@@ -23,14 +23,15 @@ final class MaintenanceService
             }
             $number = (new ReservationService())->nextCode('MNT');
             Database::execute(
-                'INSERT INTO maintenance_records (maintenance_number, vehicle_id, reported_by, maintenance_type, title, description, service_provider, start_date, expected_completion_date, odometer_reading, cost, status, notes)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO maintenance_records (maintenance_number, vehicle_id, reported_by, maintenance_type, title, description, service_provider, start_date, expected_completion_date, odometer_reading, cost, next_service_date, status, notes)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $number, $vehicleId, Auth::id(), $input['maintenance_type'], $input['title'],
                     $input['description'] ?? null, $input['service_provider'] ?? null,
                     $input['start_date'], $input['expected_completion_date'] ?: null,
                     $input['odometer_reading'] !== '' ? (int) $input['odometer_reading'] : null,
-                    $input['cost'] ?? 0, $input['status'] ?? 'scheduled', $input['notes'] ?? null,
+                    $input['cost'] ?? 0, $input['next_service_date'] ?: null,
+                    $input['status'] ?? 'scheduled', $input['notes'] ?? null,
                 ]
             );
             $id = (int) Database::lastId();

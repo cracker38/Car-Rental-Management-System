@@ -27,6 +27,10 @@ final class FinanceService
         if ((float) $amount <= 0) {
             throw new InvalidArgumentException('Amount must be greater than zero.');
         }
+        if (in_array($type, ['payment_refund', 'deposit_refund', 'deposit_deduction', 'adjustment'], true)
+            && trim((string) ($input['reason'] ?? '')) === '') {
+            throw new InvalidArgumentException('Refunds, deductions and adjustments need a reason so they can be audited.');
+        }
 
         return Database::transaction(function (PDO $pdo) use ($input, $type, $amount) {
             $invoiceId = !empty($input['invoice_id']) ? (int) $input['invoice_id'] : null;

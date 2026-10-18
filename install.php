@@ -106,6 +106,15 @@ if ($mysqli->connect_error) {
         $messages[] = 'Sample vehicles added because the fleet was empty.';
     }
     $mysqli->query("UPDATE vehicles SET image_path = 'public/img/fleet/default.svg' WHERE image_path IS NULL OR image_path = ''");
+    foreach ([
+        "ALTER TABLE driver_assignments ADD COLUMN trip_status ENUM('assigned','en_route','on_site','completed','delayed') NOT NULL DEFAULT 'assigned'",
+        'ALTER TABLE driver_assignments ADD COLUMN incident_report TEXT NULL',
+        'ALTER TABLE driver_assignments ADD COLUMN status_updated_at DATETIME NULL',
+    ] as $alter) {
+        if (!$mysqli->query($alter) && !str_contains((string) $mysqli->error, 'Duplicate')) {
+            $messages[] = 'Optional schema note: ' . $mysqli->error;
+        }
+    }
 }
 
 header('Content-Type: text/html; charset=utf-8');

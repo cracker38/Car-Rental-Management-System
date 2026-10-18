@@ -207,12 +207,13 @@ final class RentalService
     private function addInspection(int $rentalId, string $type, ?int $odometer, ?string $fuel, array $data): void
     {
         Database::execute(
-            'INSERT INTO inspections (rental_id, inspected_by, inspection_type, inspected_at, odometer_reading, fuel_level_percent, exterior_condition, interior_condition, cleanliness, damage_notes, notes)
-             VALUES (?,?,?,NOW(),?,?,?,?,?,?,?)',
+            'INSERT INTO inspections (rental_id, inspected_by, inspection_type, inspected_at, odometer_reading, fuel_level_percent, exterior_condition, interior_condition, cleanliness, damage_notes, image_path, notes)
+             VALUES (?,?,?,NOW(),?,?,?,?,?,?,?,?)',
             [
                 $rentalId, Auth::id(), $type, $odometer, $fuel !== '' ? $fuel : null,
                 $data['exterior_condition'] ?? null, $data['interior_condition'] ?? null,
-                $data['cleanliness'] ?? null, $data['damage_notes'] ?? null, $data['notes'] ?? null,
+                $data['cleanliness'] ?? null, $data['damage_notes'] ?? null,
+                $data['image_path'] ?? null, $data['notes'] ?? null,
             ]
         );
     }
