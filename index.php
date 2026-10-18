@@ -66,6 +66,7 @@ $routes = [
     'payments/receipt' => [PaymentController::class, 'receipt'],
     'maintenance' => [MaintenanceController::class, 'index'],
     'admin/users' => [AdminController::class, 'users'],
+    'admin/roles' => [AdminController::class, 'roles'],
     'admin/settings' => [AdminController::class, 'settings'],
     'admin/audit' => [AdminController::class, 'audit'],
     'admin/backup' => [AdminController::class, 'backup'],

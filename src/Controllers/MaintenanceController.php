@@ -14,12 +14,18 @@ final class MaintenanceController
 {
     public function index(): void
     {
-        Rbac::require('maintenance.manage');
+        $canManage = Rbac::can('maintenance.manage');
+        if (!$canManage) {
+            Rbac::require('maintenance.view');
+        }
+        if (Http::isPost()) {
+            Rbac::require('maintenance.manage');
+        }
         $rows = Database::fetchAll(
             'SELECT m.*, v.registration_no FROM maintenance_records m
              JOIN vehicles v ON v.vehicle_id = m.vehicle_id ORDER BY m.created_at DESC'
         );
-        $vehicles = Database::fetchAll('SELECT vehicle_id, registration_no FROM vehicles ORDER BY registration_no');
+        $vehicles = $canManage ? Database::fetchAll('SELECT vehicle_id, registration_no FROM vehicles ORDER BY registration_no') : [];
         if (Http::isPost() && Http::str('action') === 'create') {
             try {
                 (new MaintenanceService())->create($_POST);
@@ -38,6 +44,6 @@ final class MaintenanceController
             }
             Http::redirect('maintenance');
         }
-        View::render('maintenance/index', ['title' => 'Maintenance', 'rows' => $rows, 'vehicles' => $vehicles]);
+        View::render('maintenance/index', ['title' => 'Maintenance', 'rows' => $rows, 'vehicles' => $vehicles, 'canManage' => $canManage]);
     }
 }

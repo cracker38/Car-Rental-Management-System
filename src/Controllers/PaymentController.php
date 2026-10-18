@@ -68,6 +68,9 @@ final class PaymentController
     public function sync(): void
     {
         Auth::requireLogin();
+        if (!Auth::isCustomer()) {
+            Rbac::require('transactions.manage');
+        }
         if (!Http::isPost()) {
             Http::flash('danger', 'Use Check status to refresh a pending payment.');
             Http::redirect('finance');
@@ -121,7 +124,8 @@ final class PaymentController
             return;
         }
         $updated = $row;
-        if ($row['status'] === 'pending' && $row['external_reference']) {
+        $canSettle = Auth::isCustomer() || Rbac::can('transactions.manage');
+        if ($canSettle && $row['status'] === 'pending' && $row['external_reference']) {
             try {
                 $service = new HdevPaymentService();
                 $updated = $service->settleByReference((string) $row['external_reference']) ?? $row;
@@ -161,7 +165,7 @@ final class PaymentController
                 return;
             }
         } else {
-            Rbac::require('transactions.manage');
+            Rbac::require('transactions.view');
         }
         if ($row['status'] !== 'completed') {
             Http::flash('warning', 'A receipt is available after the transaction is completed.');
@@ -175,7 +179,7 @@ final class PaymentController
         if (Auth::isCustomer()) {
             return (int) $row['customer_id'] === (int) Auth::customerId();
         }
-        if (Rbac::can('transactions.manage')) {
+        if (Rbac::can('transactions.manage') || Rbac::can('transactions.view')) {
             return true;
         }
         return !empty($row['invoice_id']) && Rbac::can('invoices.view');

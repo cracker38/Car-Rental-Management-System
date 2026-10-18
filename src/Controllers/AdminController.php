@@ -9,6 +9,7 @@ use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
 use Crms\Settings;
+use Crms\Validator;
 use Crms\View;
 use Crms\Services\BackupService;
 use Crms\Services\SmsService;
@@ -19,6 +20,49 @@ final class AdminController
     {
         Rbac::require('users.manage');
         if (Http::isPost()) {
+            if (Http::str('action') === 'create') {
+                $v = new Validator();
+                $v->require($_POST, ['first_name', 'last_name', 'email', 'password', 'role_id', 'status']);
+                $v->email('email', Http::str('email'));
+                $email = strtolower(trim(Http::str('email')));
+                $firstName = trim(Http::str('first_name'));
+                $lastName = trim(Http::str('last_name'));
+                $phone = trim(Http::str('phone')) ?: null;
+                $password = (string) ($_POST['password'] ?? '');
+                $roleId = Http::int('role_id');
+                $status = Http::str('status');
+                if (strlen($password) < 8) {
+                    $v->errors['password'] = 'Use at least 8 characters.';
+                }
+                if (!in_array($status, ['active', 'inactive', 'suspended', 'pending'], true)) {
+                    $v->errors['status'] = 'Choose a valid account status.';
+                }
+                $role = $roleId > 0 ? Database::fetch('SELECT role_id, role_name FROM roles WHERE role_id = ?', [$roleId]) : null;
+                if (!$role || $role['role_name'] === 'Customer') {
+                    $v->errors['role_id'] = 'Choose a staff role. Customers should register on the website.';
+                }
+                if (Database::fetch('SELECT user_id FROM users WHERE email = ?', [$email])) {
+                    $v->errors['email'] = 'That email is already registered.';
+                }
+                if (!$v->ok()) {
+                    $errors = $v->errors;
+                    Http::flash('danger', reset($errors));
+                    Http::redirect('admin/users');
+                }
+                try {
+                    Database::transaction(function () use ($roleId, $email, $firstName, $lastName, $phone, $status, $password): void {
+                        Database::execute(
+                            'INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, status) VALUES (?,?,?,?,?,?,?)',
+                            [$roleId, $firstName, $lastName, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $status]
+                        );
+                        Audit::log('user.created', 'user', (string) Database::lastId(), $email);
+                    });
+                    Http::flash('success', 'User account created.');
+                } catch (\Throwable) {
+                    Http::flash('danger', 'Could not create the account. Check whether the email is already in use.');
+                }
+                Http::redirect('admin/users');
+            }
             $status = Http::str('status');
             $userId = Http::int('user_id');
             $roleId = Http::int('role_id');
@@ -67,9 +111,42 @@ final class AdminController
             }
             Http::redirect('admin/users');
         }
-        $users = Database::fetchAll('SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.created_at DESC');
+        $q = trim(Http::str('q'));
+        $userSql = 'SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id';
+        $userParams = [];
+        if ($q !== '') {
+            $userSql .= ' WHERE u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR r.role_name LIKE ?';
+            $like = '%' . $q . '%';
+            $userParams = [$like, $like, $like, $like];
+        }
+        $userSql .= ' ORDER BY u.created_at DESC';
+        $users = Database::fetchAll($userSql, $userParams);
         $roles = Database::fetchAll('SELECT * FROM roles ORDER BY role_name');
-        View::render('admin/users', ['title' => 'Users', 'users' => $users, 'roles' => $roles]);
+        View::render('admin/users', ['title' => 'Users', 'users' => $users, 'roles' => $roles, 'q' => $q]);
+    }
+
+    public function roles(): void
+    {
+        Rbac::require('users.manage');
+        $rows = Database::fetchAll(
+            'SELECT r.role_name, r.description AS role_description, p.permission_key, p.description AS permission_description
+             FROM roles r
+             LEFT JOIN role_permissions rp ON rp.role_id = r.role_id
+             LEFT JOIN permissions p ON p.permission_id = rp.permission_id
+             ORDER BY r.role_name, p.permission_key'
+        );
+        $roles = [];
+        foreach ($rows as $row) {
+            $name = $row['role_name'];
+            $roles[$name] ??= ['name' => $name, 'description' => $row['role_description'], 'permissions' => []];
+            if ($row['permission_key'] !== null) {
+                $roles[$name]['permissions'][] = [
+                    'key' => $row['permission_key'],
+                    'description' => $row['permission_description'],
+                ];
+            }
+        }
+        View::render('admin/roles', ['title' => 'Roles & Permissions', 'roles' => array_values($roles)]);
     }
 
     public function settings(): void

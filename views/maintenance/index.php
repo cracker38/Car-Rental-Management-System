@@ -1,3 +1,4 @@
+<?php if (!empty($canManage)): ?>
 <form method="post" class="panel mb-4">
   <?= \Crms\Csrf::field() ?>
   <input type="hidden" name="action" value="create">
@@ -19,12 +20,13 @@
   </div>
   <button class="btn btn-primary mt-3">Save job</button>
 </form>
+<?php endif; ?>
 <div class="panel table-panel">
   <div class="panel-h">Open and recent jobs</div>
   <div class="table-responsive"><table class="table mb-0">
-    <thead><tr><th>No</th><th>Vehicle</th><th>Title</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>No</th><th>Vehicle</th><th>Title</th><th>Dates</th><th>Status</th><?php if (!empty($canManage)): ?><th></th><?php endif; ?></tr></thead>
     <tbody>
-    <?php if (!$rows): ?><tr><td colspan="6"><div class="empty-state">No maintenance records.</div></td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="<?= !empty($canManage) ? 6 : 5 ?>"><div class="empty-state">No maintenance records.</div></td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
       <tr>
         <td><?= e($r['maintenance_number']) ?></td>
@@ -32,7 +34,7 @@
         <td><?= e($r['title']) ?></td>
         <td><?= e($r['start_date']) ?> → <?= e((string)$r['expected_completion_date']) ?></td>
         <td><?= status_badge((string)$r['status']) ?></td>
-        <td>
+        <?php if (!empty($canManage)): ?><td>
           <?php if (in_array($r['status'], ['scheduled','in_progress'], true)): ?>
             <form method="post" class="d-inline" data-confirm="Mark complete?">
               <?= \Crms\Csrf::field() ?>
@@ -41,7 +43,7 @@
               <button class="btn btn-sm btn-outline-success">Complete</button>
             </form>
           <?php endif; ?>
-        </td>
+        </td><?php endif; ?>
       </tr>
     <?php endforeach; ?>
     </tbody>

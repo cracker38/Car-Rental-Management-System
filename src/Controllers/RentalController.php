@@ -18,16 +18,17 @@ final class RentalController
     public function index(): void
     {
         $canManage = Rbac::can('rentals.manage');
+        $canView = Rbac::can('rentals.view');
         $canInspect = Rbac::can('inspections.manage');
-        if (!$canManage && !$canInspect) {
-            Rbac::require('rentals.manage');
+        if (!$canManage && !$canView && !$canInspect) {
+            Rbac::require('rentals.view');
         }
         $sql = 'SELECT rt.*, c.first_name, c.last_name, v.registration_no
                 FROM rentals rt
                 JOIN customers c ON c.customer_id = rt.customer_id
                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id';
         $params = [];
-        if (!$canManage && $canInspect) {
+        if (!$canManage && !$canView && $canInspect) {
             $sql .= " WHERE rt.status = 'returned'";
         } elseif (Auth::isCustomer()) {
             $sql .= ' WHERE rt.customer_id = ?';
@@ -35,16 +36,19 @@ final class RentalController
         }
         $sql .= ' ORDER BY rt.created_at DESC LIMIT 200';
         View::render('rentals/index', [
-            'title' => $canManage ? 'Rentals' : 'Return inspections',
+            'title' => ($canManage || $canView) ? 'Rentals' : 'Return inspections',
             'rows' => Database::fetchAll($sql, $params),
-            'inspectOnly' => !$canManage && $canInspect,
+            'inspectOnly' => !$canManage && !$canView && $canInspect,
         ]);
     }
 
     public function show(): void
     {
-        if (!Rbac::can('rentals.manage') && !Rbac::can('inspections.manage')) {
-            Rbac::require('rentals.manage');
+        $canManage = Rbac::can('rentals.manage');
+        $canView = Rbac::can('rentals.view');
+        $canInspect = Rbac::can('inspections.manage');
+        if (!$canManage && !$canView && !$canInspect) {
+            Rbac::require('rentals.view');
         }
         $id = Http::int('id');
         Rbac::assertCustomerOwns('rental', $id);
@@ -62,7 +66,7 @@ final class RentalController
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
-        if (!Rbac::can('rentals.manage') && !in_array($row['status'], ['returned', 'inspected'], true)) {
+        if (!$canManage && !$canView && !in_array($row['status'], ['returned', 'inspected'], true)) {
             http_response_code(403);
             View::render('errors/403', ['title' => 'Forbidden']);
             return;

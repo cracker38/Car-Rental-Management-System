@@ -7,7 +7,7 @@
     </div>
     <?= status_badge((string)$row['status']) ?>
   </div>
-  <?php if (can('rentals.manage')): ?>
+  <?php if (can('rentals.manage') || can('rentals.view')): ?>
     <div class="kpi-row">
       <div><span>Base</span><strong><?= e(\Crms\Money::format($row['base_amount'])) ?></strong></div>
       <div><span>Extras</span><strong><?= e(\Crms\Money::format($row['extra_mileage_fee'])) ?></strong></div>
@@ -17,7 +17,7 @@
     <p class="small text-muted mb-0">Agreement: <?= e($row['agreement_status']) ?> · damage <?= e(\Crms\Money::format($row['damage_fee'])) ?> · cleaning <?= e(\Crms\Money::format($row['cleaning_fee'])) ?></p>
   <?php endif; ?>
 </section>
-<?php if ($row['agreement_terms'] && can('rentals.manage')): ?>
+<?php if ($row['agreement_terms'] && (can('rentals.manage') || can('rentals.view'))): ?>
   <pre class="bg-white p-3 border rounded small"><?= e($row['agreement_terms']) ?></pre>
 <?php endif; ?>
 

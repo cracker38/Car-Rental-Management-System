@@ -6,6 +6,7 @@ namespace Crms\Services;
 use Crms\Auth;
 use Crms\Database;
 use Crms\Money;
+use Crms\Rbac;
 
 final class DashboardService
 {
@@ -40,7 +41,7 @@ final class DashboardService
     public function data(array $user): array
     {
         $role = (string) ($user['role_name'] ?? '');
-        $notes = Database::fetchAll(
+        $notes = $role === 'System Administrator' ? [] : Database::fetchAll(
             'SELECT * FROM notifications WHERE user_id = ? OR customer_id = ? ORDER BY created_at DESC LIMIT 8',
             [Auth::id(), Auth::customerId()]
         );
@@ -68,20 +69,20 @@ final class DashboardService
     {
         return match ($role) {
             'System Administrator' => [
-                ['route' => 'admin/users', 'icon' => 'bi-people', 'label' => 'Users & roles', 'hint' => 'Create, activate and assign roles'],
-                ['route' => 'admin/settings', 'icon' => 'bi-sliders', 'label' => 'Settings', 'hint' => 'Configuration, SMS and HDEV'],
-                ['route' => 'admin/audit', 'icon' => 'bi-shield-check', 'label' => 'Audit log', 'hint' => 'Security and user activity'],
-                ['route' => 'admin/backup', 'icon' => 'bi-hdd', 'label' => 'Backup', 'hint' => 'SQL export and recovery files'],
-                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'System records', 'hint' => 'Vehicles, bookings and rentals'],
-                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'System reports', 'hint' => 'Company-wide figures'],
+                ['route' => 'admin/users', 'icon' => 'bi-people', 'label' => 'Users & roles', 'hint' => 'Manage accounts, roles and permissions'],
+                ['route' => 'admin/settings', 'icon' => 'bi-sliders', 'label' => 'System settings', 'hint' => 'Manage configuration'],
+                ['route' => 'admin/audit', 'icon' => 'bi-shield-check', 'label' => 'Audit & security', 'hint' => 'Review user activity and account access'],
+                ['route' => 'admin/backup', 'icon' => 'bi-hdd', 'label' => 'Backup & recovery', 'hint' => 'Manage system backups'],
+                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'System records', 'hint' => 'View fleet and operating records'],
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'System reports', 'hint' => 'Generate company-wide reports'],
             ],
             'Business Manager' => [
-                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Reports', 'hint' => 'Hire and revenue'],
-                ['route' => 'reservations', 'icon' => 'bi-calendar3', 'label' => 'Reservations', 'hint' => 'Pipeline and confirmations'],
-                ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Rentals', 'hint' => 'Live hires and returns'],
-                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Fleet', 'hint' => 'Availability and rates'],
-                ['route' => 'customers', 'icon' => 'bi-people', 'label' => 'Customers', 'hint' => 'Accounts and licences'],
-                ['route' => 'drivers', 'icon' => 'bi-person-badge', 'label' => 'Drivers', 'hint' => 'Chauffeur assignments'],
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Reports & exports', 'hint' => 'Review permitted business reports'],
+                ['route' => 'reservations', 'icon' => 'bi-calendar3', 'label' => 'Reservations', 'hint' => 'Booking pipeline and performance'],
+                ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Rentals & returns', 'hint' => 'Active hires and upcoming returns'],
+                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Fleet availability', 'hint' => 'Utilization and vehicle status'],
+                ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Maintenance alerts', 'hint' => 'Open service and repair work'],
+                ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'Outstanding payments', 'hint' => 'Review unpaid invoice balances'],
             ],
             'Rental Officer' => [
                 ['route' => 'reservations/form', 'icon' => 'bi-plus-circle', 'label' => 'New booking', 'hint' => 'Create a reservation'],
@@ -124,17 +125,24 @@ final class DashboardService
     {
         return match ($role) {
             'System Administrator' => [
-                'Create, edit, activate and deactivate user accounts',
-                'Assign roles and review permissions',
-                'Manage system settings, backups and recovery files',
-                'View vehicles, reservations, rentals, payments and maintenance',
-                'Review audit logs, security events and system-wide reports',
+                'Create, edit, activate, deactivate and manage user accounts',
+                'Assign roles and permissions',
+                'Manage system settings and configuration',
+                'View system-wide vehicles, reservations, rentals, payments and maintenance records',
+                'Review audit logs and user activities',
+                'Manage backup and recovery procedures',
+                'Monitor security events and account access',
+                'Generate system-wide reports',
             ],
             'Business Manager' => [
-                'Monitor KPIs, revenue, bookings, live rentals and utilisation',
-                'Review operational and financial reports, including CSV export',
-                'Watch outstanding invoices, upcoming returns and maintenance alerts',
-                'Review reservation performance and rental officer activity',
+                'View business KPIs, revenue, bookings, active rentals and vehicle utilization',
+                'Review operational and financial reports',
+                'Monitor outstanding payments and upcoming returns',
+                'Review fleet availability and maintenance alerts',
+                'Monitor rental officers\' operational activity',
+                'Review reservation and rental performance',
+                'Export permitted reports to PDF or Excel',
+                'Review business trends to support decisions',
             ],
             'Rental Officer' => [
                 'Register customers and keep permitted vehicle details current',
@@ -174,8 +182,8 @@ final class DashboardService
     private function restriction(string $role): string
     {
         return match ($role) {
-            'System Administrator' => 'Payments and refunds are never auto-approved. Financial postings stay in the ledger and audit log.',
-            'Business Manager' => 'You cannot change security settings or edit posted payments. Reports are view and export only.',
+            'System Administrator' => 'Do not automatically approve financial transactions or refunds. Approve them only when explicitly authorized by business policy.',
+            'Business Manager' => 'Do not manage system security settings or change payment records without an explicitly assigned permission.',
             'Rental Officer' => 'You cannot open system administration or post unauthorised refunds or ledger adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and adjustments require a reason and are written to the audit log. Posted rows are never deleted.',
             'Vehicle Inspector/Maintenance Staff' => 'You cannot delete financial records or confirm reservations. Flag a vehicle instead of changing hire status.',
@@ -189,61 +197,136 @@ final class DashboardService
     {
         return [
             'kpis' => [
-                ['label' => 'Users', 'value' => $this->count('SELECT COUNT(*) c FROM users'), 'hint' => 'All accounts', 'href' => url('admin/users')],
-                ['label' => 'Fleet', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'"), 'hint' => 'Active vehicles', 'href' => url('vehicles')],
-                ['label' => 'Open bookings', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE status IN ('pending','confirmed')"), 'hint' => 'Pending + confirmed', 'href' => url('reservations')],
-                ['label' => 'Live rentals', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue')"), 'hint' => 'On the road', 'href' => url('rentals')],
+                ['label' => 'Total Users', 'value' => $this->count('SELECT COUNT(*) c FROM users'), 'hint' => 'Accounts across all roles', 'icon' => 'bi-people-fill', 'href' => url('admin/users')],
+                ['label' => 'User Roles', 'value' => $this->count('SELECT COUNT(*) c FROM roles'), 'hint' => 'Configured access groups', 'icon' => 'bi-person-gear', 'href' => url('admin/roles')],
+                ['label' => 'Permissions', 'value' => $this->count('SELECT COUNT(*) c FROM permissions'), 'hint' => 'Available access rules', 'icon' => 'bi-shield-lock-fill', 'href' => url('admin/roles')],
+                ['label' => 'Audit Events', 'value' => $this->count('SELECT COUNT(*) c FROM audit_logs'), 'hint' => 'Recorded system activity', 'icon' => 'bi-journal-check', 'href' => url('admin/audit')],
             ],
-            'paymentsView' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed'")),
-            'openMaint' => $this->count("SELECT COUNT(*) c FROM maintenance_records WHERE status IN ('scheduled','in_progress')"),
+            'records' => [
+                ['label' => 'Vehicles', 'value' => $this->count('SELECT COUNT(*) c FROM vehicles'), 'route' => 'vehicles', 'icon' => 'bi-car-front'],
+                ['label' => 'Reservations', 'value' => $this->count('SELECT COUNT(*) c FROM reservations'), 'route' => 'reservations', 'icon' => 'bi-calendar3'],
+                ['label' => 'Rentals', 'value' => $this->count('SELECT COUNT(*) c FROM rentals'), 'route' => 'rentals', 'icon' => 'bi-key'],
+                ['label' => 'Payments', 'value' => $this->count('SELECT COUNT(*) c FROM financial_transactions'), 'route' => 'finance', 'icon' => 'bi-wallet2'],
+                ['label' => 'Maintenance', 'value' => $this->count('SELECT COUNT(*) c FROM maintenance_records'), 'route' => 'maintenance', 'icon' => 'bi-wrench-adjustable'],
+            ],
             'users' => Database::fetchAll('SELECT u.first_name, u.last_name, u.email, u.status, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.created_at DESC LIMIT 8'),
             'audit' => Database::fetchAll('SELECT action, entity_type, result, created_at FROM audit_logs ORDER BY created_at DESC LIMIT 8'),
-            'fleet' => Database::fetchAll('SELECT status, COUNT(*) c FROM vehicles GROUP BY status'),
-            'smsFailed' => Database::fetchAll("SELECT subject, error_message, created_at FROM notifications WHERE channel = 'sms' AND status = 'failed' ORDER BY created_at DESC LIMIT 5"),
         ];
     }
 
     private function manager(): array
     {
-        $fin = Database::fetch(
-            "SELECT COALESCE(SUM(CASE WHEN transaction_type='payment' AND status='completed' THEN amount END),0) payments,
-                    COALESCE(SUM(CASE WHEN transaction_type='payment_refund' AND status='completed' THEN amount END),0) refunds
-             FROM financial_transactions"
-        );
+        $canViewFinancial = Rbac::can('reports.financial');
+        $monthRevenue = 0.0;
+        $outstanding = 0.0;
+        if ($canViewFinancial) {
+            $fin = Database::fetch(
+                "SELECT COALESCE(SUM(amount),0) revenue
+                 FROM financial_transactions
+                 WHERE transaction_type = 'payment' AND status = 'completed'
+                   AND transaction_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"
+            );
+            $monthRevenue = (float) ($fin['revenue'] ?? 0);
+            $outstanding = $this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances');
+        }
         $fleetSize = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'");
         $onHire = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'rented'");
         $util = $fleetSize > 0 ? (string) round(($onHire / $fleetSize) * 100) . '%' : '—';
+        $trendSources = [
+            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS period, COUNT(*) AS bookings, 0 AS rentals, 0 AS revenue
+             FROM reservations
+             WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
+             GROUP BY DATE_FORMAT(created_at, '%Y-%m')",
+            "SELECT DATE_FORMAT(COALESCE(rt.actual_pickup_datetime, r.pickup_datetime), '%Y-%m') AS period,
+                    0 AS bookings, COUNT(*) AS rentals, 0 AS revenue
+             FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id
+             WHERE COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
+               AND rt.status <> 'cancelled'
+             GROUP BY DATE_FORMAT(COALESCE(rt.actual_pickup_datetime, r.pickup_datetime), '%Y-%m')",
+        ];
+        if ($canViewFinancial) {
+            $trendSources[] = "SELECT DATE_FORMAT(transaction_date, '%Y-%m') AS period,
+                    0 AS bookings, 0 AS rentals, SUM(amount) AS revenue
+             FROM financial_transactions
+             WHERE transaction_type = 'payment' AND status = 'completed'
+               AND transaction_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
+             GROUP BY DATE_FORMAT(transaction_date, '%Y-%m')";
+        }
+        $trendRows = Database::fetchAll(
+            'SELECT period, SUM(bookings) AS bookings, SUM(rentals) AS rentals, SUM(revenue) AS revenue
+             FROM (' . implode(' UNION ALL ', $trendSources) . ') AS monthly_activity
+             GROUP BY period ORDER BY period'
+        );
+        $trendByMonth = [];
+        foreach ($trendRows as $row) {
+            $trendByMonth[$row['period']] = $row;
+        }
+        $trends = [];
+        $currentMonth = new \DateTimeImmutable(date('Y-m-01'));
+        for ($offset = 5; $offset >= 0; $offset--) {
+            $month = $currentMonth->modify('-' . $offset . ' months');
+            $period = $month->format('Y-m');
+            $row = $trendByMonth[$period] ?? [];
+            $trends[] = [
+                'period' => $period,
+                'label' => $month->format('M Y'),
+                'bookings' => (int) ($row['bookings'] ?? 0),
+                'rentals' => (int) ($row['rentals'] ?? 0),
+                'revenue' => (float) ($row['revenue'] ?? 0),
+            ];
+        }
+        $dueCondition = "status IN ('active','overdue','scheduled')
+                         AND (expected_return_datetime < NOW() OR expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))";
+        $kpis = [];
+        if ($canViewFinancial) {
+            $kpis[] = ['label' => 'Revenue this month', 'value' => Money::format($monthRevenue), 'hint' => 'Completed payments', 'href' => url('reports')];
+        }
+        $kpis[] = ['label' => 'Bookings this month', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"), 'hint' => 'Created this month', 'href' => url('reservations')];
+        $kpis[] = ['label' => 'Active rentals', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue')"), 'hint' => 'Currently on hire', 'href' => url('rentals')];
+        $kpis[] = ['label' => 'Vehicle utilization', 'value' => $util, 'hint' => $onHire . ' of ' . $fleetSize . ' active vehicles on hire', 'href' => url('vehicles')];
+        if ($canViewFinancial) {
+            $kpis[] = ['label' => 'Outstanding payments', 'value' => Money::format($outstanding), 'hint' => 'Unpaid invoice balances', 'href' => url('invoices')];
+        }
+        $kpis[] = ['label' => 'Returns due / overdue', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE ' . $dueCondition), 'hint' => 'Overdue or due within 7 days', 'href' => url('rentals')];
         return [
-            'kpis' => [
-                ['label' => 'Revenue received', 'value' => Money::format($fin['payments'] ?? 0), 'hint' => 'Completed payments', 'href' => url('reports')],
-                ['label' => 'Utilisation', 'value' => $util, 'hint' => $onHire . ' of ' . $fleetSize . ' cars on hire', 'href' => url('vehicles')],
-                ['label' => 'Overdue returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Need follow-up', 'href' => url('rentals')],
-                ['label' => 'Outstanding', 'value' => Money::format($this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances')), 'hint' => 'Unpaid invoices', 'href' => url('invoices')],
-            ],
+            'kpis' => $kpis,
+            'trends' => $trends,
+            'canViewFinancial' => $canViewFinancial,
             'officers' => Database::fetchAll(
-                "SELECT u.first_name, u.last_name, COUNT(*) c FROM reservations r
-                 JOIN users u ON u.user_id = r.created_by JOIN roles ro ON ro.role_id = u.role_id
-                 WHERE ro.role_name = 'Rental Officer' AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                 GROUP BY u.user_id, u.first_name, u.last_name ORDER BY c DESC LIMIT 6"
+                "SELECT u.first_name, u.last_name, COALESCE(SUM(activity.bookings),0) AS bookings,
+                        COALESCE(SUM(activity.rentals),0) AS rentals
+                 FROM users u JOIN roles ro ON ro.role_id = u.role_id
+                 LEFT JOIN (
+                    SELECT created_by AS user_id, COUNT(*) AS bookings, 0 AS rentals
+                    FROM reservations
+                    WHERE created_by IS NOT NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                    GROUP BY created_by
+                    UNION ALL
+                    SELECT handled_by AS user_id, 0 AS bookings, COUNT(*) AS rentals
+                    FROM rentals
+                    WHERE handled_by IS NOT NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                    GROUP BY handled_by
+                 ) activity ON activity.user_id = u.user_id
+                 WHERE ro.role_name = 'Rental Officer'
+                 GROUP BY u.user_id, u.first_name, u.last_name
+                 ORDER BY COALESCE(SUM(activity.bookings),0) + COALESCE(SUM(activity.rentals),0) DESC LIMIT 6"
             ),
             'maintAlerts' => Database::fetchAll(
                 "SELECT m.title, m.status, v.registration_no FROM maintenance_records m
                  JOIN vehicles v ON v.vehicle_id = m.vehicle_id
-                 WHERE m.status IN ('scheduled','in_progress') ORDER BY m.start_date LIMIT 6"
+                 WHERE m.status IN ('scheduled','in_progress')
+                 ORDER BY COALESCE(m.expected_completion_date, m.start_date), m.start_date LIMIT 6"
             ),
-            'payments' => $fin['payments'] ?? 0,
-            'refunds' => $fin['refunds'] ?? 0,
             'due' => Database::fetchAll(
                 "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status, v.registration_no, c.first_name, c.last_name
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id JOIN customers c ON c.customer_id = rt.customer_id
-                 WHERE rt.status IN ('active','overdue','scheduled') ORDER BY rt.expected_return_datetime ASC LIMIT 10"
-            ),
-            'pending' => Database::fetchAll(
-                "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, c.first_name, c.last_name, v.registration_no
-                 FROM reservations r JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
-                 WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 6"
+                 WHERE rt.status IN ('active','overdue','scheduled')
+                   AND (rt.expected_return_datetime < NOW() OR rt.expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))
+                 ORDER BY rt.expected_return_datetime ASC LIMIT 10"
             ),
             'fleet' => Database::fetchAll('SELECT status, COUNT(*) c FROM vehicles GROUP BY status'),
+            'reservationPerformance' => Database::fetchAll('SELECT status, COUNT(*) c FROM reservations GROUP BY status ORDER BY status'),
+            'rentalPerformance' => Database::fetchAll('SELECT status, COUNT(*) c FROM rentals GROUP BY status ORDER BY status'),
         ];
     }
 

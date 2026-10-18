@@ -26,7 +26,16 @@ final class Rbac
                 self::$perms[$r['permission_key']] = true;
             }
         }
-        return isset(self::$perms[$permission]);
+        if (isset(self::$perms[$permission])) {
+            return true;
+        }
+        $viewToManage = [
+            'rentals.view' => 'rentals.manage',
+            'transactions.view' => 'transactions.manage',
+            'maintenance.view' => 'maintenance.manage',
+        ];
+        $managePermission = $viewToManage[$permission] ?? null;
+        return $managePermission !== null && isset(self::$perms[$managePermission]);
     }
 
     public static function require(string $permission): void

@@ -33,7 +33,7 @@ if ($mysqli->connect_error) {
             while ($mysqli->more_results()) {
                 $mysqli->next_result();
             }
-            $messages[] = 'Schema applied with CREATE TABLE IF NOT EXISTS / INSERT IGNORE (existing data kept).';
+            $messages[] = 'Schema applied; existing business data was kept and System Administrator permissions were refreshed.';
         }
     }
 

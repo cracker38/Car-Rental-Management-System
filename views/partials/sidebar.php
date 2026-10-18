@@ -2,11 +2,12 @@
 $role = $user['role_name'] ?? '';
 $isCustomer = $role === 'Customer';
 $isDriver = $role === 'Driver';
+$isSystemAdmin = $role === 'System Administrator';
 ?>
 <aside class="sidebar d-none d-lg-flex">
   <a class="brand" href="<?= e(url($user ? 'dashboard' : 'home')) ?>">
-    <span class="brand-mark"><i class="bi bi-car-front-fill" aria-hidden="true"></i></span>
-    <span>Rent Car Rwanda</span>
+    <span class="brand-mark"><i class="bi <?= $isSystemAdmin ? 'bi-shield-lock-fill' : 'bi-car-front-fill' ?>" aria-hidden="true"></i></span>
+    <span class="brand-label">Rent Car Rwanda</span>
   </a>
   <?php if (!empty($user)): ?>
     <div class="sidebar-role"><?= e($user['first_name']) ?><span><?= e($role) ?></span></div>
@@ -22,8 +23,8 @@ $isDriver = $role === 'Driver';
   </div>
   <div class="offcanvas-body sidebar">
     <a class="brand" href="<?= e(url($user ? 'dashboard' : 'home')) ?>">
-      <span class="brand-mark"><i class="bi bi-car-front-fill" aria-hidden="true"></i></span>
-      <span>Rent Car Rwanda</span>
+      <span class="brand-mark"><i class="bi <?= $isSystemAdmin ? 'bi-shield-lock-fill' : 'bi-car-front-fill' ?>" aria-hidden="true"></i></span>
+      <span class="brand-label">Rent Car Rwanda</span>
     </a>
     <?php if (!empty($user)): ?>
       <div class="sidebar-role"><?= e($user['first_name']) ?><span><?= e($role) ?></span></div>

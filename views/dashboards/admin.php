@@ -1,51 +1,65 @@
-<?php
-$dashboardSubtitle = 'System Overview — accounts, backups, audit, and company records. Payments stay in the ledger until staff post them.';
-$dashboardActions = [
-  ['route' => 'admin/users', 'label' => 'Users & roles', 'icon' => 'bi-people'],
-  ['route' => 'admin/audit', 'label' => 'Audit', 'icon' => 'bi-shield-check'],
-  ['route' => 'admin/backup', 'label' => 'Backup', 'icon' => 'bi-hdd'],
-];
-require dirname(__DIR__) . '/partials/dashboard-heading.php';
-require dirname(__DIR__) . '/partials/kpis.php';
-require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
-?>
-<div class="row g-3">
-  <div class="col-lg-4">
-    <div class="panel">
-      <div class="panel-h">Fleet by status</div>
-      <?php if (empty($fleet)): ?><p class="text-muted mb-0">No vehicles yet.</p><?php endif; ?>
-      <?php foreach ($fleet as $f): ?>
-        <div class="mini-row d-flex justify-content-between"><span><?= status_badge($f['status']) ?></span><strong><?= (int)$f['c'] ?></strong></div>
-      <?php endforeach; ?>
-      <div class="mini-row d-flex justify-content-between mt-2"><span>Completed payments (view)</span><strong><?= e($paymentsView ?? '—') ?></strong></div>
-      <div class="mini-row d-flex justify-content-between"><span>Open maintenance</span><strong><?= (int)($openMaint ?? 0) ?></strong></div>
-      <a class="btn btn-sm btn-outline-dark mt-3" href="<?= e(url('vehicles')) ?>">View fleet records</a>
-    </div>
+<div class="admin-dashboard-heading">
+  <div>
+    <p class="eyebrow mb-1">System Administrator</p>
+    <h1>System Overview</h1>
+    <p class="text-muted mb-0">Manage access and configuration, review system records, and monitor activity.</p>
   </div>
-  <div class="col-lg-4">
-    <div class="panel">
-      <div class="panel-h">Latest accounts</div>
-      <?php if (empty($users)): ?><p class="text-muted mb-0">No users yet.</p><?php endif; ?>
-      <?php foreach ($users as $u): ?>
-        <div class="mini-row"><strong><?= e($u['first_name'] . ' ' . $u['last_name']) ?></strong><span><?= e($u['role_name']) ?> · <?= e($u['status']) ?></span></div>
-      <?php endforeach; ?>
-      <a class="btn btn-sm btn-outline-dark mt-3" href="<?= e(url('admin/users')) ?>">Roles &amp; access</a>
-    </div>
-  </div>
-  <div class="col-lg-4">
-    <div class="panel">
-      <div class="panel-h">Audit &amp; SMS</div>
-      <?php foreach ($audit as $a): ?>
-        <div class="mini-row"><strong><?= e($a['action']) ?></strong><span><?= e($a['created_at']) ?> · <?= e($a['result']) ?></span></div>
-      <?php endforeach; ?>
-      <?php if (!empty($smsFailed)): ?>
-        <p class="small text-muted mt-3 mb-1">Failed SMS</p>
-        <?php foreach ($smsFailed as $sms): ?>
-          <div class="mini-row"><strong><?= e($sms['subject']) ?></strong><span><?= e($sms['error_message'] ?: 'Rejected') ?></span></div>
+  <a class="btn btn-primary" href="<?= e(url('admin/backup')) ?>"><i class="bi bi-hdd-stack me-1" aria-hidden="true"></i>Backup &amp; recovery</a>
+</div>
+<?php require dirname(__DIR__) . '/partials/kpis.php'; ?>
+<div class="row g-3 admin-overview-panels">
+  <div class="col-lg-5">
+    <section class="panel h-100">
+      <div class="admin-panel-heading">
+        <div><h2 class="panel-h mb-1">System records</h2><p class="small text-muted mb-0">Read-only operational records</p></div>
+        <a class="small fw-bold" href="<?= e(url('reports')) ?>">System reports <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+      </div>
+      <div class="admin-record-list">
+        <?php foreach ($records as $record): ?>
+          <a class="admin-record-link" href="<?= e(url($record['route'])) ?>">
+            <span class="admin-record-icon"><i class="bi <?= e($record['icon']) ?>" aria-hidden="true"></i></span>
+            <span class="admin-record-name"><?= e($record['label']) ?></span>
+            <strong><?= number_format((int)$record['value']) ?></strong>
+            <i class="bi bi-chevron-right admin-record-chevron" aria-hidden="true"></i>
+          </a>
         <?php endforeach; ?>
-      <?php endif; ?>
-      <a class="btn btn-sm btn-outline-secondary mt-3" href="<?= e(url('admin/audit')) ?>">Full log</a>
-    </div>
+      </div>
+    </section>
+  </div>
+  <div class="col-lg-3">
+    <section class="panel h-100">
+      <div class="admin-panel-heading">
+        <div><h2 class="panel-h mb-1">Latest users</h2><p class="small text-muted mb-0">Recently created accounts</p></div>
+        <a class="admin-panel-icon-link" href="<?= e(url('admin/users')) ?>" title="Manage users" aria-label="Manage users"><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+      </div>
+      <?php if (empty($users)): ?><p class="text-muted mb-0">No user accounts yet.</p><?php endif; ?>
+      <?php foreach ($users as $u): ?>
+        <div class="admin-user-row">
+          <span class="admin-user-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
+          <span class="admin-user-detail"><strong><?= e($u['first_name'] . ' ' . $u['last_name']) ?></strong><small><?= e($u['email']) ?></small></span>
+          <span class="admin-user-status"><?= e($u['status']) ?></span>
+        </div>
+      <?php endforeach; ?>
+      <a class="btn btn-sm btn-outline-dark w-100 mt-3" href="<?= e(url('admin/users')) ?>">Manage user accounts</a>
+    </section>
+  </div>
+  <div class="col-lg-4">
+    <section class="panel h-100">
+      <div class="admin-panel-heading">
+        <div><h2 class="panel-h mb-1">Audit activity</h2><p class="small text-muted mb-0">Security events and account access</p></div>
+        <a class="admin-panel-icon-link" href="<?= e(url('admin/audit')) ?>" title="Review audit logs" aria-label="Review audit logs"><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+      </div>
+      <?php if (empty($audit)): ?><p class="text-muted mb-0">No activity recorded yet.</p><?php endif; ?>
+      <?php foreach ($audit as $event): ?>
+        <div class="admin-audit-row">
+          <span class="admin-audit-icon"><i class="bi <?= $event['result'] === 'success' ? 'bi-shield-check' : 'bi-shield-exclamation' ?>" aria-hidden="true"></i></span>
+          <span class="admin-audit-detail"><strong><?= e($event['action']) ?></strong><small><?= e($event['created_at']) ?> · <?= e($event['result']) ?></small></span>
+        </div>
+      <?php endforeach; ?>
+      <a class="btn btn-sm btn-outline-dark w-100 mt-3" href="<?= e(url('admin/audit')) ?>">Open audit logs</a>
+    </section>
   </div>
 </div>
-<?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+<div class="admin-duties-panel mt-3">
+  <?php require dirname(__DIR__) . '/partials/dashboard-duties.php'; ?>
+</div>

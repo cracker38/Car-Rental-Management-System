@@ -39,7 +39,7 @@ if (!function_exists('crms_nav_link')) {
       <div class="navbar-nav align-items-lg-center gap-lg-1">
         <?php if (!empty($user)): ?>
           <?php if (\Crms\Auth::isCustomer() || can('reservations.view')): ?>
-            <a class="nav-link<?= $current === 'reservations' || str_starts_with($current, 'reservations/') ? ' active' : '' ?>" href="<?= e(url('reservations')) ?>">My trips</a>
+            <a class="nav-link<?= $current === 'reservations' || str_starts_with($current, 'reservations/') ? ' active' : '' ?>" href="<?= e(url('reservations')) ?>"><?= \Crms\Auth::isCustomer() ? 'My trips' : 'Reservations' ?></a>
           <?php endif; ?>
           <?php if (can('invoices.view')): ?>
             <a class="nav-link<?= $current === 'invoices' || str_starts_with($current, 'invoices/') ? ' active' : '' ?>" href="<?= e(url('invoices')) ?>">Invoices</a>
@@ -49,9 +49,9 @@ if (!function_exists('crms_nav_link')) {
             $ops = [];
             if (can('vehicles.view') && !\Crms\Auth::isCustomer()) $ops[] = ['vehicles', 'Vehicles'];
             if (can('customers.view') && !\Crms\Auth::isCustomer()) $ops[] = ['customers', 'Customers'];
-            if (can('rentals.manage')) $ops[] = ['rentals', 'Rentals'];
-            if (can('transactions.manage')) $ops[] = ['finance', 'Payments'];
-            if (can('maintenance.manage')) $ops[] = ['maintenance', 'Maintenance'];
+            if (can('rentals.manage') || can('rentals.view')) $ops[] = ['rentals', 'Rentals'];
+            if (can('transactions.manage') || can('transactions.view')) $ops[] = ['finance', 'Payments'];
+            if (can('maintenance.manage') || can('maintenance.view')) $ops[] = ['maintenance', 'Maintenance'];
             if (can('drivers.manage')) $ops[] = ['drivers', 'Drivers'];
             if (can('drivers.schedule')) $ops[] = ['drivers/schedule', 'Driver schedule'];
             if (can('reports.operational') || can('reports.financial')) $ops[] = ['reports', 'Reports'];

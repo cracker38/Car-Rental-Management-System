@@ -7,7 +7,7 @@
     <div class="col-sm-2 d-grid"><button class="btn btn-primary">Apply dates</button></div>
   </div>
 </form>
-<div class="report-toolbar d-flex flex-wrap gap-2 mb-4">
+<div id="report-exports" class="report-toolbar d-flex flex-wrap gap-2 mb-4">
   <a class="btn btn-outline-dark" href="<?= e(url('reports', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'export' => 'csv'])) ?>"><i class="bi bi-download"></i> Export Excel (CSV)</a>
   <button class="btn btn-outline-dark" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Print / PDF</button>
 </div>

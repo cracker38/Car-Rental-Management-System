@@ -14,7 +14,7 @@ final class FinanceController
 {
     public function index(): void
     {
-        Rbac::require('transactions.manage');
+        Rbac::require('transactions.view');
         $rows = Database::fetchAll(
             'SELECT t.*, c.first_name, c.last_name FROM financial_transactions t
              JOIN customers c ON c.customer_id = t.customer_id

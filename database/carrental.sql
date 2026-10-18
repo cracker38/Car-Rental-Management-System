@@ -406,16 +406,23 @@ INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('users.manage','Manage user accounts and roles'),('vehicles.view','View vehicles'),('vehicles.manage','Create and update vehicles'),
  ('customers.view','View customers'),('customers.manage','Create and update customers'),
  ('reservations.view','View reservations'),('reservations.manage','Create and manage reservations'),
- ('rentals.manage','Manage pickup, return and rental records'),('invoices.view','View invoices'),('invoices.manage','Create and manage invoices'),
- ('transactions.manage','Record payments, refunds and deposits'),('maintenance.manage','Manage maintenance'),
+ ('rentals.view','View rental records'),('rentals.manage','Manage pickup, return and rental records'),
+ ('invoices.view','View invoices'),('invoices.manage','Create and manage invoices'),
+ ('transactions.view','View payment and refund records'),('transactions.manage','Record payments, refunds and deposits'),
+ ('maintenance.view','View maintenance records'),('maintenance.manage','Manage maintenance'),
  ('inspections.manage','Record vehicle inspections'),('reports.operational','View operational reports'),
  ('reports.financial','View financial reports'),('notifications.manage','Manage notifications'),
  ('audit.view','Review audit logs'),('settings.manage','Manage system settings');
 INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('drivers.manage','Manage driver records and assignments'),('drivers.schedule','View assigned driver schedule');
 
+DELETE FROM role_permissions WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='System Administrator');
+
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
-SELECT r.role_id,p.permission_id FROM roles r CROSS JOIN permissions p WHERE r.role_name='System Administrator';
+SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
+('users.manage','vehicles.view','reservations.view','rentals.view','transactions.view','maintenance.view',
+ 'reports.operational','reports.financial','audit.view','settings.manage')
+WHERE r.role_name='System Administrator';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN

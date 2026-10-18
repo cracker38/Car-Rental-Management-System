@@ -7,6 +7,16 @@ document.addEventListener('submit', function (e) {
   }
 });
 
+document.querySelectorAll('[data-sidebar-toggle]').forEach(function (button) {
+  button.addEventListener('click', function () {
+    var shell = button.closest('.app-shell');
+    if (!shell) return;
+    var collapsed = shell.classList.toggle('sidebar-collapsed');
+    button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    button.setAttribute('aria-label', collapsed ? 'Expand navigation' : 'Collapse navigation');
+  });
+});
+
 document.querySelectorAll('input[type="datetime-local"][data-min-now]').forEach(function (el) {
   if (!el.value) {
     var n = new Date();
