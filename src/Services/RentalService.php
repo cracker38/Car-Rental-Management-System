@@ -103,6 +103,9 @@ final class RentalService
             }
             $mileage = (int) $mileageInput;
             $vehicle = $this->availability->lockVehicle($pdo, (int) $rental['vehicle_id']);
+            if (!in_array($vehicle['status'], ['available', 'reserved'], true)) {
+                throw new InvalidArgumentException('This vehicle is unavailable for pickup. Resolve its safety or maintenance hold first.');
+            }
             if ($mileage < (int) $vehicle['current_mileage']) {
                 throw new InvalidArgumentException('Pickup mileage cannot be below the vehicle odometer.');
             }
@@ -236,6 +239,15 @@ final class RentalService
                     'other_charges' => $other,
                     'return_notes' => $returnNotes,
                 ]
+            );
+            (new NotificationService())->notifyUser(
+                null,
+                (int) $rental['customer_id'],
+                'rental_returned',
+                'Rental returned: ' . $rental['rental_number'],
+                'Your vehicle return was recorded. The rental team will contact you if any final charges or deposit updates are needed.',
+                'rental',
+                $rentalId
             );
         });
     }
@@ -400,11 +412,11 @@ final class RentalService
         $inspectionId = $stmt->fetchColumn();
         if ($inspectionId && !$replace) {
             Database::execute(
-                "UPDATE inspections SET inspected_by = ?, inspected_at = NOW(), odometer_reading = ?, fuel_level_percent = ?,
+                "UPDATE inspections SET odometer_reading = ?, fuel_level_percent = COALESCE(?, fuel_level_percent),
                     exterior_condition = COALESCE(?, exterior_condition), interior_condition = COALESCE(?, interior_condition),
                     cleanliness = COALESCE(?, cleanliness), notes = COALESCE(?, notes)
                  WHERE inspection_id = ?",
-                [Auth::id(), $odometer, $fuel, $data['exterior_condition'] ?? null, $data['interior_condition'] ?? null,
+                [$odometer, $fuel, $data['exterior_condition'] ?? null, $data['interior_condition'] ?? null,
                  $data['cleanliness'] ?? null, $data['notes'] ?? null, $inspectionId]
             );
             return;

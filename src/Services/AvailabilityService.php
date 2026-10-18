@@ -122,12 +122,29 @@ final class AvailabilityService
         return null;
     }
 
-    public function search(string $pickup, string $returnAt, ?int $categoryId = null, array $filters = []): array
+    public function search(string $pickup, string $returnAt, ?int $categoryId = null, array $filters = [], string $sort = 'recommended'): array
     {
         $this->assertValidPeriod($pickup, $returnAt);
+        $out = [];
+        foreach ($this->matchingVehicles("v.status NOT IN ('inactive','maintenance')", $categoryId, $filters, $sort) as $v) {
+            if ($this->hasConflict((int) $v['vehicle_id'], $pickup, $returnAt) === null) {
+                $out[] = $v;
+            }
+        }
+        return $out;
+    }
+
+    /** Browse currently available cars before the visitor enters rental dates. */
+    public function browse(?int $categoryId = null, array $filters = [], string $sort = 'recommended'): array
+    {
+        return array_slice($this->matchingVehicles("v.status = 'available'", $categoryId, $filters, $sort), 0, 60);
+    }
+
+    private function matchingVehicles(string $availability, ?int $categoryId, array $filters, string $sort): array
+    {
         $sql = 'SELECT v.*, c.category_name FROM vehicles v
                 JOIN vehicle_categories c ON c.category_id = v.category_id
-                WHERE v.status NOT IN (\'inactive\',\'maintenance\')';
+                WHERE ' . $availability;
         $params = [];
         if ($categoryId) {
             $sql .= ' AND v.category_id = ?';
@@ -155,13 +172,12 @@ final class AvailabilityService
             $sql .= ' AND v.transmission = ?';
             $params[] = $filters['transmission'];
         }
-        $sql .= ' ORDER BY v.daily_rate ASC, v.make ASC';
-        $out = [];
-        foreach (Database::fetchAll($sql, $params) as $v) {
-            if ($this->hasConflict((int) $v['vehicle_id'], $pickup, $returnAt) === null) {
-                $out[] = $v;
-            }
-        }
-        return $out;
+        $orderBy = match ($sort) {
+            'price_low' => 'v.daily_rate ASC, v.make ASC, v.model ASC',
+            'price_high' => 'v.daily_rate DESC, v.make ASC, v.model ASC',
+            default => 'v.updated_at DESC, v.daily_rate ASC, v.make ASC',
+        };
+        $sql .= ' ORDER BY ' . $orderBy;
+        return Database::fetchAll($sql, $params);
     }
 }

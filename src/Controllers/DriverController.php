@@ -77,14 +77,15 @@ final class DriverController
             $driverId = (int)($driver['driver_id'] ?? 0);
         }
         $rows = $driverId ? Database::fetchAll(
-            "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report,
+            "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report, da.status_updated_at,
                     r.reservation_code, r.pickup_datetime, r.return_datetime,
                     r.pickup_location, r.return_location, r.status AS reservation_status,
                     c.first_name,c.last_name,c.phone,v.registration_no,v.make,v.model
              FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
              JOIN customers c ON c.customer_id=r.customer_id JOIN vehicles v ON v.vehicle_id=r.vehicle_id
-             WHERE da.driver_id=? AND r.status IN ('pending','confirmed') AND r.return_datetime >= NOW()
-             ORDER BY r.pickup_datetime ASC LIMIT 200",
+             WHERE da.driver_id=? AND r.status IN ('pending','confirmed') AND da.trip_status <> 'completed'
+             ORDER BY CASE WHEN r.pickup_datetime >= NOW() THEN 0 WHEN r.return_datetime >= NOW() THEN 1 ELSE 2 END,
+                      CASE WHEN r.pickup_datetime >= NOW() THEN r.pickup_datetime ELSE r.return_datetime END ASC LIMIT 200",
             [$driverId]
         ) : [];
         $drivers = $canManage ? Database::fetchAll("SELECT driver_id,first_name,last_name FROM drivers ORDER BY last_name,first_name") : [];

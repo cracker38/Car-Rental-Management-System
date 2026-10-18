@@ -1,7 +1,7 @@
 <form class="page-toolbar" method="get">
   <input type="hidden" name="r" value="vehicles">
-  <p class="text-muted mb-0 me-auto">These records power the public fleet. Change a photo, rate or status here and the website updates.</p>
-  <input class="form-control" style="max-width:280px" name="q" value="<?= e($q) ?>" placeholder="Search registration, make, model">
+  <p class="text-muted mb-0 me-auto"><?php if (!empty($customerMode)): ?>Browse vehicles currently available to reserve. Check your dates to confirm availability.<?php else: ?>These records power the public fleet. Change a photo, rate or status here and the website updates.<?php endif; ?></p>
+  <input class="form-control" style="max-width:280px" name="q" value="<?= e($q) ?>" placeholder="<?= !empty($customerMode) ? 'Search make or model' : 'Search registration, make, model' ?>">
   <button class="btn btn-outline-dark">Filter</button>
   <?php if (can('vehicles.manage')): ?>
     <a class="btn btn-primary" href="<?= e(url('vehicles/form')) ?>">Add vehicle</a>

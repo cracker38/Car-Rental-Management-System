@@ -21,14 +21,15 @@ final class MaintenanceService
 
     public function create(array $input): array
     {
-        $vehicleId = (int) ($input['vehicle_id'] ?? 0);
-        $type = trim((string) ($input['maintenance_type'] ?? ''));
-        $title = trim((string) ($input['title'] ?? ''));
+        $vehicleInput = $this->stringInput($input['vehicle_id'] ?? '', 'vehicle');
+        $vehicleId = ctype_digit($vehicleInput) ? (int) $vehicleInput : 0;
+        $type = $this->stringInput($input['maintenance_type'] ?? '', 'maintenance type');
+        $title = $this->stringInput($input['title'] ?? '', 'title');
         $startDate = $this->date($input['start_date'] ?? '', 'Start date', true);
         $expectedDate = $this->date($input['expected_completion_date'] ?? '', 'Expected completion date');
         $nextServiceDate = $this->date($input['next_service_date'] ?? '', 'Next service date');
-        $cost = trim((string) ($input['cost'] ?? '0'));
-        $odometerInput = trim((string) ($input['odometer_reading'] ?? ''));
+        $cost = $this->stringInput($input['cost'] ?? '0', 'cost');
+        $odometerInput = $this->stringInput($input['odometer_reading'] ?? '', 'odometer');
 
         if ($vehicleId < 1) {
             throw new InvalidArgumentException('Choose a vehicle for this maintenance record.');
@@ -99,12 +100,12 @@ final class MaintenanceService
 
     public function updateDetails(int $id, array $input): void
     {
-        $title = trim((string) ($input['title'] ?? ''));
+        $title = $this->stringInput($input['title'] ?? '', 'title');
         $startDate = $this->date($input['start_date'] ?? '', 'Start date', true);
         $expectedDate = $this->date($input['expected_completion_date'] ?? '', 'Expected completion date');
         $nextServiceDate = $this->date($input['next_service_date'] ?? '', 'Next service date');
-        $cost = trim((string) ($input['cost'] ?? ''));
-        $odometerInput = trim((string) ($input['odometer_reading'] ?? ''));
+        $cost = $this->stringInput($input['cost'] ?? '', 'cost');
+        $odometerInput = $this->stringInput($input['odometer_reading'] ?? '', 'odometer');
 
         if ($title === '' || $this->length($title) > 180) {
             throw new InvalidArgumentException('Enter a maintenance title of 180 characters or fewer.');
@@ -128,6 +129,9 @@ final class MaintenanceService
             $record = $stmt->fetch();
             if (!$record) {
                 throw new InvalidArgumentException('Maintenance record not found.');
+            }
+            if ($record['completed_date'] && $startDate > $record['completed_date']) {
+                throw new InvalidArgumentException('A completed service cannot have a start date after its completion date.');
             }
             $odometer = $odometerInput !== '' ? (int) $odometerInput : ($record['odometer_reading'] !== null ? (int) $record['odometer_reading'] : null);
             if ($odometer !== null && $record['odometer_reading'] !== null && $odometer < (int) $record['odometer_reading']) {
@@ -164,9 +168,9 @@ final class MaintenanceService
         });
     }
 
-    public function updateStatus(int $id, string $newStatus, string $reason = ''): void
+    public function updateStatus(int $id, string $newStatus, string $reason = '', bool $vehicleSafe = false): void
     {
-        Database::transaction(function (PDO $pdo) use ($id, $newStatus, $reason) {
+        Database::transaction(function (PDO $pdo) use ($id, $newStatus, $reason, $vehicleSafe) {
             $stmt = $pdo->prepare('SELECT * FROM maintenance_records WHERE maintenance_id = ? FOR UPDATE');
             $stmt->execute([$id]);
             $record = $stmt->fetch();
@@ -184,6 +188,9 @@ final class MaintenanceService
             if ($newStatus === 'cancelled' && trim($reason) === '') {
                 throw new InvalidArgumentException('Enter a reason when cancelling a maintenance job.');
             }
+            if ($newStatus === 'cancelled' && !$vehicleSafe) {
+                throw new InvalidArgumentException('Confirm the vehicle is safe before releasing it from a cancelled job.');
+            }
             if ($this->length($reason) > 500) {
                 throw new InvalidArgumentException('The status note must be 500 characters or fewer.');
             }
@@ -193,7 +200,9 @@ final class MaintenanceService
                 [$newStatus, $newStatus === 'completed' ? date('Y-m-d') : null, $id]
             );
 
-            if ($newStatus === 'completed') {
+            if ($newStatus === 'completed' || ($newStatus === 'cancelled' && $vehicleSafe)) {
+                $vehicleLock = $pdo->prepare('SELECT status FROM vehicles WHERE vehicle_id = ? FOR UPDATE');
+                $vehicleLock->execute([$record['vehicle_id']]);
                 $otherOpen = Database::fetch(
                     "SELECT maintenance_id FROM maintenance_records WHERE vehicle_id = ? AND status IN ('scheduled','in_progress') AND maintenance_id <> ? LIMIT 1",
                     [$record['vehicle_id'], $id]
@@ -211,14 +220,14 @@ final class MaintenanceService
                 (string) $id,
                 $record['maintenance_number'],
                 ['status' => $oldStatus],
-                ['status' => $newStatus, 'reason' => trim($reason)]
+                ['status' => $newStatus, 'reason' => trim($reason), 'vehicle_safe' => $vehicleSafe]
             );
         });
     }
 
     private function date(mixed $value, string $label, bool $required = false): ?string
     {
-        $value = trim((string) $value);
+        $value = $this->stringInput($value, strtolower($label));
         if ($value === '') {
             if ($required) {
                 throw new InvalidArgumentException($label . ' is required.');
@@ -235,7 +244,10 @@ final class MaintenanceService
 
     private function optionalText(mixed $value, int $maxLength): ?string
     {
-        $text = trim((string) $value);
+        if ($value === null) {
+            return null;
+        }
+        $text = $this->stringInput($value, 'text');
         if ($text === '') {
             return null;
         }
@@ -248,5 +260,13 @@ final class MaintenanceService
     private function length(string $text): int
     {
         return function_exists('mb_strlen') ? mb_strlen($text) : strlen($text);
+    }
+
+    private function stringInput(mixed $value, string $label): string
+    {
+        if (!is_string($value) && !is_int($value) && !is_float($value)) {
+            throw new InvalidArgumentException('Enter a valid ' . $label . '.');
+        }
+        return trim((string) $value);
     }
 }

@@ -119,7 +119,9 @@ final class ReservationController
         $id = Http::int('id');
         Rbac::assertCustomerOwns('reservation', $id);
         $row = Database::fetch(
-            'SELECT r.*, c.first_name, c.last_name, c.phone, v.registration_no, v.make, v.model
+            'SELECT r.reservation_id, r.customer_id, r.reservation_code, r.status, r.pickup_datetime, r.return_datetime,
+                    r.estimated_amount, r.security_deposit, c.first_name, c.last_name, c.phone,
+                    v.registration_no, v.make, v.model
              FROM reservations r
              JOIN customers c ON c.customer_id = r.customer_id
              JOIN vehicles v ON v.vehicle_id = r.vehicle_id
@@ -131,7 +133,13 @@ final class ReservationController
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
-        $rental = Database::fetch('SELECT * FROM rentals WHERE reservation_id = ?', [$id]);
+        $rentalSql = 'SELECT * FROM rentals WHERE reservation_id = ?';
+        $rentalParams = [$id];
+        if (Auth::isCustomer()) {
+            $rentalSql .= ' AND customer_id = ?';
+            $rentalParams[] = Auth::customerId() ?: 0;
+        }
+        $rental = Database::fetch($rentalSql, $rentalParams);
         $canEditConfirmedStaffBooking = !Auth::isCustomer()
             && $row['status'] === 'confirmed'
             && $row['pickup_datetime'] > date('Y-m-d H:i:s')

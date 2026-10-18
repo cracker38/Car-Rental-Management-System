@@ -176,6 +176,31 @@ final class FinanceService
                 null,
                 ['status' => $requiresApproval ? 'awaiting_approval' : 'completed', 'reason' => $input['reason'] ?? null]
             );
+            if (!$requiresApproval && in_array($type, ['payment', 'deposit_received'], true)) {
+                $subject = $type === 'payment' ? 'Payment received: ' . $number : 'Security deposit recorded: ' . $number;
+                $message = $type === 'payment'
+                    ? 'A payment of ' . Money::format($amount) . ' was recorded for your invoice.'
+                    : 'A security deposit of ' . Money::format($amount) . ' was recorded for your rental.';
+                (new NotificationService())->notifyUser(
+                    null,
+                    $customerId,
+                    'payment_received',
+                    $subject,
+                    $message,
+                    'financial_transaction',
+                    $id
+                );
+            } elseif ($requiresApproval) {
+                (new NotificationService())->notifyUser(
+                    null,
+                    $customerId,
+                    'payment_status',
+                    'Financial request submitted for review: ' . $number,
+                    'A ' . str_replace('_', ' ', $type) . ' for ' . Money::format($amount) . ' was submitted for approval.',
+                    'financial_transaction',
+                    $id
+                );
+            }
             return Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$id]);
         });
     }
@@ -241,6 +266,18 @@ final class FinanceService
                     ['status' => 'rejected', 'amount' => $txn['amount'], 'requester_id' => $txn['approval_requested_by'], 'review_note' => trim($note)]
                 );
             }
+            $approved = $decision === 'approve';
+            (new NotificationService())->notifyUser(
+                null,
+                (int) $txn['customer_id'],
+                'payment_status',
+                'Financial request ' . ($approved ? 'approved' : 'rejected') . ': ' . $txn['transaction_number'],
+                'Your ' . str_replace('_', ' ', $txn['transaction_type']) . ' request for ' . Money::format($txn['amount'])
+                    . ' was ' . ($approved ? 'approved.' : 'rejected.')
+                    . (trim($note) !== '' ? ' Review note: ' . trim($note) : ''),
+                'financial_transaction',
+                $transactionId
+            );
             return Database::fetch('SELECT * FROM financial_transactions WHERE transaction_id = ?', [$transactionId]);
         });
     }

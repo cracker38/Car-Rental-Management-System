@@ -40,6 +40,10 @@ final class HomeController
         $pickup = Http::datetime('pickup_datetime');
         $returnAt = Http::datetime('return_datetime');
         $categoryId = Http::int('category_id', 0) ?: null;
+        $sort = Http::str('sort', 'recommended');
+        if (!in_array($sort, ['recommended', 'price_low', 'price_high'], true)) {
+            $sort = 'recommended';
+        }
         $results = [];
         $quotes = [];
         $error = null;
@@ -74,7 +78,7 @@ final class HomeController
         }
         if ($pickup && $returnAt && $error === null) {
             try {
-                $results = (new AvailabilityService())->search($pickup, $returnAt, $categoryId, $filters);
+                $results = (new AvailabilityService())->search($pickup, $returnAt, $categoryId, $filters, $sort);
                 $pricing = new PricingService();
                 foreach ($results as $v) {
                     $quotes[(int) $v['vehicle_id']] = $pricing->quoteRates($v, $pickup, $returnAt);
@@ -82,15 +86,24 @@ final class HomeController
             } catch (\Throwable) {
                 $error = 'We could not check availability right now. Please try again or contact our Kigali team.';
             }
+        } elseif ($pickup === '' && $returnAt === '' && $error === null) {
+            try {
+                $results = (new AvailabilityService())->browse($categoryId, $filters, $sort);
+            } catch (\Throwable) {
+                $error = 'The available fleet could not be loaded right now. Please try again shortly.';
+            }
         }
         $categories = [];
+        $maxDailyRate = 200000;
         try {
             $categories = Database::fetchAll('SELECT * FROM vehicle_categories WHERE is_active = 1 ORDER BY category_name');
+            $rateRow = Database::fetch("SELECT COALESCE(MAX(daily_rate), 0) AS max_rate FROM vehicles WHERE status NOT IN ('inactive','maintenance')");
+            $maxDailyRate = max(200000, (int) (ceil(((float) ($rateRow['max_rate'] ?? 0)) / 10000) * 10000));
         } catch (\Throwable) {
             $error ??= 'Car search is temporarily unavailable. Please contact our Kigali team for help.';
         }
         View::render('home/search', [
-            'title' => 'Book a car',
+            'title' => 'Browse cars',
             'categories' => $categories,
             'results' => $results,
             'quotes' => $quotes,
@@ -98,6 +111,8 @@ final class HomeController
             'returnAt' => $returnAt,
             'categoryId' => $categoryId,
             'filters' => $filters,
+            'sort' => $sort,
+            'maxDailyRate' => $maxDailyRate,
             'error' => $error,
             'fullBleed' => true,
         ], 'site');

@@ -7,20 +7,20 @@ $back = $back ?? 'dashboard';
   <input type="hidden" name="assignment_id" value="<?= (int) $trip['assignment_id'] ?>">
   <input type="hidden" name="back" value="<?= e($back) ?>">
   <div class="row g-2 align-items-end">
-    <div class="col-sm-4">
+    <div class="col-sm-3">
       <label class="form-label">Trip progress</label>
       <select class="form-select" name="trip_status" required>
         <?php foreach (['assigned' => 'Assigned', 'en_route' => 'En route', 'on_site' => 'On site', 'completed' => 'Completed', 'delayed' => 'Delayed'] as $value => $label): ?>
-          <option value="<?= e($value) ?>" <?= $tripStatus === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+          <option value="<?= e($value) ?>" <?= $tripStatus === $value ? 'selected' : '' ?> <?= $tripStatus === 'completed' && $value !== 'completed' ? 'disabled' : '' ?>><?= e($label) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="col-sm-6">
-      <label class="form-label">Delay or incident</label>
-      <input class="form-control" name="incident_report" maxlength="500" placeholder="Optional note" value="<?= e((string) ($trip['incident_report'] ?? '')) ?>">
+    <div class="col-sm-7">
+      <label class="form-label">New delay, incident or vehicle problem</label>
+      <textarea class="form-control" name="incident_report" maxlength="500" rows="2" placeholder="Optional report for the operations team"></textarea>
     </div>
     <div class="col-sm-2 d-grid">
-      <button class="btn btn-outline-dark">Update</button>
+      <button class="btn btn-outline-dark">Save update</button>
     </div>
   </div>
 </form>

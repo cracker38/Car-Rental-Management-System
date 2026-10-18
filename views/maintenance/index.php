@@ -51,9 +51,10 @@
             </form>
           <?php endif; ?>
           <?php if (in_array($r['status'], ['scheduled','in_progress'], true)): ?>
-            <form method="post" class="mt-2" data-confirm="Cancel this job? The vehicle will remain unavailable until a maintenance job is completed.">
+            <form method="post" class="mt-2" data-confirm="Cancel this job only after confirming the vehicle is safe for service.">
               <?= \Crms\Csrf::field() ?><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<?= (int)$r['maintenance_id'] ?>"><input type="hidden" name="new_status" value="cancelled">
               <input class="form-control form-control-sm mb-1" name="reason" maxlength="500" placeholder="Cancellation reason" required>
+              <label class="form-check small mb-1"><input class="form-check-input" type="checkbox" name="vehicle_safe" value="yes" required> Vehicle is safe to return to service</label>
               <button class="btn btn-sm btn-outline-danger">Cancel job</button>
             </form>
           <?php endif; ?>

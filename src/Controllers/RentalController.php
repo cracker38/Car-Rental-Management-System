@@ -26,7 +26,7 @@ final class RentalController
         $sql = 'SELECT rt.*, c.first_name, c.last_name, v.registration_no, r.pickup_datetime
                 FROM rentals rt
                 JOIN customers c ON c.customer_id = rt.customer_id
-                JOIN reservations r ON r.reservation_id = rt.reservation_id
+                JOIN reservations r ON r.reservation_id = rt.reservation_id AND r.customer_id = rt.customer_id
                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id';
         $params = [];
         if (!$canManage && !$canView && $canInspect) {
@@ -63,7 +63,7 @@ final class RentalController
              FROM rentals rt
              JOIN customers c ON c.customer_id = rt.customer_id
              JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
-             JOIN reservations r ON r.reservation_id = rt.reservation_id
+             JOIN reservations r ON r.reservation_id = rt.reservation_id AND r.customer_id = rt.customer_id
              WHERE rt.rental_id = ?",
             [$id]
         );
@@ -78,9 +78,14 @@ final class RentalController
             return;
         }
         $inspections = Database::fetchAll('SELECT * FROM inspections WHERE rental_id = ? ORDER BY inspected_at', [$id]);
-        $invoice = Rbac::can('invoices.view')
-            ? Database::fetch("SELECT * FROM invoices WHERE rental_id = ? AND status <> 'void'", [$id])
-            : null;
+        $invoice = null;
+        if (Rbac::can('invoices.view')) {
+            $invoiceStatusFilter = Auth::isCustomer() ? "status NOT IN ('draft','void')" : "status <> 'void'";
+            $invoice = Database::fetch(
+                'SELECT * FROM invoices WHERE rental_id = ? AND customer_id = ? AND ' . $invoiceStatusFilter,
+                [$id, Auth::isCustomer() ? (Auth::customerId() ?: 0) : (int) $row['customer_id']]
+            );
+        }
         View::render('rentals/show', [
             'title' => $row['rental_number'],
             'row' => $row,

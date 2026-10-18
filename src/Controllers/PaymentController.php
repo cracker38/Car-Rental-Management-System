@@ -150,7 +150,7 @@ final class PaymentController
         $row = Database::fetch(
             'SELECT ft.*, c.first_name, c.last_name, c.phone, c.email, i.invoice_number
              FROM financial_transactions ft JOIN customers c ON c.customer_id=ft.customer_id
-             LEFT JOIN invoices i ON i.invoice_id=ft.invoice_id WHERE ft.transaction_id=?',
+             LEFT JOIN invoices i ON i.invoice_id=ft.invoice_id AND i.customer_id=ft.customer_id WHERE ft.transaction_id=?',
             [$id]
         );
         if (!$row) {

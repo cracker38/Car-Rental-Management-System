@@ -50,6 +50,25 @@ final class DashboardService
                  ORDER BY created_at DESC LIMIT 8",
                 [Auth::id()]
             );
+        } elseif ($role === 'Vehicle Inspector/Maintenance Staff') {
+            $notes = [];
+        } elseif ($role === 'Driver') {
+            $notes = Database::fetchAll(
+                "SELECT * FROM notifications
+                 WHERE user_id = ?
+                   AND notification_type IN ('driver_assignment','driver_assignment_updated','driver_assignment_removed')
+                 ORDER BY created_at DESC LIMIT 8",
+                [Auth::id()]
+            );
+        } elseif ($role === 'Customer') {
+            $notes = Database::fetchAll(
+                "SELECT * FROM notifications
+                 WHERE customer_id = ?
+                   AND (notification_type LIKE 'reservation_%' OR notification_type LIKE 'payment_%'
+                        OR notification_type LIKE 'invoice_%' OR notification_type = 'rental_returned')
+                 ORDER BY created_at DESC LIMIT 8",
+                [Auth::customerId() ?: 0]
+            );
         } else {
             $notes = Database::fetchAll(
                 'SELECT * FROM notifications WHERE user_id = ? OR customer_id = ? ORDER BY created_at DESC LIMIT 8',
@@ -112,15 +131,16 @@ final class DashboardService
                 ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Permitted vehicle records', 'hint' => 'Review fleet condition and flag unsafe vehicles'],
             ],
             'Customer' => [
-                ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Find a car', 'hint' => 'Search dates and book'],
+                ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Search vehicles', 'hint' => 'Filter dates, category, price and features'],
+                ['route' => 'reservations/form', 'icon' => 'bi-plus-circle', 'label' => 'Request a reservation', 'hint' => 'Choose a vehicle and rental dates'],
                 ['route' => 'fleet', 'icon' => 'bi-car-front', 'label' => 'Browse fleet', 'hint' => 'Photos and daily rates'],
-                ['route' => 'reservations', 'icon' => 'bi-journal-text', 'label' => 'My trips', 'hint' => 'Status and booking details'],
-                ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'My invoices', 'hint' => 'Pay, receipts and deposits'],
+                ['route' => 'reservations', 'icon' => 'bi-journal-text', 'label' => 'My reservations', 'hint' => 'Status, booking details and eligible changes'],
+                ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'My rentals & agreements', 'hint' => 'View your rental and agreement records'],
+                ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'My invoices & receipts', 'hint' => 'Balances, payments and deposit activity'],
                 ['route' => 'customers/profile', 'icon' => 'bi-person', 'label' => 'My profile', 'hint' => 'Update your contact details'],
             ],
             'Driver' => [
-                ['route' => 'drivers/schedule', 'icon' => 'bi-calendar2-week', 'label' => 'My schedule', 'hint' => 'Only your assigned trips'],
-                ['route' => 'dashboard', 'icon' => 'bi-geo-alt', 'label' => 'Today’s run', 'hint' => 'Pickup, customer and vehicle'],
+                ['route' => 'drivers/schedule', 'icon' => 'bi-calendar2-week', 'label' => 'My schedule', 'hint' => 'View your assigned trips and times'],
             ],
             default => [],
         };
@@ -185,15 +205,26 @@ final class DashboardService
                 'View upcoming servicing and overdue maintenance',
             ],
             'Customer' => [
-                'Search cars, view photos and rates, and request a booking',
-                'Follow reservation status and change eligible pending trips',
-                'View your own invoices, payments, receipts and deposits',
-                'Update your contact details and receive SMS updates',
+                'Register an account and log in securely',
+                'Update permitted personal and contact information',
+                'Search vehicles by availability, rental dates, category, price, fuel and transmission',
+                'View vehicle details, photographs and rental rates',
+                'Request a reservation',
+                'View reservation status and booking details',
+                'Cancel or modify eligible reservations under business rules',
+                'View your own rental agreements, invoices, payments, receipts and deposit information',
+                'View outstanding balances and upcoming return dates',
+                'Receive booking, payment and return notifications',
             ],
             'Driver' => [
-                'View only your assigned trips, times and locations',
-                'See the authorised vehicle and customer contact for each trip',
-                'Update trip progress and report delays or incidents',
+                'View your own profile and contact details',
+                'View assigned trips and schedules',
+                'View pickup locations, destinations and trip times',
+                'View only the vehicle and customer information needed for each assigned trip',
+                'Check assignment status and trip instructions',
+                'Update trip progress or completion where enabled by the business',
+                'Report delays, incidents or vehicle problems',
+                'Receive assignment notifications',
             ],
             default => [],
         };
@@ -207,8 +238,8 @@ final class DashboardService
             'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
             'Vehicle Inspector/Maintenance Staff' => 'Must not delete financial transactions or confirm rentals unless specifically authorized.',
-            'Customer' => 'You can only open your own account, bookings, invoices and receipts. Changing a URL or ID will not show someone else’s records.',
-            'Driver' => 'You cannot see other drivers’ trips, the full customer list, or financial reports.',
+            'Customer' => 'You can only access your own account, reservations, rentals and financial records. Changing a URL or record ID cannot show another customer’s records.',
+            'Driver' => 'You cannot see other drivers\' private records, all customer accounts, financial reports or unassigned trips.',
             default => '',
         };
     }
@@ -449,21 +480,26 @@ final class DashboardService
     {
         return [
             'kpis' => [
-                ['label' => 'Pickup checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id WHERE rt.status = 'scheduled' AND r.pickup_datetime >= NOW() AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY) AND NOT EXISTS (SELECT 1 FROM inspections i WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup')"), 'hint' => 'Next 14 days', 'href' => url('rentals')],
+                ['label' => 'Pickup checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id WHERE ((rt.status = 'scheduled' AND r.pickup_datetime >= NOW() AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY)) OR (rt.status IN ('active','overdue') AND rt.actual_pickup_datetime >= DATE_SUB(NOW(), INTERVAL 1 DAY))) AND NOT EXISTS (SELECT 1 FROM inspections i JOIN users iu ON iu.user_id = i.inspected_by JOIN roles ir ON ir.role_id = iu.role_id WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup' AND i.inspection_id = (SELECT MAX(i2.inspection_id) FROM inspections i2 WHERE i2.rental_id = rt.rental_id AND i2.inspection_type = 'pickup') AND ir.role_name = 'Vehicle Inspector/Maintenance Staff')"), 'hint' => 'Upcoming / recent handovers', 'href' => url('rentals')],
                 ['label' => 'Return checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status = 'returned'"), 'hint' => 'Returned vehicles', 'href' => url('rentals')],
                 ['label' => 'Open maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records WHERE status IN ('scheduled','in_progress')"), 'hint' => 'Blocking hire', 'href' => url('maintenance')],
-                ['label' => 'Overdue maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM (SELECT vehicle_id FROM maintenance_records WHERE status IN ('scheduled','in_progress') AND expected_completion_date < CURDATE() UNION SELECT m.vehicle_id FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date < CURDATE() AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.maintenance_id > m.maintenance_id)) due"), 'hint' => 'Late jobs or service due', 'href' => url('maintenance')],
-                ['label' => 'Upcoming service', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date >= CURDATE() AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.maintenance_id > m.maintenance_id)"), 'hint' => 'Next 30 days', 'href' => url('maintenance')],
+                ['label' => 'Overdue maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM (SELECT vehicle_id FROM maintenance_records WHERE status IN ('scheduled','in_progress') AND expected_completion_date < CURDATE() UNION SELECT m.vehicle_id FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date < CURDATE() AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.next_service_date IS NOT NULL AND newer.maintenance_id > m.maintenance_id)) due"), 'hint' => 'Late jobs or service due', 'href' => url('maintenance')],
+                ['label' => 'Upcoming service', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date >= CURDATE() AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.next_service_date IS NOT NULL AND newer.maintenance_id > m.maintenance_id)"), 'hint' => 'Next 30 days', 'href' => url('maintenance')],
                 ['label' => 'Unavailable vehicles', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'maintenance'"), 'hint' => 'Unsafe or in service', 'href' => url('vehicles')],
             ],
             'pickupChecks' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, r.pickup_datetime, v.registration_no, v.make, v.model
+                "SELECT rt.rental_id, rt.rental_number, rt.status, COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) AS pickup_datetime, v.registration_no, v.make, v.model
                  FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id
                  JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
-                 WHERE rt.status = 'scheduled' AND r.pickup_datetime >= NOW()
-                   AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY)
-                   AND NOT EXISTS (SELECT 1 FROM inspections i WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup')
-                 ORDER BY r.pickup_datetime LIMIT 10"
+                 WHERE ((rt.status = 'scheduled' AND r.pickup_datetime >= NOW()
+                         AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY))
+                        OR (rt.status IN ('active','overdue') AND rt.actual_pickup_datetime >= DATE_SUB(NOW(), INTERVAL 1 DAY)))
+                   AND NOT EXISTS (SELECT 1 FROM inspections i JOIN users iu ON iu.user_id = i.inspected_by
+                                   JOIN roles ir ON ir.role_id = iu.role_id
+                                   WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup'
+                                     AND i.inspection_id = (SELECT MAX(i2.inspection_id) FROM inspections i2 WHERE i2.rental_id = rt.rental_id AND i2.inspection_type = 'pickup')
+                                     AND ir.role_name = 'Vehicle Inspector/Maintenance Staff')
+                 ORDER BY COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) LIMIT 10"
             ),
             'returns' => Database::fetchAll(
                 "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, v.registration_no, v.make, v.model
@@ -488,7 +524,7 @@ final class DashboardService
                  JOIN vehicles v ON v.vehicle_id = m.vehicle_id
                  WHERE m.status = 'completed' AND m.next_service_date IS NOT NULL
                    AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-                   AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.maintenance_id > m.maintenance_id)
+                   AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.next_service_date IS NOT NULL AND newer.maintenance_id > m.maintenance_id)
                  ORDER BY m.next_service_date LIMIT 10"
             ),
         ];
@@ -501,23 +537,42 @@ final class DashboardService
             'kpis' => [
                 ['label' => 'My bookings', 'value' => $this->count('SELECT COUNT(*) c FROM reservations WHERE customer_id = ?', [$cid]), 'hint' => 'All reservations', 'href' => url('reservations')],
                 ['label' => 'Upcoming', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE customer_id = ? AND status IN ('pending','confirmed') AND return_datetime >= NOW()", [$cid]), 'hint' => 'Still active', 'href' => url('reservations')],
+                ['label' => 'My rentals', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE customer_id = ?', [$cid]), 'hint' => 'Agreements and return dates', 'href' => url('rentals')],
                 ['label' => 'Open invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue')", [$cid]), 'hint' => 'To pay', 'href' => url('invoices')],
-                ['label' => 'To pay', 'value' => Money::format($this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE customer_id = ?', [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
+                ['label' => 'To pay', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue')", [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
             ],
             'reservations' => Database::fetchAll(
-                'SELECT r.*, v.make, v.model, v.registration_no, v.image_path FROM reservations r
+                'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status,
+                        v.make, v.model, v.registration_no, v.image_path FROM reservations r
                  JOIN vehicles v ON v.vehicle_id = r.vehicle_id WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 8',
                 [$cid]
             ),
             'invoices' => Database::fetchAll(
-                'SELECT i.*, b.outstanding_balance FROM invoices i
+                "SELECT i.invoice_id, i.invoice_number, i.status, i.created_at, b.outstanding_balance FROM invoices i
                  LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
-                 WHERE i.customer_id = ? ORDER BY i.created_at DESC LIMIT 8',
+                 WHERE i.customer_id = ? AND i.status NOT IN ('draft','void') ORDER BY i.created_at DESC LIMIT 8",
+                [$cid]
+            ),
+            'rentals' => Database::fetchAll(
+                'SELECT rt.rental_id, rt.rental_number, rt.status, rt.agreement_status, rt.expected_return_datetime,
+                        rt.actual_return_datetime, rt.created_at,
+                        r.reservation_code, v.make, v.model, v.registration_no
+                 FROM rentals rt
+                 JOIN reservations r ON r.reservation_id = rt.reservation_id AND r.customer_id = rt.customer_id
+                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
+                 WHERE rt.customer_id = ? ORDER BY rt.created_at DESC LIMIT 8',
+                [$cid]
+            ),
+            'payments' => Database::fetchAll(
+                'SELECT transaction_id, transaction_number, transaction_type, amount, payment_method,
+                        external_reference, status, transaction_date, invoice_id
+                 FROM financial_transactions WHERE customer_id = ?
+                 ORDER BY transaction_date DESC, transaction_id DESC LIMIT 8',
                 [$cid]
             ),
             'fleet' => Database::fetchAll(
                 "SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id
-                 WHERE v.status NOT IN ('inactive','maintenance') ORDER BY v.daily_rate ASC LIMIT 6"
+                 WHERE v.status = 'available' ORDER BY v.daily_rate ASC LIMIT 6"
             ),
             'deposit' => Money::format($this->sum(
                 "SELECT COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount
@@ -526,13 +581,13 @@ final class DashboardService
                 [$cid]
             )),
             'upcomingReturn' => Database::fetch(
-                "SELECT rt.expected_return_datetime, v.registration_no FROM rentals rt
+                "SELECT rt.expected_return_datetime, rt.status, v.registration_no FROM rentals rt
                  JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
                  WHERE rt.customer_id = ? AND rt.status IN ('scheduled','active','overdue')
-                 ORDER BY rt.expected_return_datetime ASC LIMIT 1",
+                 ORDER BY CASE WHEN rt.expected_return_datetime < NOW() THEN 0 ELSE 1 END, rt.expected_return_datetime ASC LIMIT 1",
                 [$cid]
             ),
-            'profile' => Database::fetch('SELECT * FROM customers WHERE customer_id = ?', [$cid]),
+            'profile' => Database::fetch('SELECT customer_id, first_name FROM customers WHERE customer_id = ?', [$cid]),
         ];
     }
 
@@ -540,29 +595,43 @@ final class DashboardService
     {
         $userId = Auth::id() ?: 0;
         $assignments = Database::fetchAll(
-            "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report,
+            "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report, da.status_updated_at,
                     r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
                     r.pickup_location, r.return_location, r.status AS reservation_status,
                     c.first_name, c.last_name, c.phone, v.registration_no, v.make, v.model
              FROM drivers d JOIN driver_assignments da ON da.driver_id = d.driver_id
              JOIN reservations r ON r.reservation_id = da.reservation_id
              JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
-             WHERE d.user_id = ? AND r.status IN ('pending','confirmed') AND r.return_datetime >= NOW()
-             ORDER BY r.pickup_datetime ASC LIMIT 100",
+             WHERE d.user_id = ? AND r.status IN ('pending','confirmed') AND da.trip_status <> 'completed'
+             ORDER BY CASE WHEN r.pickup_datetime >= NOW() THEN 0 WHEN r.return_datetime >= NOW() THEN 1 ELSE 2 END,
+                      CASE WHEN r.pickup_datetime >= NOW() THEN r.pickup_datetime ELSE r.return_datetime END ASC LIMIT 100",
             [$userId]
         );
         $today = array_values(array_filter($assignments, static function (array $trip): bool {
             return date('Y-m-d', strtotime((string) $trip['pickup_datetime'])) === date('Y-m-d');
         }));
+        $nextTrip = null;
+        foreach ($assignments as $trip) {
+            if (strtotime((string) $trip['pickup_datetime']) >= time()) {
+                $nextTrip = $trip;
+                break;
+            }
+            if ($nextTrip === null) {
+                $nextTrip = $trip;
+            }
+        }
         return [
             'kpis' => [
-                ['label' => 'Assigned trips', 'value' => count($assignments), 'hint' => 'Upcoming chauffeur bookings', 'href' => url('drivers/schedule')],
+                ['label' => 'Assigned trips', 'value' => count($assignments), 'hint' => 'Upcoming, active and overdue assignments', 'href' => url('drivers/schedule')],
                 ['label' => 'Today', 'value' => count($today), 'hint' => 'Pickups today'],
-                ['label' => 'Next pickup', 'value' => $assignments ? date('M j, H:i', strtotime($assignments[0]['pickup_datetime'])) : '—', 'hint' => $assignments ? $assignments[0]['reservation_code'] : 'No upcoming trips'],
+                ['label' => 'Next pickup / overdue', 'value' => $nextTrip ? date('M j, H:i', strtotime($nextTrip['pickup_datetime'])) : '—', 'hint' => $nextTrip ? $nextTrip['reservation_code'] : 'No upcoming trips'],
             ],
             'assignments' => $assignments,
-            'nextTrip' => $assignments[0] ?? null,
-            'profile' => Database::fetch('SELECT * FROM drivers WHERE user_id = ?', [$userId]),
+            'nextTrip' => $nextTrip,
+            'profile' => Database::fetch(
+                'SELECT d.*, u.email AS account_email FROM drivers d LEFT JOIN users u ON u.user_id=d.user_id WHERE d.user_id = ?',
+                [$userId]
+            ),
         ];
     }
 

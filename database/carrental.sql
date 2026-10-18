@@ -426,7 +426,7 @@ INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('reports.financial','View financial reports'),('notifications.manage','Manage notifications'),
  ('audit.view','Review audit logs'),('settings.manage','Manage system settings');
 INSERT IGNORE INTO permissions (permission_key,description) VALUES
- ('drivers.manage','Manage driver records and assignments'),('drivers.schedule','View assigned driver schedule');
+ ('drivers.manage','Manage driver records and assignments'),('drivers.schedule','View assigned driver schedule and update your trips');
 
 DELETE FROM role_permissions WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='System Administrator');
 
@@ -468,6 +468,12 @@ SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission
 ('drivers.manage','drivers.schedule') WHERE r.role_name IN ('System Administrator','Business Manager');
 
 DELETE FROM role_permissions
+WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Driver')
+  AND permission_id NOT IN (
+    SELECT permission_id FROM permissions WHERE permission_key IN ('drivers.schedule')
+  );
+
+DELETE FROM role_permissions
 WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Rental Officer')
   AND permission_id NOT IN (
     SELECT permission_id FROM permissions WHERE permission_key IN
@@ -480,7 +486,14 @@ WHERE r.role_name='Driver';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
-('vehicles.view','reservations.view','invoices.view') WHERE r.role_name='Customer';
+('vehicles.view','reservations.view','rentals.view','invoices.view') WHERE r.role_name='Customer';
+
+DELETE FROM role_permissions
+WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Customer')
+  AND permission_id NOT IN (
+    SELECT permission_id FROM permissions WHERE permission_key IN
+      ('vehicles.view','reservations.view','rentals.view','invoices.view')
+  );
 
 INSERT IGNORE INTO vehicle_categories (category_name,description,default_daily_rate,default_weekly_rate,default_monthly_rate,passenger_capacity) VALUES
  ('Economy','Small fuel-efficient vehicles',25000,150000,500000,5),

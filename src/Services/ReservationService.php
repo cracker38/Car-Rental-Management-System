@@ -219,6 +219,21 @@ final class ReservationService
                 $id,
                 Auth::id()
             );
+            $assignedDriver = Database::fetch(
+                'SELECT d.user_id FROM driver_assignments da JOIN drivers d ON d.driver_id=da.driver_id WHERE da.reservation_id=?',
+                [$id]
+            );
+            if (!empty($assignedDriver['user_id'])) {
+                $notifications->notifyUser(
+                    (int)$assignedDriver['user_id'],
+                    null,
+                    'driver_assignment_updated',
+                    'Assigned trip updated: ' . $reservation['reservation_code'],
+                    'Your assigned trip was updated. Pickup: ' . $pickup . '. Return: ' . $returnAt . '. Pickup location: ' . ((string)($input['pickup_location'] ?? '') ?: 'Not set') . '. Destination: ' . ((string)($input['return_location'] ?? '') ?: 'Not set') . '. Vehicle: ' . $vehicle['registration_no'] . '.',
+                    'reservation',
+                    $id
+                );
+            }
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
 
@@ -299,6 +314,11 @@ final class ReservationService
             Database::execute($sql, $params);
             $this->syncVehicleStatus((int) $res['vehicle_id']);
             Audit::log('reservation.status', 'reservation', (string) $id, "{$from} -> {$to}", ['status' => $from], ['status' => $to]);
+            $assignedDriver = Database::fetch(
+                'SELECT d.user_id FROM driver_assignments da JOIN drivers d ON d.driver_id=da.driver_id WHERE da.reservation_id=?',
+                [$id]
+            );
+            $res['assigned_driver_user_id'] = !empty($assignedDriver['user_id']) ? (int)$assignedDriver['user_id'] : null;
             return $res;
         });
         $message = 'Reservation ' . $before['reservation_code'] . ' is now ' . $to . '.';
@@ -323,6 +343,20 @@ final class ReservationService
             $id,
             Auth::id()
         );
+        if (!empty($before['assigned_driver_user_id'])) {
+            $removed = in_array($to, ['cancelled', 'rejected', 'no_show'], true);
+            $notifications->notifyUser(
+                (int)$before['assigned_driver_user_id'],
+                null,
+                $removed ? 'driver_assignment_removed' : 'driver_assignment_updated',
+                $removed ? 'Assigned trip removed: ' . $before['reservation_code'] : 'Assigned trip confirmed: ' . $before['reservation_code'],
+                $removed
+                    ? 'Reservation ' . $before['reservation_code'] . ' is now ' . $to . ' and has been removed from your schedule.'
+                    : 'Reservation ' . $before['reservation_code'] . ' is now confirmed and remains on your schedule.',
+                'reservation',
+                $id
+            );
+        }
         (new SmsService())->sendToCustomer(
             (int) $before['customer_id'],
             'reservation_status',

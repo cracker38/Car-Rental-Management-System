@@ -18,18 +18,26 @@ final class VehicleController
     {
         Rbac::require('vehicles.view');
         $q = Http::str('q');
-        $sql = 'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE 1=1';
+        $customer = Auth::isCustomer();
+        $sql = $customer
+            ? "SELECT v.vehicle_id, v.category_id, v.make, v.model, v.manufacture_year, v.transmission, v.fuel_type,
+                      v.daily_rate, v.image_path, 'available' AS status, NULL AS registration_no, c.category_name
+               FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.status = 'available'"
+            : 'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE 1=1';
         $params = [];
         if ($q !== '') {
-            $sql .= ' AND (v.registration_no LIKE ? OR v.make LIKE ? OR v.model LIKE ?)';
             $like = '%' . $q . '%';
-            $params = [$like, $like, $like];
+            $sql .= $customer
+                ? ' AND (v.make LIKE ? OR v.model LIKE ?)'
+                : ' AND (v.registration_no LIKE ? OR v.make LIKE ? OR v.model LIKE ?)';
+            $params = $customer ? [$like, $like] : [$like, $like, $like];
         }
         $sql .= ' ORDER BY v.updated_at DESC';
         View::render('vehicles/index', [
-            'title' => 'Vehicles',
+            'title' => $customer ? 'Available vehicles' : 'Vehicles',
             'vehicles' => Database::fetchAll($sql, $params),
             'q' => $q,
+            'customerMode' => $customer,
         ]);
     }
 
@@ -152,16 +160,20 @@ final class VehicleController
     {
         Rbac::require('vehicles.view');
         $id = Http::int('id');
-        $vehicle = Database::fetch(
-            'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.vehicle_id = ?',
-            [$id]
-        );
+        $vehicleSql = Auth::isCustomer()
+            ? "SELECT v.vehicle_id, v.category_id, v.make, v.model, v.manufacture_year, v.transmission, v.fuel_type,
+                      v.daily_rate, v.weekly_rate, v.monthly_rate, v.image_path, v.description, v.status, c.category_name
+               FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id
+               WHERE v.vehicle_id = ? AND v.status NOT IN ('inactive','maintenance')"
+            : 'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.vehicle_id = ?';
+        $vehicle = Database::fetch($vehicleSql, [$id]);
         if (!$vehicle) {
             http_response_code(404);
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
-        $history = Database::fetchAll(
+        // Reservation history contains other customers' booking data. Never expose it to customers.
+        $history = Auth::isCustomer() ? [] : Database::fetchAll(
             'SELECT reservation_code, pickup_datetime, return_datetime, status FROM reservations WHERE vehicle_id = ? ORDER BY pickup_datetime DESC LIMIT 20',
             [$id]
         );

@@ -41,7 +41,12 @@ final class MaintenanceController
         }
         if (Http::isPost() && Http::str('action') === 'status') {
             try {
-                (new MaintenanceService())->updateStatus(Http::int('id'), Http::str('new_status'), Http::str('reason'));
+                (new MaintenanceService())->updateStatus(
+                    Http::int('id'),
+                    Http::str('new_status'),
+                    Http::str('reason'),
+                    Http::str('vehicle_safe') === 'yes'
+                );
                 Http::flash('success', 'Maintenance status updated.');
             } catch (InvalidArgumentException $e) {
                 Http::flash('danger', $e->getMessage());

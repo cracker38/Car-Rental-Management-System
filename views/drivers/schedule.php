@@ -30,6 +30,9 @@
         <td><?= e($row['pickup_location'] ?: 'Not set') ?> → <?= e($row['return_location'] ?: 'Not set') ?></td>
         <td>
           <?= status_badge((string)($row['trip_status'] ?? $row['reservation_status'])) ?>
+          <?php if (strtotime((string)$row['return_datetime']) < time()): ?><small class="d-block text-danger fw-semibold mt-1">Return overdue</small><?php endif; ?>
+          <?php if (!empty($row['status_updated_at'])): ?><small class="d-block text-muted mt-1">Updated <?= e($row['status_updated_at']) ?></small><?php endif; ?>
+          <?php if (!empty($row['incident_report'])): ?><small class="d-block text-warning-emphasis mt-1"><strong>Reports:</strong> <?= nl2br(e($row['incident_report'])) ?></small><?php endif; ?>
           <?php if (!$canManage): ?>
             <?php $trip = $row; $back = 'schedule'; require dirname(__DIR__) . '/partials/driver-trip-form.php'; ?>
           <?php endif; ?>

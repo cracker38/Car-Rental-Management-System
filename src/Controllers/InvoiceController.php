@@ -23,7 +23,7 @@ final class InvoiceController
                 LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id';
         $params = [];
         if (Auth::isCustomer()) {
-            $sql .= ' WHERE i.customer_id = ?';
+            $sql .= " WHERE i.customer_id = ? AND i.status NOT IN ('draft','void')";
             $params[] = Auth::customerId() ?: 0;
         }
         $sql .= ' ORDER BY i.created_at DESC LIMIT 200';
@@ -43,21 +43,31 @@ final class InvoiceController
         Rbac::require('invoices.view');
         $id = Http::int('id');
         Rbac::assertCustomerOwns('invoice', $id);
-        $row = Database::fetch(
-            'SELECT i.*, c.first_name, c.last_name, c.phone, c.email, b.outstanding_balance, b.net_paid
-             FROM invoices i
-             JOIN customers c ON c.customer_id = i.customer_id
-             LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
-             WHERE i.invoice_id = ?',
-            [$id]
-        );
+        $invoiceSql = 'SELECT i.*, c.first_name, c.last_name, c.phone, c.email, b.outstanding_balance, b.net_paid
+                       FROM invoices i
+                       JOIN customers c ON c.customer_id = i.customer_id
+                       LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                       WHERE i.invoice_id = ?';
+        $invoiceParams = [$id];
+        if (Auth::isCustomer()) {
+            $invoiceSql .= " AND i.customer_id = ? AND i.status NOT IN ('draft','void')";
+            $invoiceParams[] = Auth::customerId() ?: 0;
+        }
+        $row = Database::fetch($invoiceSql, $invoiceParams);
         if (!$row) {
             http_response_code(404);
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
         $items = Database::fetchAll('SELECT * FROM invoice_items WHERE invoice_id = ?', [$id]);
-        $txns = Database::fetchAll('SELECT * FROM financial_transactions WHERE invoice_id = ? ORDER BY transaction_date', [$id]);
+        $txnsSql = 'SELECT * FROM financial_transactions WHERE invoice_id = ?';
+        $txnsParams = [$id];
+        if (Auth::isCustomer()) {
+            $txnsSql .= ' AND customer_id = ?';
+            $txnsParams[] = Auth::customerId() ?: 0;
+        }
+        $txnsSql .= ' ORDER BY transaction_date';
+        $txns = Database::fetchAll($txnsSql, $txnsParams);
         View::render('invoices/show', ['title' => $row['invoice_number'], 'row' => $row, 'items' => $items, 'txns' => $txns]);
     }
 
