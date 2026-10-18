@@ -22,6 +22,7 @@ final class PaymentController
         $invoiceId = Http::int('invoice_id');
         $reservationId = Http::int('reservation_id');
         $customerId = Http::int('customer_id');
+        $returnToDashboard = Auth::isCustomer() && Http::str('return_to') === 'dashboard';
         if ($invoiceId && $reservationId) {
             Http::flash('danger', 'A payment request can only apply to one invoice or reservation at a time.');
             Http::redirect('reservations/show', ['id' => $reservationId]);
@@ -74,7 +75,7 @@ final class PaymentController
             Http::flash('danger', $e->getMessage());
         }
         if ($invoiceId) {
-            Http::redirect('invoices/show', ['id' => $invoiceId]);
+            Http::redirect($returnToDashboard ? 'dashboard' : 'invoices/show', $returnToDashboard ? [] : ['id' => $invoiceId]);
         }
         if ($reservationId) {
             Http::redirect('reservations/show', ['id' => $reservationId]);

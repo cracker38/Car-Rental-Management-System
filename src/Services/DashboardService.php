@@ -548,8 +548,19 @@ final class DashboardService
                 [$cid]
             ),
             'invoices' => Database::fetchAll(
-                "SELECT i.invoice_id, i.invoice_number, i.status, i.created_at, b.outstanding_balance FROM invoices i
+                "SELECT i.invoice_id, i.invoice_number, i.status, i.created_at, i.notes,
+                        b.outstanding_balance, c.phone, r.status AS reservation_status,
+                        COALESCE(pm.pending_momo, 0) AS pending_momo_amount
+                 FROM invoices i
+                 JOIN customers c ON c.customer_id = i.customer_id
                  LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                 LEFT JOIN reservations r ON r.reservation_id = i.reservation_id
+                 LEFT JOIN (
+                    SELECT invoice_id, SUM(amount) AS pending_momo
+                    FROM financial_transactions
+                    WHERE transaction_type = 'payment' AND payment_method = 'mobile_money' AND status = 'pending'
+                    GROUP BY invoice_id
+                 ) pm ON pm.invoice_id = i.invoice_id
                  WHERE i.customer_id = ? AND i.status NOT IN ('draft','void') ORDER BY i.created_at DESC LIMIT 8",
                 [$cid]
             ),

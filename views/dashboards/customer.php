@@ -32,13 +32,46 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
       <div class="panel-h d-flex justify-content-between">My invoices <a class="small fw-normal" href="<?= e(url('invoices')) ?>">All invoices</a></div>
       <?php if (!$invoices): ?><p class="text-muted mb-0">Your invoices will appear here when they are issued.</p><?php else: ?>
         <?php foreach ($invoices as $invoice): ?>
+          <?php
+            $invoiceBalance = (float) ($invoice['outstanding_balance'] ?? 0);
+            $invoicePending = (float) ($invoice['pending_momo_amount'] ?? 0);
+            $paymentRequestable = max(0, $invoiceBalance - $invoicePending);
+            $bookingPaymentBlocked = strncmp((string) ($invoice['notes'] ?? ''), 'Booking prepayment:', 19) === 0
+              && ($invoice['reservation_status'] ?? '') !== 'confirmed';
+          ?>
           <div class="mini-row d-flex justify-content-between gap-2">
             <span><a href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>"><?= e($invoice['invoice_number']) ?></a><small class="d-block text-muted"><?= e($invoice['status']) ?></small></span>
             <span class="text-end">
-              <?= e(\Crms\Money::format($invoice['outstanding_balance'] ?? 0)) ?>
-              <?php if ((float)($invoice['outstanding_balance'] ?? 0) > 0): ?><a class="d-block small" href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>">View balance and payment options</a><?php endif; ?>
+              <?= e(\Crms\Money::format($invoiceBalance)) ?>
+              <small class="d-block text-muted">Outstanding</small>
             </span>
           </div>
+          <?php if ($invoicePending > 0): ?>
+            <p class="small text-muted mb-2">Mobile Money request pending for <?= e(\Crms\Money::format($invoicePending)) ?>. <a href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>">View payment status</a></p>
+          <?php endif; ?>
+          <?php if ($invoiceBalance > 0 && $bookingPaymentBlocked): ?>
+            <p class="small text-muted mb-3">Payment is available after the booking is confirmed.</p>
+          <?php elseif ($paymentRequestable > 0): ?>
+            <form method="post" action="<?= e(url('payments/momo')) ?>" class="border rounded-3 p-3 mb-3">
+              <?= \Crms\Csrf::field() ?>
+              <input type="hidden" name="invoice_id" value="<?= (int) $invoice['invoice_id'] ?>">
+              <input type="hidden" name="transaction_type" value="payment">
+              <input type="hidden" name="return_to" value="dashboard">
+              <label class="form-label small mb-1" for="invoice-phone-<?= (int) $invoice['invoice_id'] ?>">Mobile Money phone</label>
+              <div class="row g-2 align-items-end">
+                <div class="col-6">
+                  <input id="invoice-phone-<?= (int) $invoice['invoice_id'] ?>" class="form-control form-control-sm" type="tel" name="phone" value="<?= e((string) ($invoice['phone'] ?? '')) ?>" placeholder="07xxxxxxxx" inputmode="tel" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small mb-1" for="invoice-amount-<?= (int) $invoice['invoice_id'] ?>">Amount (RWF)</label>
+                  <input id="invoice-amount-<?= (int) $invoice['invoice_id'] ?>" class="form-control form-control-sm" type="number" name="amount" min="1" step="1" max="<?= (int) floor($paymentRequestable) ?>" value="<?= (int) floor($paymentRequestable) ?>" required>
+                </div>
+                <div class="col-12 d-grid">
+                  <button class="btn btn-sm btn-primary" type="submit">Pay invoice with Mobile Money</button>
+                </div>
+              </div>
+            </form>
+          <?php endif; ?>
         <?php endforeach; ?>
       <?php endif; ?>
       <div class="mini-row d-flex justify-content-between mt-3"><span>Security deposit held</span><strong><?= e($deposit ?? '-') ?></strong></div>
