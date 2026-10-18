@@ -32,6 +32,9 @@ final class HdevPaymentService
         $txRef = 'CRMS-' . strtoupper(bin2hex(random_bytes(6)));
         $row = Database::transaction(function (PDO $pdo) use ($input, $type, $amount, $txRef) {
             $invoiceId = !empty($input['invoice_id']) ? (int) $input['invoice_id'] : null;
+            if ($type === 'payment' && !$invoiceId) {
+                throw new InvalidArgumentException('Select an issued invoice for a Mobile Money payment.');
+            }
             if ($invoiceId) {
                 $stmt = $pdo->prepare('SELECT * FROM invoices WHERE invoice_id = ? FOR UPDATE');
                 $stmt->execute([$invoiceId]);
@@ -39,8 +42,23 @@ final class HdevPaymentService
                 if (!$invoice) {
                     throw new InvalidArgumentException('Invoice not found.');
                 }
+                if ((int) $invoice['customer_id'] !== (int) ($input['customer_id'] ?? 0)) {
+                    throw new InvalidArgumentException('The selected invoice does not belong to this customer.');
+                }
                 if (in_array($invoice['status'], ['draft', 'void'], true) && $type === 'payment') {
                     throw new InvalidArgumentException('Payments can only be requested against issued invoices.');
+                }
+                if ($type === 'payment') {
+                    $balance = Database::fetch('SELECT outstanding_balance FROM vw_invoice_balances WHERE invoice_id = ?', [$invoiceId]);
+                    $reserved = Database::fetch(
+                        "SELECT COALESCE(SUM(amount),0) AS amount FROM financial_transactions
+                         WHERE invoice_id = ? AND transaction_type = 'payment' AND payment_method = 'mobile_money' AND status = 'pending'",
+                        [$invoiceId]
+                    );
+                    $available = max(0, (float) ($balance['outstanding_balance'] ?? 0) - (float) ($reserved['amount'] ?? 0));
+                    if ((float) $amount > $available + 0.001) {
+                        throw new InvalidArgumentException('Payment exceeds the invoice balance available after pending Mobile Money requests.');
+                    }
                 }
             }
             $dup = Database::fetch('SELECT transaction_id FROM financial_transactions WHERE external_reference = ?', [$txRef]);
@@ -150,7 +168,7 @@ final class HdevPaymentService
                     throw new InvalidArgumentException('HDEV amount does not match the pending ledger row. Payment was not completed.');
                 }
                 Database::execute(
-                    "UPDATE financial_transactions SET status = 'completed' WHERE transaction_id = ? AND status = 'pending'",
+                    "UPDATE financial_transactions SET status = 'completed', transaction_date = NOW() WHERE transaction_id = ? AND status = 'pending'",
                     [$row['transaction_id']]
                 );
                 if ($row['invoice_id'] && in_array($row['transaction_type'], ['payment', 'payment_refund', 'adjustment'], true)) {

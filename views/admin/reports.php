@@ -13,10 +13,23 @@
 </div>
 <?php if ($fin): ?>
   <div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="kpi-card"><div class="kpi-label">Completed payments</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['payments'])) ?></div></div></div>
-    <div class="col-md-4"><div class="kpi-card"><div class="kpi-label">Refunds</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['refunds'])) ?></div></div></div>
-    <div class="col-md-4"><div class="kpi-card"><div class="kpi-label">Deposits received</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['deposits'])) ?></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Completed payments</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['payments'])) ?></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Payment refunds</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['refunds'])) ?></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Net deposit movement</div><div class="kpi-value"><?= e(\Crms\Money::format((float) $fin['deposits'] - (float) $fin['deposit_deductions'] - (float) $fin['deposit_refunds'])) ?></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Awaiting approval</div><div class="kpi-value"><?= number_format((int) $fin['awaiting_approvals']) ?></div></div></div>
   </div>
+  <section class="panel table-panel mb-4">
+    <div class="panel-h">Deposit and adjustment detail</div>
+    <div class="table-responsive"><table class="table mb-0">
+      <tbody>
+        <tr><th scope="row">Deposits received</th><td><?= e(\Crms\Money::format($fin['deposits'])) ?></td></tr>
+        <tr><th scope="row">Deposit deductions</th><td><?= e(\Crms\Money::format($fin['deposit_deductions'])) ?></td></tr>
+        <tr><th scope="row">Deposit refunds</th><td><?= e(\Crms\Money::format($fin['deposit_refunds'])) ?></td></tr>
+        <tr><th scope="row">Invoice adjustment credits</th><td><?= e(\Crms\Money::format($fin['adjustment_credits'])) ?></td></tr>
+        <tr><th scope="row">Invoice adjustment debits</th><td><?= e(\Crms\Money::format($fin['adjustment_debits'])) ?></td></tr>
+      </tbody>
+    </table></div>
+  </section>
 <?php endif; ?>
 <?php if (can('reports.operational')): ?>
   <section class="panel table-panel">

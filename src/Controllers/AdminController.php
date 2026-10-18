@@ -255,7 +255,12 @@ final class AdminController
                 "SELECT
                     COALESCE(SUM(CASE WHEN transaction_type='payment' AND status='completed' THEN amount END),0) AS payments,
                     COALESCE(SUM(CASE WHEN transaction_type='payment_refund' AND status='completed' THEN amount END),0) AS refunds,
-                    COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount END),0) AS deposits
+                    COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount END),0) AS deposits,
+                    COALESCE(SUM(CASE WHEN transaction_type='deposit_deduction' AND status='completed' THEN amount END),0) AS deposit_deductions,
+                    COALESCE(SUM(CASE WHEN transaction_type='deposit_refund' AND status='completed' THEN amount END),0) AS deposit_refunds,
+                    COALESCE(SUM(CASE WHEN transaction_type='adjustment' AND adjustment_direction='credit' AND status='completed' THEN amount END),0) AS adjustment_credits,
+                    COALESCE(SUM(CASE WHEN transaction_type='adjustment' AND adjustment_direction='debit' AND status='completed' THEN amount END),0) AS adjustment_debits,
+                    COALESCE(SUM(CASE WHEN status='awaiting_approval' THEN 1 ELSE 0 END),0) AS awaiting_approvals
                  FROM financial_transactions WHERE DATE(transaction_date) BETWEEN ? AND ?",
                 [$dateFrom, $dateTo]
             );
@@ -270,6 +275,11 @@ final class AdminController
                 fputcsv($out, ['Completed payments', $fin['payments']]);
                 fputcsv($out, ['Refunds', $fin['refunds']]);
                 fputcsv($out, ['Deposits received', $fin['deposits']]);
+                fputcsv($out, ['Deposit deductions', $fin['deposit_deductions']]);
+                fputcsv($out, ['Deposit refunds', $fin['deposit_refunds']]);
+                fputcsv($out, ['Invoice adjustment credits', $fin['adjustment_credits']]);
+                fputcsv($out, ['Invoice adjustment debits', $fin['adjustment_debits']]);
+                fputcsv($out, ['Requests awaiting approval', $fin['awaiting_approvals']]);
                 fputcsv($out, []);
             }
             if ($ops) {

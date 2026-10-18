@@ -32,7 +32,7 @@ final class Ui
     {
         return match ($status) {
             'available', 'paid', 'completed', 'active', 'confirmed', 'sent' => 'success',
-            'pending', 'scheduled', 'draft', 'queued', 'partially_paid' => 'warning',
+            'pending', 'awaiting_approval', 'scheduled', 'draft', 'queued', 'partially_paid' => 'warning',
             'reserved', 'issued', 'inspected' => 'info',
             'rented', 'overdue', 'failed', 'cancelled', 'rejected', 'void', 'blacklisted', 'maintenance', 'inactive' => 'danger',
             default => 'secondary',

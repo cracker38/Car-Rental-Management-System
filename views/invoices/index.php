@@ -1,3 +1,18 @@
+<?php if (!empty($unbilledRentals) && can('invoices.manage')): ?>
+  <section class="panel table-panel mb-3">
+    <div class="panel-h">Closed rentals without invoices</div>
+    <p class="small text-muted">Generate draft invoices from completed rental charges, then review and issue them through the invoice workflow.</p>
+    <div class="table-responsive"><table class="table align-middle mb-0">
+      <thead><tr><th>Rental</th><th>Customer</th><th>Returned</th><th></th></tr></thead>
+      <tbody><?php foreach ($unbilledRentals as $rental): ?><tr>
+        <td><?= e($rental['rental_number']) ?></td>
+        <td><?= e($rental['first_name'] . ' ' . $rental['last_name']) ?></td>
+        <td><?= e($rental['actual_return_datetime']) ?></td>
+        <td><form method="post" action="<?= e(url('invoices/create')) ?>" class="m-0"><?= \Crms\Csrf::field() ?><input type="hidden" name="rental_id" value="<?= (int) $rental['rental_id'] ?>"><button class="btn btn-sm btn-outline-primary">Generate draft</button></form></td>
+      </tr><?php endforeach; ?></tbody>
+    </table></div>
+  </section>
+<?php endif; ?>
 <div class="panel table-panel">
   <div class="table-responsive"><table class="table mb-0">
     <thead><tr><th>Number</th><th>Customer</th><th>Total</th><th>Paid</th><th>Outstanding</th><th>Status</th></tr></thead>

@@ -38,6 +38,7 @@ $isSystemAdmin = $role === 'System Administrator';
   <?php elseif (can('inspections.manage')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-clipboard-check"></i> Return inspections</a><?php endif; ?>
   <?php if (can('invoices.view')): ?><a class="nav-link <?= nav_active('invoices') ?>" href="<?= e(url('invoices')) ?>"><i class="bi bi-receipt"></i> Invoices</a><?php endif; ?>
   <?php if (can('transactions.manage') || can('transactions.view')): ?><a class="nav-link <?= nav_active('finance') ?>" href="<?= e(url('finance')) ?>"><i class="bi bi-wallet2"></i> Payments</a><?php endif; ?>
+  <?php if (can('transactions.approve')): ?><a class="nav-link <?= nav_active('finance/approvals') ?>" href="<?= e(url('finance/approvals')) ?>"><i class="bi bi-shield-check"></i> Financial approvals</a><?php endif; ?>
   <?php if (can('maintenance.manage') || can('maintenance.view')): ?><a class="nav-link <?= nav_active('maintenance') ?>" href="<?= e(url('maintenance')) ?>"><i class="bi bi-wrench-adjustable"></i> Maintenance</a><?php endif; ?>
   <?php if (can('drivers.manage')): ?><a class="nav-link <?= nav_active('drivers') ?>" href="<?= e(url('drivers')) ?>"><i class="bi bi-person-badge"></i> Drivers</a><?php endif; ?>
   <?php if (can('drivers.schedule')): ?><a class="nav-link <?= nav_active('drivers/schedule') ?>" href="<?= e(url('drivers/schedule')) ?>"><i class="bi bi-calendar2-week"></i> Driver schedule</a><?php endif; ?>

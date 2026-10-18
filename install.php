@@ -21,6 +21,64 @@ if ($mysqli->connect_error) {
     $db = $mysqli->real_escape_string($cfg['name']);
     $mysqli->query("CREATE DATABASE IF NOT EXISTS `{$db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $mysqli->select_db($cfg['name']);
+
+    // Prepare existing installations for the additive finance schema before its invoice-balance view is recreated.
+    $financeTable = $mysqli->query("SHOW TABLES LIKE 'financial_transactions'");
+    if ($financeTable && $financeTable->num_rows > 0) {
+        $columns = [];
+        $columnRows = $mysqli->query('SHOW COLUMNS FROM financial_transactions');
+        while ($columnRows && ($column = $columnRows->fetch_assoc())) {
+            $columns[$column['Field']] = true;
+        }
+        $financeMigrations = [
+            'adjustment_direction' => "ALTER TABLE financial_transactions ADD COLUMN adjustment_direction ENUM('credit','debit') NULL",
+            'approval_requested_by' => 'ALTER TABLE financial_transactions ADD COLUMN approval_requested_by BIGINT UNSIGNED NULL',
+            'approval_reviewed_by' => 'ALTER TABLE financial_transactions ADD COLUMN approval_reviewed_by BIGINT UNSIGNED NULL',
+            'approval_reviewed_at' => 'ALTER TABLE financial_transactions ADD COLUMN approval_reviewed_at DATETIME NULL',
+            'approval_note' => 'ALTER TABLE financial_transactions ADD COLUMN approval_note VARCHAR(500) NULL',
+            'reconciled_at' => 'ALTER TABLE financial_transactions ADD COLUMN reconciled_at DATETIME NULL',
+            'reconciled_by' => 'ALTER TABLE financial_transactions ADD COLUMN reconciled_by BIGINT UNSIGNED NULL',
+            'reconciliation_note' => 'ALTER TABLE financial_transactions ADD COLUMN reconciliation_note VARCHAR(500) NULL',
+        ];
+        foreach ($financeMigrations as $columnName => $alter) {
+            if (!isset($columns[$columnName]) && !$mysqli->query($alter)) {
+                $ok = false;
+                $messages[] = 'Finance schema update failed: ' . $mysqli->error;
+            }
+        }
+        if (!$mysqli->query("ALTER TABLE financial_transactions MODIFY COLUMN status ENUM('pending','completed','failed','cancelled','awaiting_approval','rejected') NOT NULL DEFAULT 'completed'")) {
+            $ok = false;
+            $messages[] = 'Finance status update failed: ' . $mysqli->error;
+        }
+        $indexes = [];
+        $indexRows = $mysqli->query('SHOW INDEX FROM financial_transactions');
+        while ($indexRows && ($index = $indexRows->fetch_assoc())) {
+            $indexes[$index['Key_name']] = true;
+        }
+        if (!isset($indexes['idx_fin_approval_status']) && !$mysqli->query('ALTER TABLE financial_transactions ADD KEY idx_fin_approval_status (status,created_at)')) {
+            $messages[] = 'Finance index update note: ' . $mysqli->error;
+        }
+        if (!isset($indexes['idx_fin_reconcile']) && !$mysqli->query('ALTER TABLE financial_transactions ADD KEY idx_fin_reconcile (status,reconciled_at)')) {
+            $messages[] = 'Finance reconciliation index note: ' . $mysqli->error;
+        }
+        $foreignKeys = [];
+        $foreignKeyRows = $mysqli->query(
+            "SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'financial_transactions'"
+        );
+        while ($foreignKeyRows && ($foreignKey = $foreignKeyRows->fetch_assoc())) {
+            $foreignKeys[$foreignKey['CONSTRAINT_NAME']] = true;
+        }
+        foreach ([
+            'fk_fin_approval_requester' => 'ALTER TABLE financial_transactions ADD CONSTRAINT fk_fin_approval_requester FOREIGN KEY (approval_requested_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE',
+            'fk_fin_approval_reviewer' => 'ALTER TABLE financial_transactions ADD CONSTRAINT fk_fin_approval_reviewer FOREIGN KEY (approval_reviewed_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE',
+            'fk_fin_reconciler' => 'ALTER TABLE financial_transactions ADD CONSTRAINT fk_fin_reconciler FOREIGN KEY (reconciled_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE',
+        ] as $constraintName => $alter) {
+            if (!isset($foreignKeys[$constraintName]) && !$mysqli->query($alter)) {
+                $messages[] = 'Finance integrity update note: ' . $mysqli->error;
+            }
+        }
+    }
     $sql = file_get_contents($root . '/database/carrental.sql');
     if ($sql === false) {
         $ok = false;
@@ -33,7 +91,7 @@ if ($mysqli->connect_error) {
             while ($mysqli->more_results()) {
                 $mysqli->next_result();
             }
-            $messages[] = 'Schema applied; existing business data was kept and System Administrator permissions were refreshed.';
+            $messages[] = 'Schema applied; existing business data was kept and administrator/business manager permissions were synchronized.';
         }
     }
 

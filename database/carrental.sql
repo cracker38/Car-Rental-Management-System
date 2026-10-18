@@ -297,16 +297,24 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
   rental_id BIGINT UNSIGNED NULL,
   related_transaction_id BIGINT UNSIGNED NULL,
   transaction_type ENUM('payment','payment_refund','deposit_received','deposit_deduction','deposit_refund','adjustment') NOT NULL,
+  adjustment_direction ENUM('credit','debit') NULL,
   amount DECIMAL(12,2) NOT NULL,
   payment_method ENUM('cash','bank_transfer','card','mobile_money','online','other') NULL,
   external_reference VARCHAR(150) NULL UNIQUE,
   provider_name VARCHAR(100) NULL,
-  status ENUM('pending','completed','failed','cancelled') NOT NULL DEFAULT 'completed',
+  status ENUM('pending','completed','failed','cancelled','awaiting_approval','rejected') NOT NULL DEFAULT 'completed',
   reason VARCHAR(500) NULL,
   processed_by BIGINT UNSIGNED NULL,
+  approval_requested_by BIGINT UNSIGNED NULL,
+  approval_reviewed_by BIGINT UNSIGNED NULL,
+  approval_reviewed_at DATETIME NULL,
+  approval_note VARCHAR(500) NULL,
+  reconciled_at DATETIME NULL,
+  reconciled_by BIGINT UNSIGNED NULL,
+  reconciliation_note VARCHAR(500) NULL,
   transaction_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_fin_invoice_date (invoice_id,transaction_date), KEY idx_fin_customer_date (customer_id,transaction_date),
+  KEY idx_fin_invoice_date (invoice_id,transaction_date), KEY idx_fin_customer_date (customer_id,transaction_date), KEY idx_fin_approval_status (status,created_at), KEY idx_fin_reconcile (status,reconciled_at),
   KEY idx_fin_type_status (transaction_type,status),
   CONSTRAINT fk_fin_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_fin_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -314,6 +322,9 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
   CONSTRAINT fk_fin_rental FOREIGN KEY (rental_id) REFERENCES rentals(rental_id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT fk_fin_related FOREIGN KEY (related_transaction_id) REFERENCES financial_transactions(transaction_id) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_fin_processor FOREIGN KEY (processed_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_fin_approval_requester FOREIGN KEY (approval_requested_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_fin_approval_reviewer FOREIGN KEY (approval_reviewed_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_fin_reconciler FOREIGN KEY (reconciled_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT chk_fin_amount CHECK (amount > 0)
 ) ENGINE=InnoDB;
 
@@ -409,6 +420,7 @@ INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('rentals.view','View rental records'),('rentals.manage','Manage pickup, return and rental records'),
  ('invoices.view','View invoices'),('invoices.manage','Create and manage invoices'),
  ('transactions.view','View payment and refund records'),('transactions.manage','Record payments, refunds and deposits'),
+ ('transactions.approve','Approve or reject refund and financial adjustment requests'),
  ('maintenance.view','View maintenance records'),('maintenance.manage','Manage maintenance'),
  ('inspections.manage','Record vehicle inspections'),('reports.operational','View operational reports'),
  ('reports.financial','View financial reports'),('notifications.manage','Manage notifications'),
@@ -426,7 +438,7 @@ WHERE r.role_name='System Administrator';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
-('vehicles.view','vehicles.manage','customers.view','customers.manage','reservations.view','reservations.manage','rentals.manage','invoices.view','reports.operational','reports.financial','maintenance.manage','inspections.manage')
+('vehicles.view','vehicles.manage','customers.view','customers.manage','reservations.view','reservations.manage','rentals.manage','invoices.view','reports.operational','reports.financial','maintenance.manage','inspections.manage','transactions.approve')
 WHERE r.role_name='Business Manager';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
@@ -473,9 +485,13 @@ INSERT IGNORE INTO system_settings (setting_key,setting_value,value_type,descrip
 CREATE OR REPLACE VIEW vw_invoice_balances AS
 SELECT i.invoice_id,i.invoice_number,i.customer_id,i.total_amount,
  COALESCE(SUM(CASE WHEN ft.transaction_type='payment' AND ft.status='completed' THEN ft.amount
-                   WHEN ft.transaction_type='payment_refund' AND ft.status='completed' THEN -ft.amount ELSE 0 END),0) AS net_paid,
+                   WHEN ft.transaction_type='payment_refund' AND ft.status='completed' THEN -ft.amount
+                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='credit' THEN ft.amount
+                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='debit' THEN -ft.amount ELSE 0 END),0) AS net_paid,
  GREATEST(i.total_amount-COALESCE(SUM(CASE WHEN ft.transaction_type='payment' AND ft.status='completed' THEN ft.amount
-                   WHEN ft.transaction_type='payment_refund' AND ft.status='completed' THEN -ft.amount ELSE 0 END),0),0) AS outstanding_balance,
+                   WHEN ft.transaction_type='payment_refund' AND ft.status='completed' THEN -ft.amount
+                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='credit' THEN ft.amount
+                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='debit' THEN -ft.amount ELSE 0 END),0),0) AS outstanding_balance,
  i.status
 FROM invoices i LEFT JOIN financial_transactions ft ON ft.invoice_id=i.invoice_id
 GROUP BY i.invoice_id,i.invoice_number,i.customer_id,i.total_amount,i.status;

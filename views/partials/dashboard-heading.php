@@ -1,7 +1,7 @@
 <div class="dashboard-heading">
   <div>
-    <p class="eyebrow mb-1"><?= e($role ?? 'Workspace') ?></p>
-    <h1>Welcome, <?= e($user['first_name'] ?? 'there') ?></h1>
+    <p class="eyebrow mb-1"><?= e($dashboardEyebrow ?? $role ?? 'Workspace') ?></p>
+    <h1><?= e($dashboardHeading ?? ('Welcome, ' . ($user['first_name'] ?? 'there'))) ?></h1>
     <p class="text-muted mb-0"><?= e($dashboardSubtitle ?? 'Your Rent Car Rwanda workspace.') ?></p>
   </div>
   <?php if (!empty($dashboardActions)): ?>

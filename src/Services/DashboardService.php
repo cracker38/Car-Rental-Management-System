@@ -53,6 +53,9 @@ final class DashboardService
             'duties' => $this->duties($role),
             'restriction' => $this->restriction($role),
         ];
+        if ($role === 'Business Manager' && Rbac::can('transactions.approve')) {
+            array_unshift($base['shortcuts'], ['route' => 'finance/approvals', 'icon' => 'bi-shield-check', 'label' => 'Financial approvals', 'hint' => 'Independently review refunds and adjustments']);
+        }
         return match ($role) {
             'System Administrator' => $base + $this->admin(),
             'Business Manager' => $base + $this->manager(),
@@ -91,13 +94,6 @@ final class DashboardService
                 ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Vehicles', 'hint' => 'Fleet and availability'],
                 ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Handovers', 'hint' => 'Pickup and return'],
                 ['route' => 'drivers', 'icon' => 'bi-person-badge', 'label' => 'Drivers', 'hint' => 'Assign chauffeurs'],
-            ],
-            'Accountant/Cashier' => [
-                ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'Invoices', 'hint' => 'Issue and collect'],
-                ['route' => 'finance', 'icon' => 'bi-wallet2', 'label' => 'Payments', 'hint' => 'Ledger and MoMo'],
-                ['route' => 'finance/form', 'icon' => 'bi-plus-lg', 'label' => 'Post payment', 'hint' => 'Cash, bank or refund'],
-                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Finance reports', 'hint' => 'Receipts and outstanding'],
-                ['route' => 'customers', 'icon' => 'bi-people', 'label' => 'Customers', 'hint' => 'Who owes what'],
             ],
             'Vehicle Inspector/Maintenance Staff' => [
                 ['route' => 'rentals', 'icon' => 'bi-clipboard-check', 'label' => 'Inspections', 'hint' => 'Returned vehicles'],
@@ -152,11 +148,15 @@ final class DashboardService
                 'Flag late returns, damage and extra charges for finance',
             ],
             'Accountant/Cashier' => [
-                'Issue invoices and record full or partial payments',
-                'Record method, reference, date and status, then print receipts',
-                'Track outstanding and overdue balances',
-                'Record deposits, deductions and audited refunds',
-                'Reconcile the ledger and generate finance reports',
+                'View invoices and rental charges',
+                'Create or finalize invoices according to the assigned workflow',
+                'Record full and partial payments',
+                'Record payment method, transaction reference, date and status',
+                'Generate and print receipts',
+                'Track outstanding balances and overdue payments',
+                'Record security deposits, deductions and refunds',
+                'Reconcile payment records',
+                'Generate revenue, payment, deposit and refund reports',
             ],
             'Vehicle Inspector/Maintenance Staff' => [
                 'Inspect returned vehicles and attach condition photos',
@@ -185,7 +185,7 @@ final class DashboardService
             'System Administrator' => 'Do not automatically approve financial transactions or refunds. Approve them only when explicitly authorized by business policy.',
             'Business Manager' => 'Do not manage system security settings or change payment records without an explicitly assigned permission.',
             'Rental Officer' => 'You cannot open system administration or post unauthorised refunds or ledger adjustments.',
-            'Accountant/Cashier' => 'Refunds, reversals and adjustments require a reason and are written to the audit log. Posted rows are never deleted.',
+            'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
             'Vehicle Inspector/Maintenance Staff' => 'You cannot delete financial records or confirm reservations. Flag a vehicle instead of changing hire status.',
             'Customer' => 'You can only open your own account, bookings, invoices and receipts. Changing a URL or ID will not show someone else’s records.',
             'Driver' => 'You cannot see other drivers’ trips, the full customer list, or financial reports.',
@@ -287,6 +287,9 @@ final class DashboardService
         if ($canViewFinancial) {
             $kpis[] = ['label' => 'Outstanding payments', 'value' => Money::format($outstanding), 'hint' => 'Unpaid invoice balances', 'href' => url('invoices')];
         }
+        if (Rbac::can('transactions.approve')) {
+            $kpis[] = ['label' => 'Finance approvals', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status = 'awaiting_approval'"), 'hint' => 'Independent review required', 'href' => url('finance/approvals')];
+        }
         $kpis[] = ['label' => 'Returns due / overdue', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE ' . $dueCondition), 'hint' => 'Overdue or due within 7 days', 'href' => url('rentals')];
         return [
             'kpis' => $kpis,
@@ -360,23 +363,50 @@ final class DashboardService
 
     private function cashier(): array
     {
+        $depositBalance = $this->sum(
+            "SELECT COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount
+                WHEN transaction_type IN ('deposit_refund','deposit_deduction') AND status='completed' THEN -amount END),0) s
+             FROM financial_transactions"
+        );
         return [
             'kpis' => [
-                ['label' => 'Outstanding', 'value' => Money::format($this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances')), 'hint' => 'Open invoices', 'href' => url('invoices')],
-                ['label' => 'Unpaid invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices WHERE status IN ('issued','partially_paid','overdue')"), 'hint' => 'Need collection', 'href' => url('invoices')],
-                ['label' => 'Pending MoMo', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status = 'pending' AND payment_method = 'mobile_money'"), 'hint' => 'Awaiting HDEV', 'href' => url('finance')],
-                ['label' => 'Today receipts', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed' AND DATE(transaction_date)=CURDATE()")), 'hint' => 'Completed payments', 'href' => url('finance')],
+                ['label' => 'Outstanding balance', 'value' => Money::format($this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances')), 'hint' => 'Across open invoices', 'href' => url('invoices')],
+                ['label' => 'Overdue invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices i LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id WHERE i.status IN ('overdue','issued','partially_paid') AND i.due_date IS NOT NULL AND i.due_date < CURDATE() AND COALESCE(b.outstanding_balance, i.total_amount) > 0"), 'hint' => 'Past due with a balance', 'href' => url('invoices')],
+                ['label' => 'Held deposits', 'value' => Money::format($depositBalance), 'hint' => 'Net deposit balance', 'href' => url('finance')],
+                ['label' => 'Payments received today', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed' AND DATE(transaction_date)=CURDATE()")), 'hint' => 'Completed payments', 'href' => url('finance')],
+                ['label' => 'Requests awaiting approval', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status='awaiting_approval' AND approval_requested_by = ?", [Auth::id()]), 'hint' => 'Refunds and adjustments', 'href' => url('finance')],
+                ['label' => 'Unreconciled entries', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status='completed' AND reconciled_at IS NULL"), 'hint' => 'Match to bank or receipt records', 'href' => url('finance')],
             ],
             'invoices' => Database::fetchAll(
                 "SELECT i.invoice_id, i.invoice_number, i.total_amount, i.status, b.outstanding_balance, c.first_name, c.last_name
                  FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
                  LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
-                 WHERE i.status IN ('issued','partially_paid','overdue','draft')
-                 ORDER BY i.issue_date DESC LIMIT 10"
+                 WHERE i.status IN ('draft','issued','partially_paid')
+                 ORDER BY CASE WHEN i.status = 'draft' THEN 0 ELSE 1 END, i.issue_date DESC LIMIT 10"
+            ),
+            'unbilledRentals' => Database::fetchAll(
+                "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, c.first_name, c.last_name
+                 FROM rentals rt JOIN customers c ON c.customer_id = rt.customer_id
+                 WHERE rt.status = 'closed' AND NOT EXISTS (
+                   SELECT 1 FROM invoices i WHERE i.rental_id = rt.rental_id AND i.status <> 'void'
+                 )
+                 ORDER BY rt.actual_return_datetime DESC LIMIT 6"
             ),
             'pendingPay' => Database::fetchAll(
                 "SELECT transaction_id, transaction_number, amount, external_reference, status, transaction_date, invoice_id
-                 FROM financial_transactions WHERE status = 'pending' ORDER BY created_at DESC LIMIT 8"
+                 FROM financial_transactions WHERE status = 'pending' AND payment_method = 'mobile_money' ORDER BY created_at DESC LIMIT 8"
+            ),
+            'pendingApproval' => Database::fetchAll(
+                "SELECT transaction_id, transaction_number, transaction_type, amount, reason, created_at
+                 FROM financial_transactions WHERE status = 'awaiting_approval' AND approval_requested_by = ?
+                 ORDER BY created_at DESC LIMIT 6",
+                [Auth::id()]
+            ),
+            'recentTransactions' => Database::fetchAll(
+                "SELECT ft.transaction_id, ft.transaction_number, ft.transaction_type, ft.amount, ft.payment_method,
+                        ft.external_reference, ft.status, ft.transaction_date, ft.reconciled_at, c.first_name, c.last_name
+                 FROM financial_transactions ft JOIN customers c ON c.customer_id = ft.customer_id
+                 ORDER BY ft.transaction_date DESC LIMIT 12"
             ),
             'overdue' => Database::fetchAll(
                 "SELECT i.invoice_id, i.invoice_number, i.due_date, b.outstanding_balance, c.first_name, c.last_name
@@ -386,11 +416,6 @@ final class DashboardService
                    AND COALESCE(b.outstanding_balance, i.total_amount) > 0
                  ORDER BY i.due_date ASC LIMIT 8"
             ),
-            'deposits' => Money::format($this->sum(
-                "SELECT COALESCE(SUM(CASE WHEN transaction_type='deposit_received' AND status='completed' THEN amount
-                    WHEN transaction_type IN ('deposit_refund','deposit_deduction') AND status='completed' THEN -amount END),0) s
-                 FROM financial_transactions"
-            )),
         ];
     }
 

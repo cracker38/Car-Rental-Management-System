@@ -27,7 +27,15 @@ final class InvoiceController
             $params[] = Auth::customerId() ?: 0;
         }
         $sql .= ' ORDER BY i.created_at DESC LIMIT 200';
-        View::render('invoices/index', ['title' => 'Invoices', 'rows' => Database::fetchAll($sql, $params)]);
+        $unbilledRentals = Rbac::can('invoices.manage') ? Database::fetchAll(
+            "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, c.first_name, c.last_name
+             FROM rentals rt JOIN customers c ON c.customer_id = rt.customer_id
+             WHERE rt.status = 'closed' AND NOT EXISTS (
+               SELECT 1 FROM invoices i WHERE i.rental_id = rt.rental_id AND i.status <> 'void'
+             )
+             ORDER BY rt.actual_return_datetime DESC LIMIT 50"
+        ) : [];
+        View::render('invoices/index', ['title' => 'Invoices', 'rows' => Database::fetchAll($sql, $params), 'unbilledRentals' => $unbilledRentals]);
     }
 
     public function show(): void
@@ -74,5 +82,21 @@ final class InvoiceController
             Http::flash('danger', $e->getMessage());
         }
         Http::redirect('invoices/show', ['id' => Http::int('id')]);
+    }
+
+    public function create(): void
+    {
+        Rbac::require('invoices.manage');
+        if (!Http::isPost()) {
+            Http::redirect('invoices');
+        }
+        try {
+            $invoice = (new InvoiceService())->createFromRental(Http::int('rental_id'));
+            Http::flash('success', 'Draft invoice generated from the closed rental. Review and issue it when ready.');
+            Http::redirect('invoices/show', ['id' => $invoice['invoice_id']]);
+        } catch (InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+            Http::redirect('invoices');
+        }
     }
 }

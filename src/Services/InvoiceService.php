@@ -21,6 +21,9 @@ final class InvoiceService
             if (!$rental) {
                 throw new InvalidArgumentException('Rental not found.');
             }
+            if ($rental['status'] !== 'closed') {
+                throw new InvalidArgumentException('Invoices can only be generated from closed rentals after the return inspection is complete.');
+            }
             $existing = Database::fetch("SELECT invoice_id FROM invoices WHERE rental_id = ? AND status <> 'void'", [$rentalId]);
             if ($existing) {
                 throw new InvalidArgumentException('An invoice already exists for this rental.');

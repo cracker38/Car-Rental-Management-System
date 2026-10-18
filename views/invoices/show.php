@@ -68,7 +68,7 @@
     <?php foreach ($txns as $t): ?>
       <tr <?= $t['status'] === 'pending' && $t['external_reference'] ? 'data-payment-poll="' . e(url('payments/status', ['id' => $t['transaction_id']])) . '"' : '' ?>>
         <td><?= e($t['transaction_number']) ?><?php if ($t['external_reference']): ?><div class="small text-muted"><?= e($t['external_reference']) ?></div><?php endif; ?></td>
-        <td><?= e(str_replace('_', ' ', $t['transaction_type'])) ?></td>
+        <td><?= e(str_replace('_', ' ', $t['transaction_type'])) ?><?php if ($t['adjustment_direction']): ?><small class="d-block text-muted"><?= e(ucfirst($t['adjustment_direction'])) ?> adjustment</small><?php endif; ?><?php if ($t['reason']): ?><small class="d-block text-muted"><?= e(substr((string) $t['reason'], 0, 100)) ?></small><?php endif; ?><?php if ($t['status'] === 'rejected' && $t['approval_note']): ?><small class="d-block text-danger">Rejected: <?= e(substr((string) $t['approval_note'], 0, 100)) ?></small><?php endif; ?></td>
         <td><?= e(\Crms\Money::format($t['amount'])) ?></td>
         <td><?= status_badge((string)$t['status']) ?></td>
         <td class="text-nowrap">
