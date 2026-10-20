@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-manager">
 <div class="dashboard-heading manager-dashboard-heading">
   <div>
     <p class="eyebrow mb-1">Business oversight</p>
@@ -132,3 +133,4 @@ $maxRevenue = max(1, ...array_column($trends, 'revenue'));
   </div>
 </div>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+</div>

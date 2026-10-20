@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-accountant">
 <?php
 $dashboardEyebrow = 'Finance and billing';
 $dashboardHeading = 'Financial Management';
@@ -119,4 +120,5 @@ require dirname(__DIR__) . '/partials/kpis.php';
       <?php endif; ?>
     </section>
   </div>
+</div>
 </div>

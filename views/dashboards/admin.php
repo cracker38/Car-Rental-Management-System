@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-admin">
 <div class="admin-dashboard-heading">
   <div>
     <p class="eyebrow mb-1">System Administrator</p>
@@ -79,3 +80,4 @@
   <?php endif; ?>
 </section>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+</div>

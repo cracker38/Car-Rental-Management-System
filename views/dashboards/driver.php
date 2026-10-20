@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-driver">
 <?php
 $dashboardSubtitle = 'Your assigned chauffeur trips, schedule and trip updates.';
 $dashboardNotificationHeading = 'Trip assignment notifications';
@@ -63,3 +64,4 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
   <?php endif; ?>
 </section>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+</div>
