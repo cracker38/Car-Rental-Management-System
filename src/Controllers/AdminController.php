@@ -67,7 +67,7 @@ final class AdminController
                 try {
                     Database::transaction(function () use ($roleId, $role, $email, $firstName, $lastName, $phone, $status, $password, $driverLicense, $licenseExpiry): void {
                         Database::execute(
-                            'INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, status) VALUES (?,?,?,?,?,?,?)',
+                            'INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, must_change_password, status) VALUES (?,?,?,?,?,?,1,?)',
                             [$roleId, $firstName, $lastName, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $status]
                         );
                         $userId = Database::lastId();
@@ -81,7 +81,7 @@ final class AdminController
                         }
                         Audit::log('user.created', 'user', (string) $userId, $email);
                     });
-                    Http::flash('success', 'User account created.');
+                    Http::flash('success', 'User account created. The temporary password must be changed at first sign-in.');
                 } catch (\Throwable) {
                     Http::flash('danger', 'Could not create the account. Check whether the email or driving licence number is already in use.');
                 }
@@ -178,7 +178,7 @@ final class AdminController
                     ];
                     if ($newPassword !== '') {
                         Database::execute(
-                            'UPDATE users SET role_id=?,first_name=?,last_name=?,email=?,phone=?,status=?,password_hash=? WHERE user_id=?',
+                            'UPDATE users SET role_id=?,first_name=?,last_name=?,email=?,phone=?,status=?,password_hash=?,must_change_password=1 WHERE user_id=?',
                             [$roleId, $firstName, $lastName, $email, $phone, $status, password_hash($newPassword, PASSWORD_DEFAULT), $userId]
                         );
                     } else {
@@ -217,7 +217,9 @@ final class AdminController
             if ($error !== null) {
                 Http::flash('danger', $error);
             } else {
-                Http::flash('success', 'User details and account status updated.');
+                Http::flash('success', $newPassword !== ''
+                    ? 'User details updated. The new temporary password must be changed at next sign-in.'
+                    : 'User details and account status updated.');
             }
             Http::redirect('admin/users');
         }

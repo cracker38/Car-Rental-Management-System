@@ -37,6 +37,12 @@ final class Auth
         return $u !== null && $u['status'] === 'active';
     }
 
+    public static function mustChangePassword(): bool
+    {
+        $u = self::user();
+        return $u !== null && (int) ($u['must_change_password'] ?? 0) === 1;
+    }
+
     public static function requireLogin(): void
     {
         if (!self::check()) {

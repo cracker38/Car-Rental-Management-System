@@ -35,21 +35,35 @@ document.querySelectorAll('input[type="datetime-local"][data-min-now]').forEach(
   }
 });
 
-document.querySelectorAll('.booking-panel, .hire-search-form').forEach(function (form) {
+document.querySelectorAll('.booking-panel, .hire-search-form, .reservation-form').forEach(function (form) {
   var pickup = form.querySelector('[name="pickup_datetime"]');
   var returnAt = form.querySelector('[name="return_datetime"]');
   if (!pickup || !returnAt) return;
+  var minimumHours = Math.max(1, parseInt(form.dataset.minRentalHours || '8', 10) || 8);
+  var minimumDurationMs = minimumHours * 60 * 60 * 1000;
 
-  function syncReturnDate() {
-    returnAt.min = pickup.value || pickup.min || '';
-    if (pickup.value && returnAt.value && returnAt.value <= pickup.value) {
-      returnAt.setCustomValidity('Choose a return time after pick-up.');
-    } else {
-      returnAt.setCustomValidity('');
-    }
+  function dateTimeValueAfter(value, milliseconds) {
+    return new Date(new Date(value + 'Z').getTime() + milliseconds).toISOString().slice(0, 16);
   }
 
+  function syncReturnDate() {
+    if (pickup.value) {
+      returnAt.min = dateTimeValueAfter(pickup.value, minimumDurationMs);
+    } else {
+      returnAt.min = pickup.min || '';
+    }
+
+    var duration = pickup.value && returnAt.value
+      ? new Date(returnAt.value + 'Z').getTime() - new Date(pickup.value + 'Z').getTime()
+      : null;
+    returnAt.setCustomValidity(duration !== null && duration < minimumDurationMs
+      ? 'The minimum booking duration is ' + minimumHours + ' hours.'
+      : '');
+  }
+
+  pickup.addEventListener('input', syncReturnDate);
   pickup.addEventListener('change', syncReturnDate);
+  returnAt.addEventListener('input', syncReturnDate);
   returnAt.addEventListener('change', syncReturnDate);
   form.addEventListener('submit', function (event) {
     syncReturnDate();
@@ -58,6 +72,7 @@ document.querySelectorAll('.booking-panel, .hire-search-form').forEach(function 
       form.reportValidity();
     }
   });
+  syncReturnDate();
 });
 
 document.querySelectorAll('[data-dismiss-chat]').forEach(function (button) {

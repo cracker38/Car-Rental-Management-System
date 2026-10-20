@@ -1,5 +1,5 @@
 <?php $reservation = $reservation ?? null; $editing = $reservation !== null; $rentalOfficer = (\Crms\Auth::user()['role_name'] ?? '') === 'Rental Officer'; $customerSigning = \Crms\Auth::isCustomer(); ?>
-<form method="post" action="<?= e(url('reservations/form', $editing ? ['id' => $reservation['reservation_id']] : [])) ?>" class="card card-body">
+<form method="post" action="<?= e(url('reservations/form', $editing ? ['id' => $reservation['reservation_id']] : [])) ?>" class="card card-body reservation-form" data-min-rental-hours="8">
   <?= \Crms\Csrf::field() ?>
   <div class="row g-3">
     <div class="col-md-6"><label class="form-label" for="reservation-customer">Customer</label>
@@ -17,8 +17,8 @@
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="col-md-6"><label class="form-label" for="reservation-pickup">Pickup</label><input class="form-control" id="reservation-pickup" type="datetime-local" name="pickup_datetime" required value="<?= e(str_replace(' ', 'T', substr($pickup, 0, 16))) ?>"></div>
-    <div class="col-md-6"><label class="form-label" for="reservation-return">Return</label><input class="form-control" id="reservation-return" type="datetime-local" name="return_datetime" required value="<?= e(str_replace(' ', 'T', substr($returnAt, 0, 16))) ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="reservation-pickup">Pickup</label><input class="form-control" id="reservation-pickup" type="datetime-local" name="pickup_datetime" required data-min-now value="<?= e(str_replace(' ', 'T', substr($pickup, 0, 16))) ?>"></div>
+    <div class="col-md-6"><label class="form-label" for="reservation-return">Return</label><input class="form-control" id="reservation-return" type="datetime-local" name="return_datetime" required data-min-now value="<?= e(str_replace(' ', 'T', substr($returnAt, 0, 16))) ?>"><small class="form-text">Minimum booking duration: 8 hours.</small></div>
     <div class="col-md-6"><label class="form-label" for="reservation-pickup-location">Pickup location</label><input class="form-control" id="reservation-pickup-location" name="pickup_location" value="<?= e($reservation['pickup_location'] ?? '') ?>"></div>
     <div class="col-md-6"><label class="form-label" for="reservation-return-location">Return location</label><input class="form-control" id="reservation-return-location" name="return_location" value="<?= e($reservation['return_location'] ?? '') ?>"></div>
     <?php if (!\Crms\Auth::isCustomer() && !$rentalOfficer): ?>

@@ -10,6 +10,7 @@ require dirname(__DIR__) . '/src/bootstrap.php';
 use Crms\Money;
 use Crms\Period;
 use Crms\Phone;
+use Crms\Services\AvailabilityService;
 use Crms\Services\HdevClient;
 use Crms\Services\PricingService;
 use Crms\Services\ReservationService;
@@ -96,6 +97,26 @@ expect(Period::overlaps('2026-10-01 10:00:00', '2026-10-03 10:00:00', '2026-10-0
 expect(Period::overlaps('2026-10-01 10:00:00', '2026-10-05 10:00:00', '2026-10-02 10:00:00', '2026-10-03 10:00:00'), 'inner period overlaps');
 expect(!Period::overlaps('2026-10-01 10:00:00', '2026-10-03 10:00:00', '2026-10-03 10:00:00', '2026-10-05 10:00:00', 0), 'buffer 0 allows adjacent');
 expect(Period::overlaps('2026-10-01 10:00:00', '2026-10-03 10:00:00', '2026-10-03 10:00:00', '2026-10-05 10:00:00', 60), '60-minute turnaround blocks adjacent pickup');
+
+$availability = new AvailabilityService();
+try {
+    $availability->assertValidBookingPeriod('2026-10-01 08:00:00', '2026-10-01 15:59:00');
+    expect(false, 'booking shorter than 8 hours is rejected');
+} catch (InvalidArgumentException) {
+    expect(true, 'booking shorter than 8 hours is rejected');
+}
+try {
+    $availability->assertValidBookingPeriod('2026-10-01 08:00:00', '2026-10-01 16:00:00');
+    expect(true, 'booking of exactly 8 hours is accepted');
+} catch (InvalidArgumentException) {
+    expect(false, 'booking of exactly 8 hours is accepted');
+}
+try {
+    $availability->assertValidBookingPeriod('2026-10-01 08:00:00', '2026-10-01 17:00:00');
+    expect(true, 'booking longer than 8 hours is accepted');
+} catch (InvalidArgumentException) {
+    expect(false, 'booking longer than 8 hours is accepted');
+}
 
 $pricing = new PricingService();
 expect($pricing->billableDays('2026-10-01 10:00:00', '2026-10-02 10:00:00') === 1, 'exactly 24h is 1 day');
@@ -195,6 +216,8 @@ try {
     $pdo = \Crms\Database::pdo();
     $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
     expect(in_array('reservations', $tables, true) && in_array('financial_transactions', $tables, true), 'core tables exist');
+    $userColumns = $pdo->query('SHOW COLUMNS FROM users')->fetchAll(PDO::FETCH_COLUMN);
+    expect(in_array('must_change_password', $userColumns, true), 'user schema supports forced first-login password changes');
     $reservationColumns = $pdo->query('SHOW COLUMNS FROM reservations')->fetchAll(PDO::FETCH_COLUMN);
     expect(count(array_diff(['payment_status', 'customer_signature', 'customer_signature_user_id', 'customer_signature_captured_by', 'customer_signed_at', 'approval_note', 'approver_signature', 'decision_by', 'decision_at'], $reservationColumns)) === 0, 'reservation workflow migration columns are installed');
     $reservationIndexes = $pdo->query('SHOW INDEX FROM reservations')->fetchAll(PDO::FETCH_COLUMN, 2);

@@ -51,7 +51,7 @@ final class ReservationService
             ? Signature::decodePng((string) ($input['customer_signature'] ?? ''))
             : null;
         $customerSignedAt = Auth::isCustomer() ? date('Y-m-d H:i:s') : null;
-        $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
+        $this->availability->assertValidBookingPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
         $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff, $customerSignature, $customerSignedAt) {
             $customerId = (int) $input['customer_id'];
             $vehicleId = (int) $input['vehicle_id'];
@@ -168,7 +168,7 @@ final class ReservationService
             ? Signature::decodePng((string) ($input['customer_signature'] ?? ''))
             : null;
         $customerSignedAt = Auth::isCustomer() ? date('Y-m-d H:i:s') : null;
-        $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
+        $this->availability->assertValidBookingPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
         $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff, $customerSignature, $customerSignedAt) {
             $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
             $stmt->execute([$id]);

@@ -4,7 +4,7 @@ $sliderValue = ($filters['max_rate'] ?? '') !== '' ? (int)$filters['max_rate'] :
 $hasDates = $pickup !== '' && $returnAt !== '';
 ?>
 <section class="hire-page">
-  <form method="get" action="<?= e(url('search')) ?>" class="hire-search-form">
+  <form method="get" action="<?= e(url('search')) ?>" class="hire-search-form" data-min-rental-hours="8">
     <input type="hidden" name="r" value="search">
     <header class="hire-search-hero">
       <div class="container">
@@ -38,7 +38,7 @@ $hasDates = $pickup !== '' && $returnAt !== '';
                 <input class="form-control" id="hire-pickup" type="datetime-local" name="pickup_datetime" value="<?= e(str_replace(' ', 'T', substr((string)$pickup, 0, 16))) ?>" data-min-now>
                 <label for="hire-return">Return</label>
                 <input class="form-control" id="hire-return" type="datetime-local" name="return_datetime" value="<?= e(str_replace(' ', 'T', substr((string)$returnAt, 0, 16))) ?>" data-min-now>
-                <small>Choose both dates to check live availability.</small>
+                <small>Choose both dates to check availability. The minimum rental is 8 hours.</small>
               </fieldset>
 
               <fieldset class="hire-filter-group">

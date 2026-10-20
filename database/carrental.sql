@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(190) NULL UNIQUE,
   phone VARCHAR(30) NULL,
   password_hash VARCHAR(255) NOT NULL,
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   status ENUM('active','inactive','suspended','pending') NOT NULL DEFAULT 'active',
   last_login_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

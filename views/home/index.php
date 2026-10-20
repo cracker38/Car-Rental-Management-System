@@ -15,11 +15,11 @@
         </div>
       </div>
 
-      <form class="booking-panel" id="booking" method="get" action="<?= e(url('search')) ?>">
+      <form class="booking-panel" id="booking" method="get" action="<?= e(url('search')) ?>" data-min-rental-hours="8">
         <input type="hidden" name="r" value="search">
         <div class="booking-heading">
           <span class="booking-icon"><i class="bi bi-calendar2-check" aria-hidden="true"></i></span>
-          <div><strong>Plan your trip</strong><small>Choose your dates to see available cars</small></div>
+          <div><strong>Plan your trip</strong><small>Choose dates for at least 8 hours to see available cars</small></div>
         </div>
         <div class="booking-fields">
           <label class="booking-field"><span>Pick-up date &amp; time</span><input type="datetime-local" name="pickup_datetime" required data-min-now></label>

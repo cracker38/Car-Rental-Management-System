@@ -16,6 +16,7 @@ use Crms\Controllers\PaymentController;
 use Crms\Controllers\RentalController;
 use Crms\Controllers\ReservationController;
 use Crms\Controllers\VehicleController;
+use Crms\Auth;
 use Crms\View;
 
 $route = $_GET['r'] ?? 'home';
@@ -31,6 +32,7 @@ $routes = [
     'contact' => [HomeController::class, 'contact'],
     'dashboard' => [HomeController::class, 'dashboard'],
     'login' => [AuthController::class, 'login'],
+    'password/change' => [AuthController::class, 'changePassword'],
     'register' => [AuthController::class, 'register'],
     'logout' => [AuthController::class, 'logout'],
     'vehicles' => [VehicleController::class, 'index'],
@@ -87,6 +89,10 @@ if (!isset($routes[$route])) {
     http_response_code(404);
     View::render('errors/404', ['title' => 'Not found']);
     exit;
+}
+
+if (Auth::check() && Auth::mustChangePassword() && !in_array($route, ['password/change', 'logout'], true)) {
+    \Crms\Http::redirect('password/change');
 }
 
 [$class, $method] = $routes[$route];

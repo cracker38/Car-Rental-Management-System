@@ -20,6 +20,8 @@ use PDO;
  */
 final class AvailabilityService
 {
+    private const MIN_BOOKING_HOURS = 8;
+
     public function assertValidPeriod(string $pickup, string $returnAt): void
     {
         $p = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $pickup);
@@ -31,6 +33,17 @@ final class AvailabilityService
         }
         if ($r <= $p) {
             throw new InvalidArgumentException('Return date/time must be after pickup.');
+        }
+    }
+
+    public function assertValidBookingPeriod(string $pickup, string $returnAt): void
+    {
+        $this->assertValidPeriod($pickup, $returnAt);
+        $pickupAt = new DateTimeImmutable($pickup);
+        $returnDate = new DateTimeImmutable($returnAt);
+        $minimumSeconds = self::MIN_BOOKING_HOURS * 60 * 60;
+        if ($returnDate->getTimestamp() - $pickupAt->getTimestamp() < $minimumSeconds) {
+            throw new InvalidArgumentException('The minimum booking duration is 8 hours.');
         }
     }
 
@@ -124,7 +137,7 @@ final class AvailabilityService
 
     public function search(string $pickup, string $returnAt, ?int $categoryId = null, array $filters = [], string $sort = 'recommended'): array
     {
-        $this->assertValidPeriod($pickup, $returnAt);
+        $this->assertValidBookingPeriod($pickup, $returnAt);
         $out = [];
         foreach ($this->matchingVehicles("v.status NOT IN ('inactive','maintenance')", $categoryId, $filters, $sort) as $v) {
             if ($this->hasConflict((int) $v['vehicle_id'], $pickup, $returnAt) === null) {

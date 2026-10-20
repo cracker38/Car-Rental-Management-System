@@ -16,17 +16,67 @@ final class AuthController
     public function login(): void
     {
         if (Auth::check()) {
-            Http::redirect('dashboard');
+            Http::redirect(Auth::mustChangePassword() ? 'password/change' : 'dashboard');
         }
         if (Http::isPost()) {
             $email = strtolower(Http::str('email'));
             $password = (string) ($_POST['password'] ?? '');
             if (Auth::login($email, $password)) {
                 Http::clearOld();
-                Http::redirect('dashboard');
+                Http::redirect(Auth::mustChangePassword() ? 'password/change' : 'dashboard');
             }
         }
         View::render('auth/login', ['title' => 'Sign in', 'fullBleed' => true], 'site');
+    }
+
+    public function changePassword(): void
+    {
+        Auth::requireLogin();
+        $userId = (int) Auth::id();
+        $mustChangePassword = Auth::mustChangePassword();
+
+        if (Http::isPost()) {
+            $currentPassword = (string) ($_POST['current_password'] ?? '');
+            $newPassword = (string) ($_POST['new_password'] ?? '');
+            $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+
+            if ($currentPassword === '') {
+                Http::flash('danger', 'Enter your current password.');
+            } elseif (strlen($newPassword) < 8) {
+                Http::flash('danger', 'Use at least 8 characters for your new password.');
+            } elseif ($newPassword !== $confirmPassword) {
+                Http::flash('danger', 'The new passwords do not match.');
+            } else {
+                try {
+                    Database::transaction(function () use ($userId, $currentPassword, $newPassword): void {
+                        $account = Database::fetch('SELECT password_hash FROM users WHERE user_id = ? FOR UPDATE', [$userId]);
+                        if (!$account || !password_verify($currentPassword, $account['password_hash'])) {
+                            throw new \InvalidArgumentException('Your current password is incorrect.');
+                        }
+                        if (password_verify($newPassword, $account['password_hash'])) {
+                            throw new \InvalidArgumentException('Choose a new password different from your current password.');
+                        }
+
+                        Database::execute(
+                            'UPDATE users SET password_hash = ?, must_change_password = 0 WHERE user_id = ?',
+                            [password_hash($newPassword, PASSWORD_DEFAULT), $userId]
+                        );
+                        Audit::log('user.password_changed', 'user', (string) $userId, 'Account password changed');
+                    });
+                    Http::flash('success', 'Your password has been changed.');
+                    Http::redirect('dashboard');
+                } catch (\InvalidArgumentException $e) {
+                    Http::flash('danger', $e->getMessage());
+                } catch (\Throwable) {
+                    Http::flash('danger', 'Could not change your password. Please try again.');
+                }
+            }
+        }
+
+        View::render('auth/change-password', [
+            'title' => 'Change password',
+            'mustChangePassword' => $mustChangePassword,
+        ]);
     }
 
     public function register(): void

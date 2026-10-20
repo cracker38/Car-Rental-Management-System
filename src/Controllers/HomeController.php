@@ -83,6 +83,8 @@ final class HomeController
                 foreach ($results as $v) {
                     $quotes[(int) $v['vehicle_id']] = $pricing->quoteRates($v, $pickup, $returnAt);
                 }
+            } catch (\InvalidArgumentException $e) {
+                $error = $e->getMessage();
             } catch (\Throwable) {
                 $error = 'We could not check availability right now. Please try again or contact our Kigali team.';
             }

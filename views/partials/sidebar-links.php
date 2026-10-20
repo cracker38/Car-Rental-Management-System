@@ -69,3 +69,5 @@ $isSystemAdmin = $role === 'System Administrator';
     <?php if (can('settings.manage')): ?><a class="nav-link <?= nav_active('admin/backup') ?>" href="<?= e(url('admin/backup')) ?>"><i class="bi bi-hdd"></i> Backup</a><?php endif; ?>
   <?php endif; ?>
 <?php endif; ?>
+<div class="nav-label">Account</div>
+<a class="nav-link <?= nav_active('password/change') ?>" href="<?= e(url('password/change')) ?>"><i class="bi bi-key"></i> Change password</a>

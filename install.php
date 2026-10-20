@@ -22,6 +22,21 @@ if ($mysqli->connect_error) {
     $mysqli->query("CREATE DATABASE IF NOT EXISTS `{$db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $mysqli->select_db($cfg['name']);
 
+    // Track temporary passwords for administrator-created accounts on existing installs.
+    $userTable = $mysqli->query("SHOW TABLES LIKE 'users'");
+    if ($userTable && $userTable->num_rows > 0) {
+        $userColumns = [];
+        $userColumnRows = $mysqli->query('SHOW COLUMNS FROM users');
+        while ($userColumnRows && ($column = $userColumnRows->fetch_assoc())) {
+            $userColumns[$column['Field']] = true;
+        }
+        if (!isset($userColumns['must_change_password'])
+            && !$mysqli->query('ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password_hash')) {
+            $ok = false;
+            $messages[] = 'First-login password schema update failed: ' . $mysqli->error;
+        }
+    }
+
     // Additive reservation signature, decision and payment state fields.
     $reservationTable = $mysqli->query("SHOW TABLES LIKE 'reservations'");
     if ($reservationTable && $reservationTable->num_rows > 0) {
@@ -173,7 +188,7 @@ if ($mysqli->connect_error) {
     if ($exists && $exists->num_rows === 0) {
         $hash = password_hash('Admin@12345', PASSWORD_DEFAULT);
         $role = $mysqli->query("SELECT role_id FROM roles WHERE role_name = 'System Administrator'")->fetch_assoc();
-        $ins = $mysqli->prepare('INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, status) VALUES (?,?,?,?,?,?,\'active\')');
+        $ins = $mysqli->prepare('INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, must_change_password, status) VALUES (?,?,?,?,?,?,1,\'active\')');
         $fn = 'System';
         $ln = 'Administrator';
         $phone = '+250785354935';
