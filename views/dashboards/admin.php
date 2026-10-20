@@ -4,7 +4,10 @@
     <h1>System Overview</h1>
     <p class="text-muted mb-0">Manage access and configuration, review system records, and monitor activity.</p>
   </div>
-  <a class="btn btn-primary" href="<?= e(url('admin/backup')) ?>"><i class="bi bi-hdd-stack me-1" aria-hidden="true"></i>Backup &amp; recovery</a>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-dark" href="#dashboard-notifications"><i class="bi bi-bell me-1" aria-hidden="true"></i>Notifications <span class="badge text-bg-<?= (int) ($unreadNotificationCount ?? 0) > 0 ? 'primary' : 'secondary' ?>" data-notification-count><?= (int) ($unreadNotificationCount ?? 0) ?></span></a>
+    <a class="btn btn-primary" href="<?= e(url('admin/backup')) ?>"><i class="bi bi-hdd-stack me-1" aria-hidden="true"></i>Backup &amp; recovery</a>
+  </div>
 </div>
 <?php require dirname(__DIR__) . '/partials/kpis.php'; ?>
 <div class="row g-3 admin-overview-panels">

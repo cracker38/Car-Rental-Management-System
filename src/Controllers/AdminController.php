@@ -190,12 +190,13 @@ final class AdminController
             Http::redirect('admin/users');
         }
         $q = trim(Http::str('q'));
+        $q = function_exists('mb_substr') ? mb_substr($q, 0, 120) : substr($q, 0, 120);
         $userSql = 'SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id';
         $userParams = [];
         if ($q !== '') {
-            $userSql .= ' WHERE u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR r.role_name LIKE ?';
+            $userSql .= ' WHERE (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR r.role_name LIKE ?)';
             $like = '%' . $q . '%';
-            $userParams = [$like, $like, $like, $like];
+            $userParams = [$like, $like, $like, $like, $like];
         }
         $userSql .= ' ORDER BY u.created_at DESC';
         $users = Database::fetchAll($userSql, $userParams);

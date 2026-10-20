@@ -1,7 +1,7 @@
-<section class="panel mt-4" aria-labelledby="dashboard-notifications-title" data-notification-poll="<?= e(url('notifications/poll')) ?>" data-unread="<?= (int) ($unreadNotificationCount ?? 0) ?>">
+<section class="panel mt-4" id="dashboard-notifications" aria-labelledby="dashboard-notifications-title" data-notification-poll="<?= e(url('notifications/poll')) ?>" data-unread="<?= (int) ($unreadNotificationCount ?? 0) ?>">
   <div class="panel-h d-flex justify-content-between align-items-center gap-2">
     <span id="dashboard-notifications-title"><?= e($dashboardNotificationHeading ?? 'Notifications') ?></span>
-    <span class="badge text-bg-<?= (int) ($unreadNotificationCount ?? 0) > 0 ? 'primary' : 'secondary' ?>" id="dashboard-notification-count">
+    <span class="badge text-bg-<?= (int) ($unreadNotificationCount ?? 0) > 0 ? 'primary' : 'secondary' ?>" id="dashboard-notification-count" data-notification-count data-notification-suffix=" unread">
       <?= (int) ($unreadNotificationCount ?? 0) ?> unread
     </span>
   </div>
@@ -29,8 +29,8 @@
 <script>
 (() => {
   const panel = document.querySelector('[data-notification-poll]');
-  const count = document.getElementById('dashboard-notification-count');
-  if (!panel || !count) return;
+  const counts = [...document.querySelectorAll('[data-notification-count]')];
+  if (!panel || !counts.length) return;
   const refresh = async () => {
     try {
       const response = await fetch(panel.dataset.notificationPoll, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
@@ -43,9 +43,11 @@
         return;
       }
       panel.dataset.unread = String(next);
-      count.textContent = `${next} unread`;
-      count.classList.toggle('text-bg-primary', next > 0);
-      count.classList.toggle('text-bg-secondary', next === 0);
+      counts.forEach(count => {
+        count.textContent = `${next}${count.dataset.notificationSuffix || ''}`;
+        count.classList.toggle('text-bg-primary', next > 0);
+        count.classList.toggle('text-bg-secondary', next === 0);
+      });
     } catch (_) {}
   };
   window.setInterval(refresh, 30000);
