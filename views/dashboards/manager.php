@@ -37,7 +37,7 @@
 <?php
 $maxBookings = max(1, ...array_column($trends, 'bookings'));
 $maxRentals = max(1, ...array_column($trends, 'rentals'));
-$maxRevenue = max(1, ...array_column($trends, 'revenue'));
+$maxRevenue = max(1, ...array_map(static fn($value): float => abs((float) $value), array_column($trends, 'revenue')));
 ?>
 <section class="panel table-panel mb-3">
   <div class="panel-h d-flex flex-wrap align-items-baseline justify-content-between gap-2">
@@ -46,19 +46,20 @@ $maxRevenue = max(1, ...array_column($trends, 'revenue'));
   </div>
   <div class="table-responsive">
     <table class="table manager-trend-table align-middle mb-0">
-      <thead><tr><th scope="col">Month</th><th scope="col">Bookings</th><th scope="col">Rental pickups</th><?php if ($canViewFinancial): ?><th scope="col">Revenue</th><?php endif; ?></tr></thead>
+      <thead><tr><th scope="col">Month</th><th scope="col">Bookings created</th><th scope="col">Rental pickups</th><?php if ($canViewFinancial): ?><th scope="col">Net payments</th><?php endif; ?></tr></thead>
       <tbody>
       <?php foreach ($trends as $trend): ?>
         <?php
-          $bookingWidth = (int) round(((int) $trend['bookings'] / $maxBookings) * 100);
-          $rentalWidth = (int) round(((int) $trend['rentals'] / $maxRentals) * 100);
-          $revenueWidth = (int) round(((float) $trend['revenue'] / $maxRevenue) * 100);
+          $bookingWidth = max(0, min(100, (int) round(((int) $trend['bookings'] / $maxBookings) * 100)));
+          $rentalWidth = max(0, min(100, (int) round(((int) $trend['rentals'] / $maxRentals) * 100)));
+          $revenueWidth = max(0, min(100, (int) round((abs((float) $trend['revenue']) / $maxRevenue) * 100)));
+          $revenueNegative = (float) $trend['revenue'] < 0;
         ?>
         <tr>
           <th scope="row" class="text-nowrap"><?= e($trend['label']) ?></th>
           <td><strong><?= number_format((int) $trend['bookings']) ?></strong><div class="progress manager-trend-progress" role="img" aria-label="Bookings trend: <?= number_format((int) $trend['bookings']) ?>"><div class="progress-bar" style="width: <?= $bookingWidth ?>%"></div></div></td>
           <td><strong><?= number_format((int) $trend['rentals']) ?></strong><div class="progress manager-trend-progress" role="img" aria-label="Rental pickups trend: <?= number_format((int) $trend['rentals']) ?>"><div class="progress-bar" style="width: <?= $rentalWidth ?>%"></div></div></td>
-          <?php if ($canViewFinancial): ?><td><strong><?= e(\Crms\Money::format($trend['revenue'])) ?></strong><div class="progress manager-trend-progress" role="img" aria-label="Revenue trend: <?= e(\Crms\Money::format($trend['revenue'])) ?>"><div class="progress-bar" style="width: <?= $revenueWidth ?>%"></div></div></td><?php endif; ?>
+          <?php if ($canViewFinancial): ?><td><strong><?= e(\Crms\Money::format($trend['revenue'])) ?></strong><div class="progress manager-trend-progress" role="img" aria-label="Net payments: <?= e(\Crms\Money::format($trend['revenue'])) ?>"><div class="progress-bar<?= $revenueNegative ? ' manager-trend-negative' : '' ?>" style="width: <?= $revenueWidth ?>%"></div></div></td><?php endif; ?>
         </tr>
       <?php endforeach; ?>
       </tbody>

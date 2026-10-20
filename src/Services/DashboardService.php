@@ -182,17 +182,18 @@ final class DashboardService
     private function manager(): array
     {
         $canViewFinancial = Rbac::can('reports.financial');
-        $monthRevenue = 0.0;
+        $monthNetPayments = 0.0;
         $outstanding = 0.0;
         if ($canViewFinancial) {
             $fin = Database::fetch(
-                "SELECT COALESCE(SUM(amount),0) revenue
+                "SELECT COALESCE(SUM(CASE WHEN transaction_type='payment' THEN amount ELSE -amount END),0) net_payments
                  FROM financial_transactions
-                 WHERE transaction_type = 'payment' AND status = 'completed'
-                   AND transaction_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"
+                 WHERE transaction_type IN ('payment','payment_refund') AND status = 'completed'
+                   AND transaction_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND transaction_date <= NOW()"
             );
-            $monthRevenue = (float) ($fin['revenue'] ?? 0);
-            $outstanding = $this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances');
+            $monthNetPayments = (float) ($fin['net_payments'] ?? 0);
+            $outstanding = $this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances
+                                       WHERE status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0");
         }
         $fleetSize = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'");
         $onHire = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'rented'");
@@ -206,15 +207,18 @@ final class DashboardService
                     0 AS bookings, COUNT(*) AS rentals, 0 AS revenue
              FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id
              WHERE COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
-               AND rt.status <> 'cancelled'
+               AND COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) <= NOW()
+               AND rt.status IN ('active','overdue','returned','inspected','closed')
              GROUP BY DATE_FORMAT(COALESCE(rt.actual_pickup_datetime, r.pickup_datetime), '%Y-%m')",
         ];
         if ($canViewFinancial) {
             $trendSources[] = "SELECT DATE_FORMAT(transaction_date, '%Y-%m') AS period,
-                    0 AS bookings, 0 AS rentals, SUM(amount) AS revenue
+                    0 AS bookings, 0 AS rentals,
+                    SUM(CASE WHEN transaction_type='payment' THEN amount ELSE -amount END) AS revenue
              FROM financial_transactions
-             WHERE transaction_type = 'payment' AND status = 'completed'
+             WHERE transaction_type IN ('payment','payment_refund') AND status = 'completed'
                AND transaction_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
+               AND transaction_date <= NOW()
              GROUP BY DATE_FORMAT(transaction_date, '%Y-%m')";
         }
         $trendRows = Database::fetchAll(
@@ -240,11 +244,11 @@ final class DashboardService
                 'revenue' => (float) ($row['revenue'] ?? 0),
             ];
         }
-        $dueCondition = "status IN ('active','overdue','scheduled')
-                         AND (expected_return_datetime < NOW() OR expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))";
+        $dueCondition = "status IN ('active','overdue')
+                         AND expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)";
         $kpis = [];
         if ($canViewFinancial) {
-            $kpis[] = ['label' => 'Revenue this month', 'value' => Money::format($monthRevenue), 'hint' => 'Completed payments', 'href' => url('reports')];
+            $kpis[] = ['label' => 'Net payments this month', 'value' => Money::format($monthNetPayments), 'hint' => 'Completed payments less refunds', 'href' => url('reports')];
         }
         $kpis[] = ['label' => 'Bookings this month', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"), 'hint' => 'Created this month', 'href' => url('reservations')];
         $kpis[] = ['label' => 'Active rentals', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue')"), 'hint' => 'Currently on hire', 'href' => url('rentals')];
@@ -307,7 +311,7 @@ final class DashboardService
                         v.registration_no, v.make, v.model, v.image_path, vc.category_name, c.first_name, c.last_name
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id JOIN customers c ON c.customer_id = rt.customer_id
                  JOIN vehicle_categories vc ON vc.category_id=v.category_id
-                 WHERE rt.status IN ('active','overdue','scheduled')
+                 WHERE rt.status IN ('active','overdue')
                    AND (rt.expected_return_datetime < NOW() OR rt.expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))
                  ORDER BY rt.expected_return_datetime ASC LIMIT 10"
             ),
@@ -371,10 +375,10 @@ final class DashboardService
         );
         return [
             'kpis' => [
-                ['label' => 'Outstanding balance', 'value' => Money::format($this->sum('SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances')), 'hint' => 'Across open invoices', 'href' => url('invoices')],
-                ['label' => 'Overdue invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices i LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id WHERE i.status IN ('overdue','issued','partially_paid') AND i.due_date IS NOT NULL AND i.due_date < CURDATE() AND COALESCE(b.outstanding_balance, i.total_amount) > 0"), 'hint' => 'Past due with a balance', 'href' => url('invoices')],
+                ['label' => 'Outstanding balance', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0")), 'hint' => 'Across open invoices', 'href' => url('invoices')],
+                ['label' => 'Overdue invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices i JOIN vw_invoice_balances b ON b.invoice_id=i.invoice_id WHERE b.status IN ('overdue','issued','partially_paid') AND b.outstanding_balance > 0 AND i.due_date IS NOT NULL AND i.due_date < CURDATE()"), 'hint' => 'Past due with a balance', 'href' => url('invoices')],
                 ['label' => 'Held deposits', 'value' => Money::format($depositBalance), 'hint' => 'Net deposit balance', 'href' => url('finance')],
-                ['label' => 'Payments received today', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed' AND DATE(transaction_date)=CURDATE()")), 'hint' => 'Completed payments', 'href' => url('finance')],
+                ['label' => 'Payments received today', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed' AND transaction_date >= CURDATE() AND transaction_date < DATE_ADD(CURDATE(), INTERVAL 1 DAY)")), 'hint' => 'Completed payments', 'href' => url('finance')],
                 ['label' => 'Requests awaiting approval', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status='awaiting_approval' AND approval_requested_by = ?", [Auth::id()]), 'hint' => 'Refunds and adjustments', 'href' => url('finance')],
                 ['label' => 'Unreconciled entries', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status='completed' AND reconciled_at IS NULL"), 'hint' => 'Match to bank or receipt records', 'href' => url('finance')],
             ],
@@ -382,7 +386,7 @@ final class DashboardService
                 "SELECT i.invoice_id, i.invoice_number, i.total_amount, i.status, b.outstanding_balance, c.first_name, c.last_name
                  FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
                  LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
-                 WHERE i.status IN ('draft','issued','partially_paid')
+                 WHERE i.status IN ('draft','issued','partially_paid','overdue')
                  ORDER BY CASE WHEN i.status = 'draft' THEN 0 ELSE 1 END, i.issue_date DESC LIMIT 10"
             ),
             'unbilledRentals' => Database::fetchAll(
@@ -448,10 +452,10 @@ final class DashboardService
         return [
             'kpis' => [
                 ['label' => 'My bookings', 'value' => $this->count('SELECT COUNT(*) c FROM reservations WHERE customer_id = ?', [$cid]), 'hint' => 'All reservations', 'href' => url('reservations')],
-                ['label' => 'Upcoming', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE customer_id = ? AND status IN ('pending','confirmed') AND return_datetime >= NOW()", [$cid]), 'hint' => 'Still active', 'href' => url('reservations')],
+                ['label' => 'Upcoming', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE customer_id = ? AND status IN ('pending','confirmed') AND pickup_datetime >= NOW()", [$cid]), 'hint' => 'Future pickups', 'href' => url('reservations')],
                 ['label' => 'My rentals', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE customer_id = ?', [$cid]), 'hint' => 'Agreements and return dates', 'href' => url('rentals')],
-                ['label' => 'Open invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue')", [$cid]), 'hint' => 'To pay', 'href' => url('invoices')],
-                ['label' => 'To pay', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue')", [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
+                ['label' => 'Open invoices', 'value' => $this->count("SELECT COUNT(*) c FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0", [$cid]), 'hint' => 'Invoices with an unpaid balance', 'href' => url('invoices')],
+                ['label' => 'To pay', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0", [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
             ],
             'reservations' => Database::fetchAll(
                 'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, r.payment_status,

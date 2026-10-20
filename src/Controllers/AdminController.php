@@ -13,6 +13,7 @@ use Crms\Validator;
 use Crms\View;
 use Crms\Services\BackupService;
 use Crms\Services\HdevClient;
+use Crms\Services\ReportExportService;
 use Crms\Services\SmsService;
 
 final class AdminController
@@ -357,21 +358,44 @@ final class AdminController
             View::render('errors/403', ['title' => 'Forbidden']);
             return;
         }
-        $dateFrom = Http::str('date_from', date('Y-m-01'));
-        $dateTo = Http::str('date_to', date('Y-m-d'));
-        foreach (['date_from' => $dateFrom, 'date_to' => $dateTo] as $key => $date) {
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !checkdate((int)substr($date, 5, 2), (int)substr($date, 8, 2), (int)substr($date, 0, 4))) {
-                Http::flash('danger', 'Choose valid report start and end dates.');
-                $dateFrom = date('Y-m-01');
-                $dateTo = date('Y-m-d');
-                break;
-            }
-        }
-        if ($dateFrom > $dateTo) {
+        $defaultFrom = date('Y-m-01');
+        $defaultTo = date('Y-m-d');
+        $dateFrom = Http::str('date_from', $defaultFrom);
+        $dateTo = Http::str('date_to', $defaultTo);
+        $validDate = static function (string $date): bool {
+            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
+                && checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4));
+        };
+        if (!$validDate($dateFrom) || !$validDate($dateTo)) {
+            Http::flash('danger', 'Choose valid report start and end dates.');
+            $dateFrom = $defaultFrom;
+            $dateTo = $defaultTo;
+        } elseif ($dateFrom > $dateTo) {
             Http::flash('danger', 'The report start date must be on or before the end date.');
-            $dateFrom = date('Y-m-01');
-            $dateTo = date('Y-m-d');
+            $dateFrom = $defaultFrom;
+            $dateTo = $defaultTo;
         }
+        $rangeStart = $dateFrom . ' 00:00:00';
+        $rangeEnd = (new \DateTimeImmutable($dateTo))->modify('+1 day')->format('Y-m-d 00:00:00');
+        $isFullOutput = Http::str('export') === 'csv' || Http::str('print') === '1';
+        $pageSize = 50;
+        $requestedPage = max(1, Http::int('page', 1));
+        $reportPage = 1;
+        $reportPages = 1;
+        $reportTotalRows = 0;
+        $setPage = static function (int $total) use (&$reportPage, &$reportPages, &$reportTotalRows, $requestedPage, $pageSize, $isFullOutput): int {
+            $reportTotalRows = max(0, $total);
+            $reportPages = max(1, (int) ceil($reportTotalRows / $pageSize));
+            $reportPage = $isFullOutput ? 1 : min($requestedPage, $reportPages);
+            return $isFullOutput ? 0 : ($reportPage - 1) * $pageSize;
+        };
+        $limitForPage = static fn(int $offset): string => $isFullOutput ? '' : ' LIMIT ' . $pageSize . ' OFFSET ' . $offset;
+        $formatDateTime = static function (?string $value): string {
+            return $value ? date('d M Y, H:i', strtotime($value)) : '-';
+        };
+        $formatDate = static function (?string $value): string {
+            return $value ? date('d M Y', strtotime($value)) : '-';
+        };
         $summary = [];
         $columns = [];
         $rows = [];
@@ -379,24 +403,38 @@ final class AdminController
         $financialDetails = [];
         $fin = null;
         if ($mode === 'company' || $mode === 'operational') {
+            $operationalTotals = Database::fetch(
+                "SELECT (SELECT COUNT(*) FROM vehicles) AS fleet_vehicles,
+                        (SELECT COUNT(*) FROM reservations r
+                         WHERE r.status IN ('confirmed','completed') AND r.pickup_datetime >= ? AND r.pickup_datetime < ?) AS confirmed_bookings,
+                        (SELECT COUNT(*) FROM rentals rt JOIN reservations r ON r.reservation_id=rt.reservation_id
+                         WHERE rt.status IN ('active','overdue','returned','inspected','closed')
+                           AND COALESCE(rt.actual_pickup_datetime,r.pickup_datetime) >= ?
+                           AND COALESCE(rt.actual_pickup_datetime,r.pickup_datetime) < ?) AS rental_activity",
+                [$rangeStart, $rangeEnd, $rangeStart, $rangeEnd]
+            ) ?? [];
+            $vehicleCount = (int) ($operationalTotals['fleet_vehicles'] ?? 0);
+            $offset = $setPage($vehicleCount);
             $vehicleRows = Database::fetchAll(
                 "SELECT v.registration_no, v.status,
-                    (SELECT COUNT(*) FROM reservations r WHERE r.vehicle_id=v.vehicle_id AND r.status IN ('confirmed','completed') AND DATE(r.pickup_datetime) BETWEEN ? AND ?) AS confirmed_bookings,
+                    (SELECT COUNT(*) FROM reservations r WHERE r.vehicle_id=v.vehicle_id AND r.status IN ('confirmed','completed') AND r.pickup_datetime >= ? AND r.pickup_datetime < ?) AS confirmed_bookings,
                     (SELECT COUNT(*) FROM rentals rt JOIN reservations r ON r.reservation_id=rt.reservation_id
                      WHERE rt.vehicle_id=v.vehicle_id AND rt.status IN ('active','overdue','returned','inspected','closed')
-                       AND DATE(COALESCE(rt.actual_pickup_datetime,r.pickup_datetime)) BETWEEN ? AND ?) AS live_rentals
-                 FROM vehicles v ORDER BY v.registration_no",
-                [$dateFrom, $dateTo, $dateFrom, $dateTo]
+                       AND COALESCE(rt.actual_pickup_datetime,r.pickup_datetime) >= ?
+                       AND COALESCE(rt.actual_pickup_datetime,r.pickup_datetime) < ?) AS rental_activity
+                 FROM vehicles v ORDER BY v.registration_no" . $limitForPage($offset),
+                [$rangeStart, $rangeEnd, $rangeStart, $rangeEnd]
             );
             $operationalSummary = [
-                ['label' => 'Fleet vehicles', 'value' => count($vehicleRows)],
-                ['label' => 'Confirmed bookings', 'value' => array_sum(array_map(static fn(array $row): int => (int) $row['confirmed_bookings'], $vehicleRows))],
-                ['label' => 'Rental activity', 'value' => array_sum(array_map(static fn(array $row): int => (int) $row['live_rentals'], $vehicleRows))],
+                ['label' => 'Fleet vehicles', 'value' => number_format($vehicleCount)],
+                ['label' => 'Confirmed or completed bookings', 'value' => number_format((int) ($operationalTotals['confirmed_bookings'] ?? 0))],
+                ['label' => 'Rental pickups', 'value' => number_format((int) ($operationalTotals['rental_activity'] ?? 0))],
             ];
             $summary = $operationalSummary;
-            $columns = ['Vehicle', 'Current status', 'Confirmed bookings', 'Rentals'];
+            $columns = ['Vehicle', 'Current status', 'Bookings', 'Rental pickups'];
             $rows = array_map(static fn(array $row): array => [
-                $row['registration_no'], $row['status'], $row['confirmed_bookings'], $row['live_rentals'],
+                $row['registration_no'], ucwords(str_replace('_', ' ', (string) $row['status'])),
+                number_format((int) $row['confirmed_bookings']), number_format((int) $row['rental_activity']),
             ], $vehicleRows);
             $emptyMessage = 'No vehicles are recorded.';
         }
@@ -411,28 +449,38 @@ final class AdminController
                     COALESCE(SUM(CASE WHEN transaction_type='adjustment' AND adjustment_direction='credit' AND status='completed' THEN amount END),0) AS adjustment_credits,
                     COALESCE(SUM(CASE WHEN transaction_type='adjustment' AND adjustment_direction='debit' AND status='completed' THEN amount END),0) AS adjustment_debits,
                     COALESCE(SUM(CASE WHEN status='awaiting_approval' THEN 1 ELSE 0 END),0) AS awaiting_approvals
-                 FROM financial_transactions WHERE DATE(transaction_date) BETWEEN ? AND ?",
-                [$dateFrom, $dateTo]
+                 FROM financial_transactions WHERE transaction_date >= ? AND transaction_date < ?",
+                [$rangeStart, $rangeEnd]
             );
+            $netPayments = (float) $fin['payments'] - (float) $fin['refunds'];
+            $netDeposits = (float) $fin['deposits'] - (float) $fin['deposit_deductions'] - (float) $fin['deposit_refunds'];
             $financialDetails = [
-                ['Deposits received', $fin['deposits']],
-                ['Deposit deductions', $fin['deposit_deductions']],
-                ['Deposit refunds', $fin['deposit_refunds']],
-                ['Invoice adjustment credits', $fin['adjustment_credits']],
-                ['Invoice adjustment debits', $fin['adjustment_debits']],
+                ['Completed payments', \Crms\Money::format($fin['payments'])],
+                ['Payment refunds', \Crms\Money::format($fin['refunds'])],
+                ['Net payments', \Crms\Money::format($netPayments)],
+                ['Deposits received', \Crms\Money::format($fin['deposits'])],
+                ['Deposit deductions', \Crms\Money::format($fin['deposit_deductions'])],
+                ['Deposit refunds', \Crms\Money::format($fin['deposit_refunds'])],
+                ['Net deposit movement', \Crms\Money::format($netDeposits)],
+                ['Invoice adjustment credits', \Crms\Money::format($fin['adjustment_credits'])],
+                ['Invoice adjustment debits', \Crms\Money::format($fin['adjustment_debits'])],
+                ['Approvals awaiting decision', number_format((int) $fin['awaiting_approvals'])],
             ];
             $financialSummary = [
                 ['label' => 'Completed payments', 'value' => \Crms\Money::format($fin['payments'])],
                 ['label' => 'Payment refunds', 'value' => \Crms\Money::format($fin['refunds'])],
-                ['label' => 'Net deposit movement', 'value' => \Crms\Money::format((float) $fin['deposits'] - (float) $fin['deposit_deductions'] - (float) $fin['deposit_refunds'])],
-                ['label' => 'Awaiting approval', 'value' => number_format((int) $fin['awaiting_approvals'])],
+                ['label' => 'Net payments', 'value' => \Crms\Money::format($netPayments)],
+                ['label' => 'Net deposit movement', 'value' => \Crms\Money::format($netDeposits)],
+                ['label' => 'Awaiting approvals', 'value' => number_format((int) $fin['awaiting_approvals'])],
             ];
             if ($mode === 'company') {
                 $summary = array_merge($summary, $financialSummary);
             } else {
                 $summary = $financialSummary;
                 $columns = ['Financial activity', 'Amount'];
-                $rows = array_map(static fn(array $detail): array => [$detail[0], \Crms\Money::format($detail[1])], $financialDetails);
+                $reportTotalRows = count($financialDetails);
+                $rows = array_map(static fn(array $detail): array => [$detail[0], $detail[1]], $financialDetails);
+                $reportPages = 1;
                 $emptyMessage = 'No financial activity was found for the selected period.';
             }
         }
@@ -446,22 +494,25 @@ final class AdminController
                 [$dateFrom, $dateTo]
             ) ?? [];
             $summary = [
-                ['label' => 'Maintenance jobs', 'value' => (int) ($maintenanceSummary['jobs'] ?? 0)],
-                ['label' => 'Open jobs', 'value' => (int) ($maintenanceSummary['open_jobs'] ?? 0)],
-                ['label' => 'Completed jobs', 'value' => (int) ($maintenanceSummary['completed_jobs'] ?? 0)],
+                ['label' => 'Maintenance jobs', 'value' => number_format((int) ($maintenanceSummary['jobs'] ?? 0))],
+                ['label' => 'Open jobs', 'value' => number_format((int) ($maintenanceSummary['open_jobs'] ?? 0))],
+                ['label' => 'Completed jobs', 'value' => number_format((int) ($maintenanceSummary['completed_jobs'] ?? 0))],
                 ['label' => 'Recorded costs', 'value' => \Crms\Money::format($maintenanceSummary['recorded_cost'] ?? 0)],
             ];
+            $maintenanceCount = Database::fetch('SELECT COUNT(*) AS total FROM maintenance_records WHERE start_date BETWEEN ? AND ?', [$dateFrom, $dateTo]);
+            $offset = $setPage((int) ($maintenanceCount['total'] ?? 0));
             $maintenanceRows = Database::fetchAll(
                 'SELECT m.maintenance_number, v.registration_no, m.maintenance_type, m.title, m.status,
                         m.start_date, m.expected_completion_date, m.completed_date
                  FROM maintenance_records m JOIN vehicles v ON v.vehicle_id=m.vehicle_id
-                 WHERE m.start_date BETWEEN ? AND ? ORDER BY m.start_date DESC, m.maintenance_id DESC LIMIT 300',
+                 WHERE m.start_date BETWEEN ? AND ? ORDER BY m.start_date DESC, m.maintenance_id DESC' . $limitForPage($offset),
                 [$dateFrom, $dateTo]
             );
             $columns = ['Job', 'Vehicle', 'Type', 'Work', 'Status', 'Started', 'Expected completion', 'Completed'];
             $rows = array_map(static fn(array $row): array => [
                 $row['maintenance_number'], $row['registration_no'], $row['maintenance_type'], $row['title'],
-                $row['status'], $row['start_date'], $row['expected_completion_date'] ?: '—', $row['completed_date'] ?: '—',
+                ucwords(str_replace('_', ' ', (string) $row['status'])), $formatDate($row['start_date']),
+                $formatDate($row['expected_completion_date']), $formatDate($row['completed_date']),
             ], $maintenanceRows);
             $emptyMessage = 'No maintenance jobs started in the selected period.';
         }
@@ -471,33 +522,40 @@ final class AdminController
                 "SELECT COUNT(*) AS reservations,
                         SUM(status='confirmed') AS approved,
                         SUM(status='rejected') AS rejected
-                 FROM reservations WHERE customer_id=? AND DATE(created_at) BETWEEN ? AND ?",
-                [$customerId, $dateFrom, $dateTo]
+                 FROM reservations WHERE customer_id=? AND created_at >= ? AND created_at < ?",
+                [$customerId, $rangeStart, $rangeEnd]
             ) ?? [];
             $paidRow = Database::fetch(
-                "SELECT COALESCE(SUM(amount),0) AS amount FROM financial_transactions
-                 WHERE customer_id=? AND transaction_type='payment' AND status='completed'
-                   AND DATE(transaction_date) BETWEEN ? AND ?",
-                [$customerId, $dateFrom, $dateTo]
+                "SELECT COALESCE(SUM(CASE WHEN transaction_type='payment' AND status='completed' THEN amount
+                                          WHEN transaction_type='payment_refund' AND status='completed' THEN -amount ELSE 0 END),0) AS amount
+                 FROM financial_transactions
+                 WHERE customer_id=? AND transaction_type IN ('payment','payment_refund') AND transaction_date >= ? AND transaction_date < ?",
+                [$customerId, $rangeStart, $rangeEnd]
             ) ?? [];
             $summary = [
-                ['label' => 'My reservations', 'value' => (int) ($customerSummary['reservations'] ?? 0)],
-                ['label' => 'Approved reservations', 'value' => (int) ($customerSummary['approved'] ?? 0)],
-                ['label' => 'Rejected reservations', 'value' => (int) ($customerSummary['rejected'] ?? 0)],
-                ['label' => 'Total paid', 'value' => \Crms\Money::format($paidRow['amount'] ?? 0)],
+                ['label' => 'My reservations', 'value' => number_format((int) ($customerSummary['reservations'] ?? 0))],
+                ['label' => 'Confirmed reservations', 'value' => number_format((int) ($customerSummary['approved'] ?? 0))],
+                ['label' => 'Rejected reservations', 'value' => number_format((int) ($customerSummary['rejected'] ?? 0))],
+                ['label' => 'Net payments', 'value' => \Crms\Money::format($paidRow['amount'] ?? 0)],
             ];
+            $customerCount = Database::fetch(
+                'SELECT COUNT(*) AS total FROM reservations WHERE customer_id=? AND created_at >= ? AND created_at < ?',
+                [$customerId, $rangeStart, $rangeEnd]
+            );
+            $offset = $setPage((int) ($customerCount['total'] ?? 0));
             $customerRows = Database::fetchAll(
                 'SELECT r.reservation_id, r.reservation_code, v.make, v.model, r.pickup_datetime, r.return_datetime, r.status, r.payment_status
                  FROM reservations r JOIN vehicles v ON v.vehicle_id=r.vehicle_id
-                 WHERE r.customer_id=? AND DATE(r.created_at) BETWEEN ? AND ?
-                 ORDER BY r.created_at DESC LIMIT 300',
-                [$customerId, $dateFrom, $dateTo]
+                 WHERE r.customer_id=? AND r.created_at >= ? AND r.created_at < ?
+                 ORDER BY r.created_at DESC, r.reservation_id DESC' . $limitForPage($offset),
+                [$customerId, $rangeStart, $rangeEnd]
             );
             $columns = ['Reservation', 'Vehicle', 'Pickup', 'Return', 'Reservation status', 'Payment status'];
             $rows = array_map(static fn(array $row): array => [
-                $row['reservation_code'], $row['make'] . ' ' . $row['model'], $row['pickup_datetime'],
-                $row['return_datetime'], \Crms\Ui::reservationStatusLabel((string) $row['status'], (string) $row['payment_status']),
-                ucfirst((string) $row['payment_status']), '_reservation_id' => (int) $row['reservation_id'],
+                $row['reservation_code'], $row['make'] . ' ' . $row['model'],
+                $formatDateTime($row['pickup_datetime']), $formatDateTime($row['return_datetime']),
+                \Crms\Ui::reservationStatusLabel((string) $row['status'], (string) $row['payment_status']),
+                ucwords(str_replace('_', ' ', (string) $row['payment_status'])), '_reservation_id' => (int) $row['reservation_id'],
             ], $customerRows);
             $emptyMessage = 'You have no reservations created during the selected period.';
         }
@@ -506,30 +564,41 @@ final class AdminController
             $driverId = (int) ($driver['driver_id'] ?? 0);
             $driverSummary = $driverId ? (Database::fetch(
                 "SELECT COUNT(*) AS trips,
-                        SUM(da.trip_status='completed') AS completed,
-                        SUM(da.trip_status='delayed') AS delayed_trips
+                        COALESCE(SUM(da.trip_status='completed'),0) AS completed,
+                        COALESCE(SUM(da.trip_status='delayed'),0) AS delayed_trips
                  FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
-                 WHERE da.driver_id=? AND DATE(r.pickup_datetime) BETWEEN ? AND ?",
-                [$driverId, $dateFrom, $dateTo]
+                 WHERE da.driver_id=? AND r.status IN ('pending','confirmed','completed')
+                   AND r.pickup_datetime >= ? AND r.pickup_datetime < ?",
+                [$driverId, $rangeStart, $rangeEnd]
             ) ?? []) : [];
             $summary = [
-                ['label' => 'Assigned trips', 'value' => (int) ($driverSummary['trips'] ?? 0)],
-                ['label' => 'Completed trips', 'value' => (int) ($driverSummary['completed'] ?? 0)],
-                ['label' => 'Delayed trips', 'value' => (int) ($driverSummary['delayed_trips'] ?? 0)],
+                ['label' => 'Assigned trips', 'value' => number_format((int) ($driverSummary['trips'] ?? 0))],
+                ['label' => 'Completed trips', 'value' => number_format((int) ($driverSummary['completed'] ?? 0))],
+                ['label' => 'Delayed trips', 'value' => number_format((int) ($driverSummary['delayed_trips'] ?? 0))],
             ];
+            $driverCount = $driverId ? Database::fetch(
+                "SELECT COUNT(*) AS total FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
+                 WHERE da.driver_id=? AND r.status IN ('pending','confirmed','completed')
+                   AND r.pickup_datetime >= ? AND r.pickup_datetime < ?",
+                [$driverId, $rangeStart, $rangeEnd]
+            ) : ['total' => 0];
+            $offset = $setPage((int) ($driverCount['total'] ?? 0));
             $driverRows = $driverId ? Database::fetchAll(
                 'SELECT r.reservation_code, r.pickup_datetime, r.return_datetime, r.status AS reservation_status,
                         da.trip_status, v.registration_no, v.make, v.model
                  FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
                  JOIN vehicles v ON v.vehicle_id=r.vehicle_id
-                 WHERE da.driver_id=? AND DATE(r.pickup_datetime) BETWEEN ? AND ?
-                 ORDER BY r.pickup_datetime DESC LIMIT 300',
-                [$driverId, $dateFrom, $dateTo]
+                 WHERE da.driver_id=? AND r.status IN ('pending','confirmed','completed')
+                   AND r.pickup_datetime >= ? AND r.pickup_datetime < ?
+                 ORDER BY r.pickup_datetime DESC, da.assignment_id DESC' . $limitForPage($offset),
+                [$driverId, $rangeStart, $rangeEnd]
             ) : [];
             $columns = ['Reservation', 'Pickup', 'Return', 'Vehicle', 'Trip status', 'Reservation status'];
             $rows = array_map(static fn(array $row): array => [
-                $row['reservation_code'], $row['pickup_datetime'], $row['return_datetime'],
-                $row['registration_no'] . ' — ' . $row['make'] . ' ' . $row['model'], $row['trip_status'], $row['reservation_status'],
+                $row['reservation_code'], $formatDateTime($row['pickup_datetime']), $formatDateTime($row['return_datetime']),
+                $row['registration_no'] . ' - ' . $row['make'] . ' ' . $row['model'],
+                ucwords(str_replace('_', ' ', (string) $row['trip_status'])),
+                ucwords(str_replace('_', ' ', (string) $row['reservation_status'])),
             ], $driverRows);
             $emptyMessage = $driverId ? 'No assigned trips were found for the selected period.' : 'Your driver profile is not linked to this account.';
         }
@@ -538,26 +607,27 @@ final class AdminController
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="' . $filename . '"');
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Report', $mode, $dateFrom, $dateTo]);
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, array_map([ReportExportService::class, 'csvSafeCell'], ['Report', $mode, $dateFrom, $dateTo]));
             if ($summary) {
                 fputcsv($out, []);
                 fputcsv($out, ['Summary', 'Value']);
                 foreach ($summary as $item) {
-                    fputcsv($out, [$item['label'], $item['value']]);
+                    fputcsv($out, array_map([ReportExportService::class, 'csvSafeCell'], [$item['label'], $item['value']]));
                 }
             }
             if ($columns) {
                 fputcsv($out, []);
-                fputcsv($out, $columns);
+                fputcsv($out, array_map([ReportExportService::class, 'csvSafeCell'], $columns));
                 foreach ($rows as $row) {
-                    fputcsv($out, array_slice($row, 0, count($columns)));
+                    fputcsv($out, array_map([ReportExportService::class, 'csvSafeCell'], array_slice($row, 0, count($columns))));
                 }
             }
             if ($mode === 'company' && $financialDetails) {
                 fputcsv($out, []);
                 fputcsv($out, ['Financial detail', 'Amount']);
                 foreach ($financialDetails as [$label, $amount]) {
-                    fputcsv($out, [$label, \Crms\Money::format($amount)]);
+                    fputcsv($out, array_map([ReportExportService::class, 'csvSafeCell'], [$label, $amount]));
                 }
             }
             fclose($out);
@@ -567,11 +637,19 @@ final class AdminController
             'company' => 'Company reports', 'operational' => 'Fleet activity report', 'financial' => 'Financial reports',
             'maintenance' => 'Maintenance reports', 'customer' => 'My reservation report', 'driver' => 'My trip report',
         ];
+        $modeLabels = [
+            'company' => 'Company-wide', 'operational' => 'Fleet operations', 'financial' => 'Finance',
+            'maintenance' => 'Maintenance', 'customer' => 'Personal', 'driver' => 'Driver activity',
+        ];
+        $reportPages = max(1, $reportPages);
         View::render('admin/reports', [
             'title' => $titles[$mode] ?? 'Reports', 'reportMode' => $mode, 'summary' => $summary,
             'columns' => $columns, 'rows' => $rows, 'emptyMessage' => $emptyMessage,
             'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'financialDetails' => $financialDetails,
-            'reportPrint' => true, 'autoPrintReport' => Http::str('print') === '1',
+            'reportModeLabel' => $modeLabels[$mode] ?? 'Reports',
+            'reportPage' => $reportPage, 'reportPages' => $reportPages, 'reportTotalRows' => $reportTotalRows,
+            'pageSize' => $pageSize, 'generatedAt' => date('d M Y, H:i'),
+            'reportPrint' => true, 'autoPrintReport' => Http::str('print') === '1', 'isFullReportOutput' => $isFullOutput,
         ]);
     }
 }
