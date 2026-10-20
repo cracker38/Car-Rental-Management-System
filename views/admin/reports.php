@@ -1,4 +1,4 @@
-<form method="get" class="report-filters panel mb-4">
+<form method="get" action="<?= e(url('reports')) ?>" class="report-filters panel mb-4">
   <input type="hidden" name="r" value="reports">
   <div class="panel-h">Reporting period</div>
   <div class="row g-3 align-items-end">

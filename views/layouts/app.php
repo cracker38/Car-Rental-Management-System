@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="<?= e(asset('public/css/app.css')) ?>" rel="stylesheet">
+  <link href="<?= e(asset('public/css/app.css') . '?v=' . (string) filemtime(dirname(__DIR__, 2) . '/public/css/app.css')) ?>" rel="stylesheet">
 </head>
 <?php $isSystemAdmin = ($user['role_name'] ?? '') === 'System Administrator'; ?>
 <body class="site-body app-body<?= $isSystemAdmin ? ' admin-workspace' : '' ?><?= !empty($printAgreement) ? ' rental-agreement-print' : '' ?><?= !empty($reportPrint) ? ' report-print' : '' ?>">

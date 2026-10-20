@@ -156,14 +156,6 @@ final class DashboardService
                 'Reconcile payment records',
                 'Generate revenue, payment, deposit and refund reports',
             ],
-            'Vehicle Inspector/Maintenance Staff' => [
-                'View vehicles currently held in maintenance and their service records',
-                'Update maintenance job progress and completion details',
-                'Choose whether a vehicle is ready for service or must remain on a safety hold',
-                'Record an inspection note for every vehicle readiness decision',
-                'Release a vehicle only after all open maintenance jobs are resolved',
-                'Do not manage rental schedules, reservations, or driver assignments',
-            ],
             'Customer' => [
                 'Register an account and log in securely',
                 'Update permitted personal and contact information',
@@ -196,7 +188,6 @@ final class DashboardService
             'System Administrator' => 'Do not automatically approve financial transactions or refunds. Approve them only when explicitly authorized by business policy.',
             'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
-            'Vehicle Inspector/Maintenance Staff' => 'Must not delete financial transactions or confirm rentals unless specifically authorized.',
             'Customer' => 'You can only access your own account, reservations, rentals and financial records. Changing a URL or record ID cannot show another customer’s records.',
             'Driver' => 'You cannot see other drivers\' private records, all customer accounts, financial reports or unassigned trips.',
             default => '',

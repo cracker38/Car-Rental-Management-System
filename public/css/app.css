@@ -774,10 +774,15 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
   .app-shell > .sidebar, .app-topbar, .app-offcanvas, .report-toolbar, .alert, .dashboard-heading-actions { display: none !important; }
   .app-shell { display: block !important; }
   .app-content { padding: 0 !important; }
-  body.report-print .app-shell { min-height: 0 !important; }
+  body.report-print .app-shell,
+  body.report-print .app-main,
+  body.report-print .app-content { display: block !important; width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+  body.report-print * { visibility: hidden !important; }
+  body.report-print .report-print-area,
+  body.report-print .report-print-area * { visibility: visible !important; }
   body.report-print .app-content > :not(.report-print-area) { display: none !important; }
-  body.report-print .report-print-area { display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; }
-  body.report-print .report-print-area .panel { box-shadow: none !important; break-inside: avoid-page; }
+  body.report-print .report-print-area { position: static !important; display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+  body.report-print .report-print-area .panel { box-shadow: none !important; break-inside: auto !important; page-break-inside: auto !important; }
   body.report-print .report-print-area .table-responsive { overflow: visible !important; }
   body.report-print .report-print-area thead { display: table-header-group; }
   body.report-print .report-print-area tr { break-inside: avoid; page-break-inside: avoid; }
