@@ -435,6 +435,7 @@ INSERT IGNORE INTO permissions (permission_key,description) VALUES
  ('transactions.view','View payment and refund records'),('transactions.manage','Record payments, refunds and deposits'),
  ('transactions.approve','Approve or reject refund and financial adjustment requests'),
  ('maintenance.view','View maintenance records'),('maintenance.manage','Manage maintenance'),
+ ('maintenance.schedule','Schedule maintenance work'),
  ('inspections.manage','Record vehicle inspections'),('reports.operational','View operational reports'),
  ('reports.financial','View financial reports'),('notifications.manage','Manage notifications'),
  ('audit.view','Review audit logs'),('settings.manage','Manage system settings');
@@ -451,8 +452,14 @@ WHERE r.role_name='System Administrator';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
-('vehicles.view','vehicles.manage','customers.view','customers.manage','reservations.view','rentals.manage','invoices.view','reports.operational','reports.financial','maintenance.manage','inspections.manage','transactions.approve')
+('vehicles.view','vehicles.manage','customers.view','customers.manage','reservations.view','rentals.manage','invoices.view','reports.operational','reports.financial','maintenance.view','inspections.manage','transactions.approve')
 WHERE r.role_name='Business Manager';
+
+DELETE FROM role_permissions
+WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Business Manager')
+  AND permission_id IN (
+    SELECT permission_id FROM permissions WHERE permission_key IN ('maintenance.manage','maintenance.schedule')
+  );
 
 DELETE FROM role_permissions
 WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Business Manager')
@@ -460,7 +467,7 @@ WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Business Manager')
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
-('vehicles.view','vehicles.manage','customers.view','customers.manage','reservations.view','reservations.manage','reservations.decide','rentals.manage')
+('vehicles.view','vehicles.manage','customers.view','customers.manage','reservations.view','reservations.manage','reservations.decide','rentals.manage','maintenance.view','maintenance.schedule')
 WHERE r.role_name='Rental Officer';
 
 DELETE FROM role_permissions
@@ -474,14 +481,14 @@ WHERE r.role_name='Accountant/Cashier';
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)
 SELECT r.role_id,p.permission_id FROM roles r JOIN permissions p ON p.permission_key IN
-('vehicles.view','maintenance.manage')
+('vehicles.view','maintenance.view','maintenance.manage','maintenance.schedule')
 WHERE r.role_name='Vehicle Inspector/Maintenance Staff';
 
 DELETE FROM role_permissions
 WHERE role_id IN (SELECT role_id FROM roles WHERE role_name='Vehicle Inspector/Maintenance Staff')
   AND permission_id NOT IN (
     SELECT permission_id FROM permissions WHERE permission_key IN
-      ('vehicles.view','maintenance.manage')
+      ('vehicles.view','maintenance.view','maintenance.manage','maintenance.schedule')
   );
 
 INSERT IGNORE INTO role_permissions (role_id,permission_id)

@@ -89,7 +89,7 @@ $maxRevenue = max(1, ...array_column($trends, 'revenue'));
       <?php foreach ($fleet as $item): ?>
         <div class="mini-row d-flex justify-content-between align-items-center"><span><?= status_badge((string) $item['status']) ?></span><strong><?= number_format((int) $item['c']) ?></strong></div>
       <?php endforeach; ?>
-      <div class="manager-subsection-heading">Maintenance alerts <a class="small fw-normal" href="<?= e(url('maintenance')) ?>">View records</a></div>
+      <div class="manager-subsection-heading">Maintenance alerts <a class="small fw-normal" href="<?= e(url('maintenance')) ?>">View inspector report</a></div>
       <?php if (!$maintAlerts): ?><p class="small text-muted mb-0">No scheduled or in-progress maintenance alerts.</p><?php else: ?>
         <?php foreach ($maintAlerts as $alert): ?><div class="mini-row"><span class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($alert['image_path'] ?? null, $alert['category_name'] ?? null)) ?>" alt="<?= e($alert['make'] . ' ' . $alert['model']) ?>"><strong><?= e($alert['registration_no']) ?></strong></span><span><?= e($alert['title']) ?> &middot; <?= e(ucwords(str_replace('_', ' ', $alert['status']))) ?></span></div><?php endforeach; ?>
       <?php endif; ?>

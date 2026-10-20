@@ -1,5 +1,8 @@
 <?php if (!empty($inspectorMode)): ?>
-  <p class="lead-muted mb-3">This view is limited to vehicles currently held for maintenance. Inspectors can close service work and record a signed-off readiness decision; rental scheduling is managed by operations staff.</p>
+  <p class="lead-muted mb-3">This view is limited to vehicles currently held for maintenance. Inspectors can schedule work, update job progress, and record a signed-off readiness decision.</p>
+<?php endif; ?>
+<?php if (!empty($managerMode)): ?>
+  <p class="lead-muted mb-3">Read-only inspector report for vehicles currently held in maintenance. Scheduling and service updates are handled by authorized staff.</p>
 <?php endif; ?>
 <?php if (!empty($canSchedule)): ?>
 <form method="post" class="panel mb-4">

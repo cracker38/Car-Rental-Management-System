@@ -15,14 +15,21 @@ final class MaintenanceController
 {
     public function index(): void
     {
-        $inspectorMode = (Auth::user()['role_name'] ?? '') === 'Vehicle Inspector/Maintenance Staff';
-        $canManage = Rbac::can('maintenance.manage');
-        $canSchedule = $canManage && !$inspectorMode;
-        if (!$canManage) {
+        $role = (string) (Auth::user()['role_name'] ?? '');
+        $inspectorMode = $role === 'Vehicle Inspector/Maintenance Staff';
+        $managerMode = $role === 'Business Manager';
+        $canManage = Rbac::can('maintenance.manage') && !$managerMode;
+        $canSchedule = Rbac::can('maintenance.schedule') && !$managerMode;
+        if (!$canManage && !$canSchedule) {
             Rbac::require('maintenance.view');
         }
         if (Http::isPost()) {
-            Rbac::require('maintenance.manage');
+            if ($managerMode) {
+                http_response_code(403);
+                View::render('errors/403', ['title' => 'Forbidden']);
+                return;
+            }
+            Rbac::require(Http::str('action') === 'create' ? 'maintenance.schedule' : 'maintenance.manage');
         }
         if (Http::isPost() && Http::str('action') === 'create') {
             if (!$canSchedule) {
@@ -75,7 +82,7 @@ final class MaintenanceController
             }
             Http::redirect('maintenance');
         }
-        $vehicleScope = $inspectorMode ? " WHERE v.status = 'maintenance'" : '';
+        $vehicleScope = ($inspectorMode || $managerMode) ? " WHERE v.status = 'maintenance'" : '';
         $rows = Database::fetchAll(
             'SELECT m.*, v.registration_no FROM maintenance_records m
              JOIN vehicles v ON v.vehicle_id = m.vehicle_id' . $vehicleScope . ' ORDER BY
@@ -96,6 +103,7 @@ final class MaintenanceController
             'canManage' => $canManage,
             'canSchedule' => $canSchedule,
             'inspectorMode' => $inspectorMode,
+            'managerMode' => $managerMode,
         ]);
     }
 }
