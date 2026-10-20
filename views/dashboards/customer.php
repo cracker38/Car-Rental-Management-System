@@ -66,6 +66,10 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
                 <div class="col-6">
                   <input id="invoice-phone-<?= (int) $invoice['invoice_id'] ?>" class="form-control form-control-sm" type="tel" name="phone" value="<?= e((string) ($invoice['phone'] ?? '')) ?>" placeholder="07xxxxxxxx" inputmode="tel" required>
                 </div>
+                <div class="col-12">
+                  <label class="form-label small mb-1" for="invoice-provider-<?= (int) $invoice['invoice_id'] ?>">Mobile network</label>
+                  <select id="invoice-provider-<?= (int) $invoice['invoice_id'] ?>" class="form-select form-select-sm" name="provider" required><option value="">Choose network</option><option value="MTN_MOMO_RWA">MTN</option><option value="AIRTEL_RWA">Airtel</option></select>
+                </div>
                 <div class="col-6">
                   <label class="form-label small mb-1" for="invoice-amount-<?= (int) $invoice['invoice_id'] ?>">Amount (RWF)</label>
                   <input id="invoice-amount-<?= (int) $invoice['invoice_id'] ?>" class="form-control form-control-sm" type="number" name="amount" min="1" step="1" max="<?= (int) floor($paymentRequestable) ?>" value="<?= (int) floor($paymentRequestable) ?>" required>

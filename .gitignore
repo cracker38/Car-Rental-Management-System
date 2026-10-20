@@ -1,4 +1,5 @@
 /config/hdev.local.php
+/config/pawapay.local.php
 /config/mail.local.php
 /storage/backups/*.sql
 /storage/backups/*.tmp

@@ -7,7 +7,7 @@
 3. Select **Book this car**, review the details, and draw your signature before submitting. The system checks dates and pricing again on the server. Every request starts as pending approval.
 4. Open **My trips** to review a reservation and its persisted notifications. You can edit a pending request or cancel an eligible pending or approved reservation.
 5. A Rental Officer reviews the signed request and records an approval or rejection with a note and signature. Managers can view the request and its signatures. If approved, the booking invoice and Mobile Money option become available. Rejected and pending requests cannot be paid.
-6. Pay with the configured HDEV Mobile Money flow or contact staff to record another payment. HDEV status is checked on the backend; a browser message alone never marks an invoice paid. The reservation is shown as paid only when its booking invoice balance is settled.
+6. Pay with the configured PawaPay Mobile Money flow: enter the payer's phone number, choose MTN or Airtel, then approve the prompt on that phone. PawaPay status is checked on the backend; a browser message alone never marks an invoice paid. The reservation is shown as paid only when its booking invoice balance is settled.
 7. Completed payments and deposit transactions have a **Receipt** link. Use **Print receipt** to print or save it as a PDF in the browser.
 
 ## Rental and handover workflow for staff

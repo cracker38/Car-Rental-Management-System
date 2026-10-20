@@ -1,6 +1,6 @@
 <?php $canManageTransactions = can('transactions.manage'); ?>
 <div class="page-toolbar">
-  <p class="text-muted mb-0">Mobile Money payments wait for HDEV confirmation. Refunds and adjustments need independent approval; reconcile completed entries against their bank or receipt records.</p>
+  <p class="text-muted mb-0">Mobile Money payments wait for provider confirmation. Refunds and adjustments need independent approval; reconcile completed entries against their bank or receipt records.</p>
   <?php if (can('transactions.approve')): ?><a class="btn btn-outline-dark" href="<?= e(url('finance/approvals')) ?>">Review finance approvals</a><?php endif; ?>
   <?php if ($canManageTransactions): ?><a class="btn btn-primary" href="<?= e(url('finance/form')) ?>">Post transaction</a><?php endif; ?>
 </div>

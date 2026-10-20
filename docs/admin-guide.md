@@ -5,7 +5,7 @@
 1. Configure the database connection in `config/database.php` or with the `CRMS_DB_*` environment variables.
 2. Open `install.php` once. It applies the additive schema and seed data; it does not drop existing tables. If the database is empty, it creates a starter administrator and sample fleet. After a successful setup, the installer creates `storage/install.lock` and returns 404 on later visits.
 3. Sign in with the credentials shown by the installer and change the starter password immediately. For a planned installer maintenance run, remove `storage/install.lock`, perform the work, and confirm the lock is recreated.
-4. In **Settings**, enter the business name, tax rate, deposit amount, turnaround buffer, mileage/late fees, and HDEV callback/SMS settings as applicable. HDEV SMS requires its own API ID and key, configured as `HDEV_SMS_API_ID` and `HDEV_SMS_API_KEY` in the server environment or as `sms_api_id` and `sms_api_key` in the ignored `config/hdev.local.php` file. Payment credentials do not configure SMS.
+4. In **Settings**, enter the business name, tax rate, deposit amount, turnaround buffer, mileage/late fees, and HDEV SMS settings as applicable. HDEV SMS requires its own API ID and key, configured as `HDEV_SMS_API_ID` and `HDEV_SMS_API_KEY` in the server environment or as `sms_api_id` and `sms_api_key` in the ignored `config/hdev.local.php` file. PawaPay payment credentials do not configure SMS.
 
 ## Accounts and permissions
 
@@ -39,4 +39,4 @@ Create a second daily task at the business's preferred reminder time using the s
 - **Reports** accepts a start and end date and supports CSV export and browser print/save-to-PDF. Financial totals use transaction date; fleet bookings and rentals use their pick-up date.
 - **Audit log** records important account, reservation, fleet, finance, and administrative actions.
 - Configure HTTPS and secure database credentials in production. Restrict the installer and backup directory from public downloads.
-- Enable HDEV SMS/MoMo only after valid credentials and a public HTTPS callback are configured. Settlement rechecks the HDEV transaction reference server-side; test with the provider's sandbox/account before using live payments.
+- Configure PawaPay with `PAWAPAY_BASE_URL` and `PAWAPAY_API_TOKEN` on the server, or use the ignored `config/pawapay.local.php` for local development. The live endpoint is `https://api.pawapay.io`; payment settlement is verified server-side by deposit ID. HDEV SMS is a separate service and needs its own credentials.

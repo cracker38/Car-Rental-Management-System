@@ -13,7 +13,7 @@ Use this checklist for onboarding. Practice first with sample records or a non-p
 
 - Issue an invoice and explain the outstanding balance.
 - Record a payment, deposit, refund, or deduction with its payment method and provider reference.
-- Check that a pending MoMo payment is not treated as complete until HDEV confirms it.
+- Check that a pending Mobile Money payment is not treated as complete until PawaPay confirms it.
 - Open and print the completed transaction receipt; use a new ledger entry to correct an error.
 
 ## Inspector/Maintenance Staff

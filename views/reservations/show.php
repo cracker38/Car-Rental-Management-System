@@ -156,11 +156,12 @@ $signedApprovalComplete = $row['status'] === 'confirmed'
       <input type="hidden" name="reservation_id" value="<?= (int) $row['reservation_id'] ?>">
       <input type="hidden" name="transaction_type" value="deposit_received">
       <input type="hidden" name="amount" value="<?= e((string) (int) round($depositSummary['requestable'])) ?>">
-      <p class="small text-muted">Pay the remaining security deposit with MTN or Airtel Mobile Money. HDEV must confirm it before a rental agreement can be issued or the vehicle picked up. The quoted hire charge is paid through the rental prepayment invoice above.</p>
+      <p class="small text-muted">Pay the remaining security deposit with MTN or Airtel Mobile Money. PawaPay must confirm it before a rental agreement can be issued or the vehicle picked up. The quoted hire charge is paid through the rental prepayment invoice above.</p>
       <div class="row g-2 align-items-end">
-        <div class="col-md-5"><label class="form-label" for="booking-momo-phone">MoMo phone</label><input class="form-control" id="booking-momo-phone" name="phone" required value="<?= e((string) $row['phone']) ?>" placeholder="07xxxxxxxx" inputmode="tel"></div>
-        <div class="col-md-4"><label class="form-label">Amount due</label><input class="form-control" value="<?= e(\Crms\Money::format($depositSummary['requestable'])) ?>" readonly></div>
-        <div class="col-md-3 d-grid"><button class="btn btn-primary">Pay booking deposit</button></div>
+        <div class="col-md-4"><label class="form-label" for="booking-momo-phone">MoMo phone</label><input class="form-control" id="booking-momo-phone" name="phone" required value="<?= e((string) $row['phone']) ?>" placeholder="07xxxxxxxx" inputmode="tel"></div>
+        <div class="col-md-3"><label class="form-label" for="booking-momo-provider">Mobile network</label><select class="form-select" id="booking-momo-provider" name="provider" required><option value="">Choose network</option><option value="MTN_MOMO_RWA">MTN</option><option value="AIRTEL_RWA">Airtel</option></select></div>
+        <div class="col-md-3"><label class="form-label">Amount due</label><input class="form-control" value="<?= e(\Crms\Money::format($depositSummary['requestable'])) ?>" readonly></div>
+        <div class="col-md-2 d-grid"><button class="btn btn-primary">Pay booking deposit</button></div>
       </div>
     </form>
   <?php elseif ($depositSummary['requestable'] > 0 && !$signedApprovalComplete): ?>

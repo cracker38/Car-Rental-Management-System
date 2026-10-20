@@ -67,9 +67,9 @@
   <div class="col-lg-6">
     <form method="post" action="<?= e(url('payments/momo')) ?>" class="panel momo-card">
       <?= \Crms\Csrf::field() ?>
-      <p class="eyebrow">HDEV</p>
+      <p class="eyebrow">PawaPay</p>
       <h2 class="h4">Request Mobile Money</h2>
-      <p class="text-muted">Creates a pending ledger row. Completes only after the customer approves the prompt and HDEV confirms.</p>
+      <p class="text-muted">Creates a pending ledger row. It completes after the customer approves the prompt and PawaPay confirms.</p>
       <?php if ($invoice): ?>
         <input type="hidden" name="invoice_id" value="<?= (int)$invoice['invoice_id'] ?>">
         <input type="hidden" name="customer_id" value="<?= (int)$invoice['customer_id'] ?>">
@@ -97,6 +97,7 @@
         </select>
       </div>
       <div class="mb-3"><label class="form-label">MoMo phone</label><input class="form-control" name="phone" required placeholder="07xxxxxxxx" inputmode="tel"></div>
+      <div class="mb-3"><label class="form-label">Mobile network</label><select class="form-select" name="provider" required><option value="">Choose network</option><option value="MTN_MOMO_RWA">MTN</option><option value="AIRTEL_RWA">Airtel</option></select></div>
       <div class="mb-3"><label class="form-label">Amount (RWF)</label><input class="form-control" name="amount" required value="<?= e((string)((int)($invoice['outstanding_balance'] ?? 0))) ?>"></div>
       <button class="btn btn-primary">Send MoMo prompt</button>
     </form>

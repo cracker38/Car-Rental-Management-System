@@ -6,8 +6,9 @@ A server-rendered PHP/MySQL car rental system for fleet availability, reservatio
 
 1. Configure the database in `config/database.php` or set `CRMS_DB_HOST`, `CRMS_DB_PORT`, `CRMS_DB_NAME`, `CRMS_DB_USER`, and `CRMS_DB_PASS`.
 2. Open `install.php` once. It applies the additive database schema and seed records, then locks itself with `storage/install.lock`. Change the starter administrator password after setup.
-3. Configure business pricing, tax, deposits, turnaround time, and optional HDEV settings under **Settings**.
-4. To send notification emails through Gmail, copy `config/mail.local.php.example` to `config/mail.local.php`, then enter the Gmail address and Google app password. The account needs 2-Step Verification for an app password; see [Google's app password instructions](https://support.google.com/accounts/answer/185833). The local file is ignored by Git. Emails are recorded with sent or failed status. Run `C:\xampp\php\php.exe scripts\send_test_email.php recipient@example.com` to send a delivery check.
+3. Configure business pricing, tax, deposits, turnaround time, and optional HDEV SMS settings under **Settings**.
+4. Configure PawaPay payments with `PAWAPAY_BASE_URL` and `PAWAPAY_API_TOKEN` on the server, or use the ignored `config/pawapay.local.php` file for local development. Select the payer's Rwanda mobile network when requesting payment.
+5. To send notification emails through Gmail, copy `config/mail.local.php.example` to `config/mail.local.php`, then enter the Gmail address and Google app password. The account needs 2-Step Verification for an app password; see [Google's app password instructions](https://support.google.com/accounts/answer/185833). The local file is ignored by Git. Emails are recorded with sent or failed status. Run `C:\xampp\php\php.exe scripts\send_test_email.php recipient@example.com` to send a delivery check.
 
 See [the administrator guide](docs/admin-guide.md) for setup and recovery details.
 
@@ -23,14 +24,14 @@ For recurring backups on Windows, schedule `C:\xampp\php\php.exe` with argument 
 ## Main workflows
 
 - Search live availability by dates, category, vehicle, fuel, transmission, and price.
-- Submit signed reservations for staff approval, then pay approved booking invoices through verified HDEV MoMo settlement.
+- Submit signed reservations for staff approval, then pay approved booking invoices through verified PawaPay Mobile Money settlement.
 - Create rental agreements and record vehicle pickup, return, inspection, mileage, and fuel.
 - Maintain invoices and an append-only payment/deposit/refund ledger with printable receipts.
 - Manage maintenance blocks, driver records, chauffeur assignments, notifications, reports, audit logs, and SQL backup exports.
 - Export date-filtered reports as CSV or print/save them as PDF from the browser.
 - Send scheduled upcoming-return, overdue-return, and payment-due reminders through in-app notifications and configured email.
 
-Reports provide date-filtered summaries, CSV exports, and browser print/save-to-PDF. Scheduled SQL backups are available through `scripts/backup.php`; restore remains a manual, rehearsed operation into a separate database. HDEV payment and SMS features require provider configuration.
+Reports provide date-filtered summaries, CSV exports, and browser print/save-to-PDF. Scheduled SQL backups are available through `scripts/backup.php`; restore remains a manual, rehearsed operation into a separate database. PawaPay payments require a production token and HDEV SMS requires separate HDEV SMS credentials.
 
 ## Requirements traceability
 

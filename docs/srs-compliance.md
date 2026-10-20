@@ -72,7 +72,8 @@ flowchart LR
     Driver[Driver] -->|Assigned trip updates| CRMS
     CRMS <--> DB[(MySQL / MariaDB database)]
     CRMS -->|Configured email| SMTP[Gmail SMTP]
-    CRMS <--> |Configured payment and SMS APIs| HDEV[HDEV services]
+    CRMS <--> |Mobile Money deposits| PawaPay[PawaPay API]
+    CRMS <--> |SMS notifications| HDEV[HDEV SMS service]
     Admin[Administrator / scheduled task] -->|SQL backup job| CRMS
 ```
 
@@ -168,7 +169,7 @@ Both figures remain planning estimates and require review against current suppli
 ## 9. Deployment actions before production sign-off
 
 1. Serve the application over HTTPS and set secure database credentials outside source control.
-2. Configure Gmail SMTP and, if used, HDEV payment/SMS credentials and a public HTTPS callback; verify each provider independently.
+2. Configure Gmail SMTP and, if used, PawaPay payment credentials and HDEV SMS credentials; verify each provider independently.
 3. Schedule `scripts/backup.php` daily with Windows Task Scheduler or the host's scheduler. The default retention is 30 days; set `CRMS_BACKUP_RETENTION_DAYS` to change it. Schedule `scripts/reminders.php` daily to deliver due-return and payment reminders.
 4. Copy SQL exports, uploaded vehicle photographs, and required configuration to storage outside the application host. The SQL export does not include uploaded files or secrets.
 5. Rehearse a restore into a separate database, validate representative records and attachments, and document the recovery time.

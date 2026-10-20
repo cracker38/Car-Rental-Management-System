@@ -8,6 +8,7 @@ use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
 use Crms\Services\HdevPaymentService;
+use Crms\Services\PawaPayPaymentService;
 use InvalidArgumentException;
 
 final class PaymentController
@@ -63,7 +64,7 @@ final class PaymentController
         }
 
         try {
-            $row = (new HdevPaymentService())->initiate([
+            $row = (new PawaPayPaymentService())->initiate([
                 'customer_id' => $customerId,
                 'invoice_id' => $invoiceId ?: null,
                 'reservation_id' => $reservationId ?: null,
@@ -71,15 +72,16 @@ final class PaymentController
                 'transaction_type' => Http::str('transaction_type') ?: 'payment',
                 'amount' => Http::str('amount'),
                 'phone' => Http::str('phone'),
-                'reason' => Http::str('reason') ?: 'HDEV mobile money',
+                'provider' => Http::str('provider'),
+                'reason' => Http::str('reason') ?: 'PawaPay mobile money',
             ]);
-            (new HdevPaymentService())->notifyIfCompleted(['status' => 'pending'], $row);
+            (new PawaPayPaymentService())->notifyIfCompleted(['status' => 'pending'], $row);
             if (($row['status'] ?? '') === 'completed') {
                 Http::flash('success', $reservationId ? 'Security deposit confirmed. The ledger is up to date.' : 'Mobile Money payment confirmed. The invoice and ledger are up to date.');
             } elseif (($row['status'] ?? '') === 'failed') {
-                Http::flash('danger', 'HDEV rejected or failed the request. Check the phone number and try again.');
+                Http::flash('danger', 'PawaPay rejected or failed the request. Check the phone number and selected network.');
             } else {
-                Http::flash('success', 'Approve the MoMo prompt on the phone. This page will refresh when HDEV confirms. Ref ' . ($row['external_reference'] ?? ''));
+                Http::flash('success', 'Approve the Mobile Money prompt on the phone. This page will refresh when PawaPay confirms. Ref ' . ($row['external_reference'] ?? ''));
             }
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
@@ -115,14 +117,14 @@ final class PaymentController
             return;
         }
         try {
-            $service = new HdevPaymentService();
+            $service = $this->paymentService($row);
             $updated = $service->settleByReference((string) $row['external_reference']);
             $service->notifyIfCompleted($row, $updated);
             $status = $updated['status'] ?? $row['status'];
             if ($status === 'completed') {
-                Http::flash('success', 'Payment confirmed by HDEV.');
+                Http::flash('success', 'Payment confirmed by the provider.');
             } elseif ($status === 'failed') {
-                Http::flash('danger', 'HDEV reported this payment as failed.');
+                Http::flash('danger', 'The provider reported this payment as failed.');
             } else {
                 Http::flash('info', 'Still waiting for the customer to approve the MoMo prompt.');
             }
@@ -158,7 +160,7 @@ final class PaymentController
         $canSettle = Auth::isCustomer() || Rbac::can('transactions.manage');
         if ($canSettle && $row['status'] === 'pending' && $row['external_reference']) {
             try {
-                $service = new HdevPaymentService();
+                $service = $this->paymentService($row);
                 $updated = $service->settleByReference((string) $row['external_reference']) ?? $row;
                 $service->notifyIfCompleted($row, $updated);
             } catch (InvalidArgumentException $e) {
@@ -219,5 +221,12 @@ final class PaymentController
             return true;
         }
         return !empty($row['invoice_id']) && Rbac::can('invoices.view');
+    }
+
+    private function paymentService(array $row): HdevPaymentService|PawaPayPaymentService
+    {
+        return ($row['provider_name'] ?? '') === 'PawaPay'
+            ? new PawaPayPaymentService()
+            : new HdevPaymentService();
     }
 }

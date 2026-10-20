@@ -27,11 +27,12 @@
     <input type="hidden" name="transaction_type" value="payment">
     <p class="eyebrow">Mobile Money</p>
     <h3>Pay with MTN or Airtel</h3>
-    <p class="text-muted">A prompt is sent to the phone. The invoice stays unpaid until HDEV confirms.</p>
+    <p class="text-muted">A prompt is sent to the selected Mobile Money wallet. The invoice stays unpaid until PawaPay confirms.</p>
     <div class="row g-3">
-      <div class="col-md-5"><label class="form-label">MoMo phone</label><input class="form-control" name="phone" required value="<?= e((string)$row['phone']) ?>" placeholder="07xxxxxxxx" inputmode="tel"></div>
-      <div class="col-md-4"><label class="form-label">Amount available (RWF)</label><input class="form-control" name="amount" required value="<?= e((string)((int)($paymentRequestable ?? 0))) ?>"></div>
-      <div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100">Send prompt</button></div>
+      <div class="col-md-4"><label class="form-label">MoMo phone</label><input class="form-control" name="phone" required value="<?= e((string)$row['phone']) ?>" placeholder="07xxxxxxxx" inputmode="tel"></div>
+      <div class="col-md-3"><label class="form-label">Mobile network</label><select class="form-select" name="provider" required><option value="">Choose network</option><option value="MTN_MOMO_RWA">MTN</option><option value="AIRTEL_RWA">Airtel</option></select></div>
+      <div class="col-md-3"><label class="form-label">Amount available (RWF)</label><input class="form-control" name="amount" required value="<?= e((string)((int)($paymentRequestable ?? 0))) ?>"></div>
+      <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Send prompt</button></div>
     </div>
   </form>
   <?php elseif (!$bookingPaymentBlocked && (float) ($row['outstanding_balance'] ?? 0) > 0 && (float) ($pendingMomoAmount ?? 0) > 0): ?>

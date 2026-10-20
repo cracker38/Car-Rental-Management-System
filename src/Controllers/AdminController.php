@@ -13,6 +13,7 @@ use Crms\Validator;
 use Crms\View;
 use Crms\Services\BackupService;
 use Crms\Services\HdevClient;
+use Crms\Services\PawaPayClient;
 use Crms\Services\ReportExportService;
 use Crms\Services\SmsService;
 
@@ -362,10 +363,14 @@ final class AdminController
         $rows = Database::fetchAll('SELECT * FROM system_settings ORDER BY setting_key');
         $hdev = HdevClient::config();
         $smsCredentialsConfigured = trim($hdev['sms_api_id']) !== '' && trim($hdev['sms_api_key']) !== '';
+        $pawaPay = PawaPayClient::config();
+        $pawaPayConfigured = trim($pawaPay['api_token']) !== '';
         View::render('admin/settings', [
             'title' => 'Settings',
             'rows' => $rows,
             'smsCredentialsConfigured' => $smsCredentialsConfigured,
+            'pawaPayConfigured' => $pawaPayConfigured,
+            'pawaPayBaseUrl' => $pawaPay['base_url'],
         ]);
     }
 

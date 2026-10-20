@@ -12,7 +12,7 @@ The application is a server-rendered PHP 8+ application using MySQL or a compati
 
 ## Data and security rules
 
-Use prepared statements through `Crms\Database`, escape view output with `e()`, and include `Crms\Csrf::field()` on every POST form. `Crms\Rbac` checks permissions; customer routes also check ownership. Reservation creation and edits require a validated PNG signature. Rental Officers alone receive `reservations.decide`; approval or rejection requires a note and the Rental Officer's signature, and those decisions are serialized in a database transaction. Business Managers have read-only reservation access. HDEV payment requests are eligible only for signed, approved reservations. HDEV settlement is queried by transaction reference on the backend before the financial ledger, invoice, reservation payment status, and persisted notifications are updated. Availability periods use pickup-inclusive/return-exclusive intervals and support a configured turnaround buffer. Server-side pricing is authoritative.
+Use prepared statements through `Crms\Database`, escape view output with `e()`, and include `Crms\Csrf::field()` on every POST form. `Crms\Rbac` checks permissions; customer routes also check ownership. Reservation creation and edits require a validated PNG signature. Rental Officers alone receive `reservations.decide`; approval or rejection requires a note and the Rental Officer's signature, and those decisions are serialized in a database transaction. Business Managers have read-only reservation access. PawaPay deposits are eligible only for signed, approved reservations. PawaPay settlement is queried by deposit ID on the backend before the financial ledger, invoice, reservation payment status, and persisted notifications are updated. Availability periods use pickup-inclusive/return-exclusive intervals and support a configured turnaround buffer. Server-side pricing is authoritative.
 
 The financial transaction table is an append-only ledger at the service layer. Payments, refunds, deposits, and deductions are represented as separate transaction rows; corrections should be posted as new entries. Backups are SQL exports, not an in-app restore feature.
 
@@ -20,7 +20,7 @@ User administration can update account identity, contact details, role and statu
 
 ## Integrations and current boundaries
 
-- HDEV is used for MoMo and SMS when configured. Pending MoMo requests do not count as paid until a provider response confirms them.
+- PawaPay handles new Rwanda Mobile Money deposits; HDEV remains available for SMS and legacy HDEV payment records. Pending requests do not count as paid until the matching provider status is confirmed server-side.
 - In-app notifications are persisted, scoped to their user/customer, marked read through authenticated POST requests, and polled by each role dashboard. Notification events also send plain-text email through Gmail SMTP when `config/mail.local.php` or the `CRMS_MAIL_*` environment variables are configured; sent and failed email attempts are recorded separately from in-app notifications. `scripts/reminders.php` can be scheduled to create one-time due-return, overdue-return, and payment-due reminders.
 - Driver scheduling is internal to the system. Drivers need a linked Driver-role user account to sign in and see their assigned schedule.
 - Reports are date-filtered summaries with CSV export and browser print/save-to-PDF.

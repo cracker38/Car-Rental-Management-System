@@ -32,20 +32,27 @@ $shown = array_merge($opsKeys, $hdevKeys, ['reservation_confirmation_required'])
           <div class="form-text"><?= e((string)$r['description']) ?></div>
         </div>
       <?php endforeach; ?>
-      <p class="eyebrow mt-4">HDEV</p>
-      <h2 class="h4 mb-3">Payment and SMS</h2>
+      <p class="eyebrow mt-4">Payment and SMS</p>
+      <h2 class="h4 mb-3">PawaPay payments and HDEV SMS</h2>
+      <?php if (!empty($pawaPayConfigured)): ?>
+        <div class="alert alert-success py-2">PawaPay API token is configured. Base URL: <?= e((string) ($pawaPayBaseUrl ?? '')) ?></div>
+      <?php else: ?>
+        <div class="alert alert-warning py-2">
+          PawaPay API token is missing. Set <code>PAWAPAY_API_TOKEN</code> and optionally <code>PAWAPAY_BASE_URL</code> in the server environment, or add them to the ignored <code>config/pawapay.local.php</code> file, then reload this page.
+        </div>
+      <?php endif; ?>
       <?php if (!empty($smsCredentialsConfigured)): ?>
         <div class="alert alert-success py-2">HDEV SMS API credentials are configured. A test message will confirm the sender ID and provider response.</div>
       <?php else: ?>
         <div class="alert alert-warning py-2">
-          HDEV SMS API credentials are missing. The payment API credentials do not fill in the SMS API fields. Set <code>HDEV_SMS_API_ID</code> and <code>HDEV_SMS_API_KEY</code> in the server environment, or add <code>sms_api_id</code> and <code>sms_api_key</code> to the ignored <code>config/hdev.local.php</code> file, then reload this page.
+          HDEV SMS API credentials are missing. Set <code>HDEV_SMS_API_ID</code> and <code>HDEV_SMS_API_KEY</code> in the server environment, or add <code>sms_api_id</code> and <code>sms_api_key</code> to the ignored <code>config/hdev.local.php</code> file, then reload this page.
         </div>
       <?php endif; ?>
       <?php if (!empty($byKey['hdev_callback_url'])): $r = $byKey['hdev_callback_url']; ?>
         <div class="mb-3">
-          <label class="form-label">Public callback URL</label>
+          <label class="form-label">Legacy HDEV callback URL</label>
           <input class="form-control" name="hdev_callback_url" value="<?= e((string)$r['setting_value']) ?>" placeholder="https://your-host/CarrentalMS/hdev_callback.php">
-          <div class="form-text">HDEV cannot reach localhost. Use a public HTTPS URL of hdev_callback.php.</div>
+          <div class="form-text">Used only for older HDEV payment records. New payments use PawaPay status checks.</div>
         </div>
       <?php endif; ?>
       <?php if (!empty($byKey['hdev_sms_sender'])): $r = $byKey['hdev_sms_sender']; ?>
@@ -64,7 +71,7 @@ $shown = array_merge($opsKeys, $hdevKeys, ['reservation_confirmation_required'])
           </select>
         </div>
       <?php endif; ?>
-      <p class="small text-muted">Keep API IDs and keys in server environment variables or the ignored <code>config/hdev.local.php</code> file. Do not store credentials in the database or commit them to source control.</p>
+      <p class="small text-muted">Keep the PawaPay token and HDEV SMS credentials in server environment variables or their ignored local config files. Do not store credentials in the database or commit them to source control.</p>
       <button class="btn btn-primary">Save settings</button>
     </form>
   </div>
