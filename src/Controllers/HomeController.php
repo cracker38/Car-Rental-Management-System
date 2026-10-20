@@ -128,7 +128,8 @@ final class HomeController
         $role = (string) ($user['role_name'] ?? '');
         try {
             $data = (new DashboardService())->data($user ?? []);
-        } catch (\Throwable) {
+        } catch (\Throwable $error) {
+            error_log('Dashboard data loading failed: ' . $error->getMessage());
             $data = ['user' => $user, 'notes' => [], 'role' => $role, 'shortcuts' => [], 'kpis' => [], 'duties' => [], 'restriction' => ''];
             Http::flash('warning', 'Some dashboard figures could not be loaded. Check the database connection.');
         }
