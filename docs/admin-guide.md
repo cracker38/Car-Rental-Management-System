@@ -3,8 +3,8 @@
 ## Initial setup
 
 1. Configure the database connection in `config/database.php` or with the `CRMS_DB_*` environment variables.
-2. Open `install.php` once. It applies the additive schema and seed data; it does not drop existing tables. If the database is empty, it creates a starter administrator and sample fleet.
-3. Sign in with the credentials shown by the installer, change the starter password immediately, and remove or protect `install.php` from public access.
+2. Open `install.php` once. It applies the additive schema and seed data; it does not drop existing tables. If the database is empty, it creates a starter administrator and sample fleet. After a successful setup, the installer creates `storage/install.lock` and returns 404 on later visits.
+3. Sign in with the credentials shown by the installer and change the starter password immediately. For a planned installer maintenance run, remove `storage/install.lock`, perform the work, and confirm the lock is recreated.
 4. In **Settings**, enter the business name, tax rate, deposit amount, turnaround buffer, mileage/late fees, and HDEV callback/SMS settings as applicable. HDEV SMS requires its own API ID and key, configured as `HDEV_SMS_API_ID` and `HDEV_SMS_API_KEY` in the server environment or as `sms_api_id` and `sms_api_key` in the ignored `config/hdev.local.php` file. Payment credentials do not configure SMS.
 
 ## Accounts and permissions
@@ -19,11 +19,24 @@ To give a driver schedule access, assign the Driver role to an active user, then
 
 ## Backups and recovery
 
-Open **Backup** and create an SQL export. Store a copy outside the web root and include uploaded vehicle images and configuration in the operational backup plan. The generated SQL contains table drop/recreate statements: restore it only into a deliberately selected, backed-up database. The application does not perform an automatic restore or verify a restore. For recovery, restore to a separate database first, confirm tables and representative records, then point the application at the recovered database.
+Open **Backup** and create an SQL export, or run the recurring CLI job below. The generated SQL contains table drop/recreate statements: restore it only into a deliberately selected, backed-up database. The application does not perform an automatic restore. Rehearse recovery into a separate database first, confirm tables and representative records, then point the application at the recovered database. SQL exports do not contain uploaded vehicle images or secrets; copy those separately and keep an off-machine backup copy.
+
+### Schedule daily backups on Windows
+
+Create a Windows Task Scheduler task that runs once per day:
+
+- **Program:** `C:\xampp\php\php.exe`
+- **Arguments:** `C:\xampp\htdocs\CarrentalMS\scripts\backup.php`
+- **Start in:** `C:\xampp\htdocs\CarrentalMS`
+- Run it under a Windows account that can access the project backup folder and database.
+
+The job writes complete SQL exports to `storage/backups`, prevents concurrent exports, removes incomplete temporary files after a failed run, and retains 30 days by default. Set the server environment variable `CRMS_BACKUP_RETENTION_DAYS` to a whole number from 1 to 3650 to change retention. Review Task Scheduler's last-run result and copy backups to separate storage. The backup directory denies direct Apache web requests; keep it outside source control as well.
+
+Create a second daily task at the business's preferred reminder time using the same **Program** and **Start in** values, with **Arguments** set to `C:\xampp\htdocs\CarrentalMS\scripts\reminders.php`. It creates one in-app reminder for each rental due within 24 hours, each overdue rental, and each unpaid invoice due today or tomorrow. It also sends email when SMTP is configured. The job keeps a lock so overlapping runs do not create duplicate reminders. Confirm that the system date and time zone are correct before enabling it.
 
 ## Operations
 
-- **Reports** accepts a start and end date. Financial totals use transaction date; fleet bookings and rentals use their pick-up date.
+- **Reports** accepts a start and end date and supports CSV export and browser print/save-to-PDF. Financial totals use transaction date; fleet bookings and rentals use their pick-up date.
 - **Audit log** records important account, reservation, fleet, finance, and administrative actions.
 - Configure HTTPS and secure database credentials in production. Restrict the installer and backup directory from public downloads.
 - Enable HDEV SMS/MoMo only after valid credentials and a public HTTPS callback are configured. Settlement rechecks the HDEV transaction reference server-side; test with the provider's sandbox/account before using live payments.

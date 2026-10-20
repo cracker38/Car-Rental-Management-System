@@ -1,2 +1,7 @@
 /config/hdev.local.php
 /config/mail.local.php
+/storage/backups/*.sql
+/storage/backups/*.tmp
+/storage/backups/.backup.lock
+/storage/install.lock
+/storage/.reminders.lock

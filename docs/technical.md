@@ -21,11 +21,11 @@ User administration can update account identity, contact details, role and statu
 ## Integrations and current boundaries
 
 - HDEV is used for MoMo and SMS when configured. Pending MoMo requests do not count as paid until a provider response confirms them.
-- In-app notifications are persisted, scoped to their user/customer, marked read through authenticated POST requests, and polled by each role dashboard. Notification events also send plain-text email through Gmail SMTP when `config/mail.local.php` or the `CRMS_MAIL_*` environment variables are configured; sent and failed email attempts are recorded separately from in-app notifications.
+- In-app notifications are persisted, scoped to their user/customer, marked read through authenticated POST requests, and polled by each role dashboard. Notification events also send plain-text email through Gmail SMTP when `config/mail.local.php` or the `CRMS_MAIL_*` environment variables are configured; sent and failed email attempts are recorded separately from in-app notifications. `scripts/reminders.php` can be scheduled to create one-time due-return, overdue-return, and payment-due reminders.
 - Driver scheduling is internal to the system. Drivers need a linked Driver-role user account to sign in and see their assigned schedule.
-- Reports are date-filtered screen summaries. PDF/Excel export is not currently implemented.
-- The backup export can be created by an authorized user, but restore should be performed manually into a separate database and verified before recovery use.
+- Reports are date-filtered summaries with CSV export and browser print/save-to-PDF.
+- An authorized user can create a SQL export, or an operator can schedule `scripts/backup.php` through the host scheduler. The export is written atomically, concurrent exports are blocked, and the scheduled job applies configurable retention (30 days by default). Restore remains a manual operation into a separate database and must be verified before recovery use.
 
 ## Deployment notes
 
-Set production database and mail secrets outside source control, use HTTPS, disable public access to `install.php` after setup, and protect `storage/backups` from direct web downloads. Configure a real business name, currency/tax policy, phone details, payment provider settings, and backup retention before launch. Rehearse restore from a recent SQL export before relying on it for recovery.
+Set production database and mail secrets outside source control and use HTTPS. A successful installer run creates `storage/install.lock` to block later web access. Apache access to `storage/` is denied by `storage/.htaccess`. Configure a real business name, currency/tax policy, phone details, payment provider settings, and backup retention before launch. Schedule recurring backups, copy them outside the host, and rehearse restore from a recent SQL export before relying on it for recovery. SQL exports exclude uploaded vehicle images and local configuration secrets.

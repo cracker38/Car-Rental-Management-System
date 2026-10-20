@@ -337,8 +337,12 @@ final class AdminController
         $files = glob(dirname(__DIR__, 2) . '/storage/backups/*.sql') ?: [];
         rsort($files);
         if (Http::isPost() && Http::str('action') === 'export') {
-            $path = (new BackupService())->exportSql();
-            Http::flash('success', 'Backup written to ' . basename($path) . '. Restore has not been auto-tested in this request.');
+            try {
+                $path = (new BackupService())->exportSql();
+                Http::flash('success', 'Backup written to ' . basename($path) . '. Restore has not been tested in this request.');
+            } catch (\Throwable) {
+                Http::flash('danger', 'The backup could not be created. Check the database connection and storage/backups permissions.');
+            }
             Http::redirect('admin/backup');
         }
         View::render('admin/backup', ['title' => 'Backups', 'files' => $files]);

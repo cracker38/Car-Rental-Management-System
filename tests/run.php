@@ -462,15 +462,19 @@ try {
             'service_provider' => '', 'notes' => '',
         ];
         $_SESSION['user_id'] = $inspectorUserId;
-        expect(\Crms\Rbac::can('maintenance.manage') && !\Crms\Rbac::can('drivers.manage') && !\Crms\Rbac::can('inspections.manage'), 'inspector can manage maintenance but cannot access driver or rental scheduling');
+        expect(\Crms\Rbac::can('maintenance.manage') && \Crms\Rbac::can('maintenance.schedule')
+            && !\Crms\Rbac::can('drivers.manage') && !\Crms\Rbac::can('inspections.manage'),
+            'maintenance staff can schedule and manage service work without driver or rental scheduling access');
+        $maintenanceJob = $maintenanceService->create($maintenanceInput);
+        expect((int) $maintenanceJob['vehicle_id'] === $vehicleId, 'maintenance staff can schedule a service job');
+
+        $_SESSION['user_id'] = $managerUserId;
         try {
             $maintenanceService->create($maintenanceInput);
-            expect(false, 'inspector cannot schedule maintenance jobs');
+            expect(false, 'business manager cannot schedule maintenance jobs');
         } catch (InvalidArgumentException) {
-            expect(true, 'inspector cannot schedule maintenance jobs');
+            expect(true, 'business manager cannot schedule maintenance jobs');
         }
-        $_SESSION['user_id'] = $managerUserId;
-        $maintenanceJob = $maintenanceService->create($maintenanceInput);
         $_SESSION['user_id'] = $inspectorUserId;
         try {
             $maintenanceService->updateVehicleReadiness($vehicleId, 'available', 'Premature release');
@@ -498,9 +502,8 @@ try {
         );
         $releaseVehicleId = (int) \Crms\Database::lastId();
         $maintenanceInput['vehicle_id'] = (string) $releaseVehicleId;
-        $_SESSION['user_id'] = $managerUserId;
-        $maintenanceJob = $maintenanceService->create($maintenanceInput);
         $_SESSION['user_id'] = $inspectorUserId;
+        $maintenanceJob = $maintenanceService->create($maintenanceInput);
         $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'in_progress');
         $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'completed', 'Inspection passed; ready for hire.', false, 'available');
         $releasedVehicle = \Crms\Database::fetch('SELECT status FROM vehicles WHERE vehicle_id=?', [$releaseVehicleId]);

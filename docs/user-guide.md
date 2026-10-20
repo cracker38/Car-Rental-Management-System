@@ -22,6 +22,8 @@
 
 After sign-in, **Dashboard** shows the work relevant to the account role and a persisted notification list with unread counts. New notifications refresh automatically while the dashboard is open. Customers see only their own bookings and invoices. Drivers see only trips assigned to their linked driver profile.
 
+When the administrator has enabled the scheduled reminder task, customers receive an in-app reminder for a rental due within 24 hours, an overdue return, or an unpaid invoice due today or tomorrow. Email copies are sent when SMTP is configured.
+
 ## Need help?
 
 Call or WhatsApp **0785354935**. Service availability and payment methods depend on the business configuration.

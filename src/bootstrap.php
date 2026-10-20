@@ -136,16 +136,22 @@ if (!function_exists('vehicle_img')) {
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || ((int) ($_SERVER['SERVER_PORT'] ?? 80) === 443);
 
-session_name($appCfg['session_name']);
-session_set_cookie_params([
-    'lifetime' => 0,
-    'path' => '/',
-    'secure' => $https,
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
+if (PHP_SAPI === 'cli') {
+    // CLI jobs and the test runner use an in-memory session and do not need
+    // to read or write the web server's session files.
+    $_SESSION = $_SESSION ?? [];
+} else {
+    session_name($appCfg['session_name']);
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
 }
 
 header('X-Content-Type-Options: nosniff');

@@ -7,6 +7,13 @@ declare(strict_types=1);
  */
 
 $root = __DIR__;
+$installLock = $root . '/storage/install.lock';
+if (is_file($installLock)) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'The CRMS installer is locked after setup. Remove storage/install.lock only for an intentional maintenance run.';
+    exit;
+}
 $cfg = require $root . '/config/database.php';
 $messages = [];
 $ok = true;
@@ -244,6 +251,19 @@ if ($mysqli->connect_error) {
     }
 }
 
+if ($ok) {
+    $storage = $root . '/storage';
+    if (!is_dir($storage) && !mkdir($storage, 0750, true) && !is_dir($storage)) {
+        $ok = false;
+        $messages[] = 'Setup completed, but the installer lock could not be created because storage is unavailable.';
+    } elseif (file_put_contents($installLock, 'Installed ' . date(DATE_ATOM) . PHP_EOL, LOCK_EX) === false) {
+        $ok = false;
+        $messages[] = 'Setup completed, but the installer lock could not be written. Restrict install.php from web access immediately.';
+    } else {
+        $messages[] = 'Installer locked after setup. Remove storage/install.lock only for a planned maintenance run.';
+    }
+}
+
 header('Content-Type: text/html; charset=utf-8');
 ?>
 <!doctype html>
@@ -263,7 +283,7 @@ header('Content-Type: text/html; charset=utf-8');
   <?php endforeach; ?>
   <?php if ($ok): ?>
     <a class="btn btn-primary" href="index.php">Open CRMS</a>
-    <p class="mt-3 small">Delete or protect <code>install.php</code> after setup. Change the admin password immediately.</p>
+    <p class="mt-3 small">The installer is locked after setup. Change the starter administrator password immediately.</p>
   <?php endif; ?>
 </div>
 </body>
