@@ -31,7 +31,7 @@ $rowEnd = min($reportTotalRows, $reportPage * $pageSize);
     </div>
     <div class="report-period-card">
       <span><i class="bi bi-calendar3" aria-hidden="true"></i> Reporting period</span>
-      <strong><?= e(date('d M Y', strtotime($dateFrom))) ?> <span aria-hidden="true">–</span> <?= e(date('d M Y', strtotime($dateTo))) ?></strong>
+      <strong><?= e(date('d M Y', strtotime($dateFrom))) ?> <span aria-hidden="true">&ndash;</span> <?= e(date('d M Y', strtotime($dateTo))) ?></strong>
       <small>Generated <?= e($generatedAt) ?></small>
     </div>
   </header>
@@ -55,7 +55,7 @@ $rowEnd = min($reportTotalRows, $reportPage * $pageSize);
   <div class="report-toolbar">
     <div class="report-results-note">
       <i class="bi bi-info-circle" aria-hidden="true"></i>
-      <span>Summary totals cover the full reporting period<?php if (!$isFullReportOutput && $reportTotalRows > 0): ?>. Showing <?= number_format($rowStart) ?>–<?= number_format($rowEnd) ?> of <?= number_format($reportTotalRows) ?> records<?php endif; ?>.</span>
+      <span>Summary totals cover the full reporting period<?php if (!$isFullReportOutput && $reportTotalRows > 0): ?>. Showing <?= number_format($rowStart) ?>&ndash;<?= number_format($rowEnd) ?> of <?= number_format($reportTotalRows) ?> records<?php endif; ?>.</span>
     </div>
     <div class="d-flex flex-wrap gap-2">
       <a class="btn btn-outline-dark" href="<?= e(url('reports', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'export' => 'csv'])) ?>"><i class="bi bi-download" aria-hidden="true"></i> Export CSV</a>

@@ -16,6 +16,7 @@ use Crms\Services\PricingService;
 use Crms\Services\ReservationService;
 use Crms\Services\RentalService;
 use Crms\Services\DashboardService;
+use Crms\Services\ReportExportService;
 
 $failed = 0;
 $passed = 0;
@@ -131,6 +132,10 @@ try {
 expect(Money::round('10.005') === '10.01', 'half-up rounding 10.005 -> 10.01');
 expect(Money::add('10.10', '0.05') === '10.15', 'money add');
 expect(Money::sub('100.00', '40.50') === '59.50', 'money sub');
+expect(ReportExportService::csvSafeCell('=HYPERLINK("https://example.com")') === "'=HYPERLINK(\"https://example.com\")", 'CSV export neutralizes spreadsheet formulas');
+expect(ReportExportService::csvSafeCell("  @SUM(A1:A2)") === "'  @SUM(A1:A2)", 'CSV export neutralizes formulas after whitespace');
+expect(ReportExportService::csvSafeCell('Vehicle RAD-001') === 'Vehicle RAD-001', 'CSV export keeps ordinary report labels readable');
+expect(ReportExportService::csvSafeCell(-1250.5) === -1250.5, 'CSV export keeps numeric values typed');
 
 $vehicle = ['daily_rate' => '35000', 'weekly_rate' => '210000', 'monthly_rate' => '700000'];
 $quote = $pricing->quoteRates($vehicle, '2026-10-01 08:00:00', '2026-10-03 08:00:00', '0');
