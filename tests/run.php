@@ -205,7 +205,7 @@ try {
     expect((int) $roles === 7, 'all seven roles seeded');
     $rolePermissions = [
         'System Administrator' => ['users.manage', 'settings.manage', 'audit.view', 'drivers.manage'],
-        'Business Manager' => ['reports.operational', 'reports.financial', 'rentals.manage', 'drivers.manage', 'drivers.schedule', 'reservations.view', 'reservations.manage'],
+        'Business Manager' => ['reports.operational', 'reports.financial', 'rentals.manage', 'drivers.manage', 'drivers.schedule', 'reservations.view'],
         'Rental Officer' => ['reservations.manage', 'reservations.decide', 'rentals.manage'],
         'Accountant/Cashier' => ['invoices.manage', 'transactions.manage', 'reports.financial'],
         'Vehicle Inspector/Maintenance Staff' => ['maintenance.manage', 'vehicles.view'],
@@ -229,7 +229,7 @@ try {
             expect(!in_array('rentals.view', $assigned, true) && !in_array('inspections.manage', $assigned, true), 'maintenance inspectors cannot browse or schedule rental work');
         }
         if ($roleName === 'Business Manager') {
-            expect(!in_array('reservations.decide', $assigned, true), 'manager may view reservations but cannot sign decisions');
+            expect(!in_array('reservations.manage', $assigned, true) && !in_array('reservations.decide', $assigned, true), 'manager has read-only reservation access and cannot sign decisions');
         }
         if ($roleName === 'Rental Officer') {
             expect(in_array('reservations.view', $assigned, true), 'Rental Officer can view reservation requests they review');
@@ -332,6 +332,13 @@ try {
         }
 
         $_SESSION['user_id'] = $managerUserId;
+        expect(\Crms\Rbac::can('reservations.view') && !\Crms\Rbac::can('reservations.manage'), 'manager can view reservations without edit or decision access');
+        try {
+            $createRequest();
+            expect(false, 'manager cannot submit a reservation with a staff-provided customer signature');
+        } catch (InvalidArgumentException) {
+            expect(true, 'manager cannot submit a reservation with a staff-provided customer signature');
+        }
         try {
             (new ReservationService())->decide((int) $first['reservation_id'], 'approve', 'Manager must not sign decisions', $signature);
             expect(false, 'manager cannot sign or record reservation decisions');

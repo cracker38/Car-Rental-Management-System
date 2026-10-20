@@ -200,7 +200,7 @@ final class FinanceService
                     $id
                 );
                 (new NotificationService())->notifyUsersWithAnyPermission(
-                    ['transactions.view', 'transactions.manage', 'reservations.manage'],
+                    ['transactions.view', 'transactions.manage', 'reservations.view'],
                     'payment_received',
                     $subject,
                     $message,

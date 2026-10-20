@@ -315,7 +315,7 @@ final class HdevPaymentService
         $notifications = new NotificationService();
         $notifications->notifyUser(null, (int) $row['customer_id'], $type, $subject, $message, 'financial_transaction', (int) $row['transaction_id']);
         $notifications->notifyUsersWithAnyPermission(
-            ['transactions.view', 'transactions.manage', 'reservations.manage'],
+            ['transactions.view', 'transactions.manage', 'reservations.view'],
             $type,
             $subject . ': ' . $row['transaction_number'],
             $message,

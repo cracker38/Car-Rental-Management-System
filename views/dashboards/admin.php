@@ -60,7 +60,4 @@
     </section>
   </div>
 </div>
-<div class="admin-duties-panel mt-3">
-  <?php require dirname(__DIR__) . '/partials/dashboard-duties.php'; ?>
-</div>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>

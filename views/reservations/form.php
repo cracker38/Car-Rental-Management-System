@@ -48,7 +48,7 @@
     </div>
     <div class="small text-danger mt-2" id="customer-signature-error" role="alert" hidden>Draw your signature before submitting.</div>
   </section>
-  <p class="small text-muted mt-3">After submission, the request remains pending until a Manager or Rental Officer records a signed decision. Payment is available only after approval.</p>
+  <p class="small text-muted mt-3">After submission, the request remains pending until a Rental Officer records a signed decision. Payment is available only after approval.</p>
   <div class="d-flex gap-2 mt-2"><button class="btn btn-primary"><?= $editing ? 'Sign and update request' : 'Sign and submit request' ?></button><?php if ($editing): ?><a class="btn btn-outline-secondary" href="<?= e(url('reservations/show', ['id' => $reservation['reservation_id']])) ?>">Cancel</a><?php endif; ?></div>
 </form>
 <script>
