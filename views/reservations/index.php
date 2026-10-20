@@ -4,15 +4,16 @@
     <a class="btn btn-primary" href="<?= e(url('reservations/form')) ?>">New reservation</a>
   <?php endif; ?>
 </div>
+<?php $isCustomer = \Crms\Auth::isCustomer(); ?>
 <div class="panel table-panel">
   <div class="table-responsive"><table class="table mb-0">
-    <thead><tr><th>Code</th><th>Customer</th><th>Vehicle</th><th>Pickup</th><th>Return</th><th>Est.</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Code</th><?php if (!$isCustomer): ?><th>Customer</th><?php endif; ?><th>Vehicle</th><th>Pickup</th><th>Return</th><th>Est.</th><th>Status</th><th></th></tr></thead>
     <tbody>
-    <?php if (!$rows): ?><tr><td colspan="8"><div class="empty-state">No reservations yet.</div></td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="<?= $isCustomer ? '7' : '8' ?>"><div class="empty-state">No reservations yet.</div></td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
       <tr>
         <td><a href="<?= e(url('reservations/show', ['id' => $r['reservation_id']])) ?>"><?= e($r['reservation_code']) ?></a></td>
-        <td><?= e($r['first_name'] . ' ' . $r['last_name']) ?></td>
+        <?php if (!$isCustomer): ?><td><?= e($r['first_name'] . ' ' . $r['last_name']) ?></td><?php endif; ?>
         <td><?= e($r['registration_no']) ?></td>
         <td><?= e($r['pickup_datetime']) ?></td>
         <td><?= e($r['return_datetime']) ?></td>
