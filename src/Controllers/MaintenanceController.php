@@ -27,8 +27,8 @@ final class MaintenanceController
         if (Http::isPost() && Http::str('action') === 'create') {
             if (!$canSchedule) {
                 http_response_code(403);
-                Http::flash('danger', 'Inspectors can update maintenance work and vehicle readiness, but cannot schedule maintenance jobs.');
-                Http::redirect('maintenance');
+                View::render('errors/403', ['title' => 'Forbidden']);
+                return;
             }
             try {
                 (new MaintenanceService())->create($_POST);

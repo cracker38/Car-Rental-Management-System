@@ -1,4 +1,7 @@
-<?php if (!empty($canManage)): ?>
+<?php if (!empty($inspectorMode)): ?>
+  <p class="lead-muted mb-3">This view is limited to vehicles currently held for maintenance. Inspectors can close service work and record a signed-off readiness decision; rental scheduling is managed by operations staff.</p>
+<?php endif; ?>
+<?php if (!empty($canSchedule)): ?>
 <form method="post" class="panel mb-4">
   <?= \Crms\Csrf::field() ?>
   <input type="hidden" name="action" value="create">
@@ -24,6 +27,37 @@
 </form>
 <?php endif; ?>
 
+<div class="panel table-panel mb-4">
+  <div class="panel-h">Vehicles currently in maintenance</div>
+  <div class="table-responsive"><table class="table align-middle mb-0">
+    <thead><tr><th>Vehicle</th><th>Open work</th><th>Operational status</th><?php if (!empty($canManage)): ?><th>Readiness decision</th><?php endif; ?></tr></thead>
+    <tbody>
+    <?php if (empty($maintenanceVehicles)): ?><tr><td colspan="<?= !empty($canManage) ? 4 : 3 ?>"><div class="empty-state">No vehicles are currently held for maintenance.</div></td></tr><?php endif; ?>
+    <?php foreach ($maintenanceVehicles as $v): ?>
+      <tr>
+        <td><strong><?= e($v['registration_no']) ?></strong><small class="d-block text-muted"><?= e($v['make'] . ' ' . $v['model']) ?></small></td>
+        <td><?= (int)$v['open_jobs'] > 0 ? (int)$v['open_jobs'] . ' open job(s)' : 'No open jobs' ?></td>
+        <td><?= status_badge((string)$v['status']) ?></td>
+        <?php if (!empty($canManage)): ?><td>
+          <?php if ((int)$v['open_jobs'] > 0): ?>
+            <span class="small text-muted">Complete or cancel all open jobs before releasing the vehicle.</span>
+          <?php else: ?>
+            <form method="post" class="d-flex flex-column flex-lg-row gap-2" data-confirm="Return this vehicle to operational service after inspection?">
+              <?= \Crms\Csrf::field() ?>
+              <input type="hidden" name="action" value="vehicle_readiness">
+              <input type="hidden" name="vehicle_id" value="<?= (int)$v['vehicle_id'] ?>">
+              <input type="hidden" name="vehicle_status" value="available">
+              <input class="form-control form-control-sm" name="reason" maxlength="500" minlength="5" required placeholder="Inspection and release note">
+              <button class="btn btn-sm btn-outline-success text-nowrap">Mark ready for service</button>
+            </form>
+          <?php endif; ?>
+        </td><?php endif; ?>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+</div>
+
 <div class="panel table-panel">
   <div class="panel-h">Maintenance and servicing records</div>
   <div class="table-responsive"><table class="table align-middle mb-0">
@@ -45,9 +79,20 @@
               <button class="btn btn-sm btn-outline-primary">Start</button>
             </form>
           <?php elseif ($r['status'] === 'in_progress'): ?>
-            <form method="post" class="d-inline" data-confirm="Mark this job complete?">
-              <?= \Crms\Csrf::field() ?><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<?= (int)$r['maintenance_id'] ?>"><input type="hidden" name="new_status" value="completed">
-              <button class="btn btn-sm btn-outline-success">Complete</button>
+            <form method="post" class="mt-2 text-start" data-confirm="Complete this work and save the vehicle readiness decision?">
+              <?= \Crms\Csrf::field() ?>
+              <input type="hidden" name="action" value="status">
+              <input type="hidden" name="id" value="<?= (int)$r['maintenance_id'] ?>">
+              <input type="hidden" name="new_status" value="completed">
+              <label class="form-label small">Vehicle readiness after this work</label>
+              <select class="form-select form-select-sm mb-2" name="vehicle_status" required>
+                <option value="">Choose readiness</option>
+                <option value="available">Inspected and ready for service</option>
+                <option value="maintenance">Keep in maintenance</option>
+              </select>
+              <label class="form-label small">Completion / inspection note</label>
+              <textarea class="form-control form-control-sm mb-2" name="reason" rows="2" minlength="5" maxlength="500" required></textarea>
+              <button class="btn btn-sm btn-outline-success">Complete job</button>
             </form>
           <?php endif; ?>
           <?php if (in_array($r['status'], ['scheduled','in_progress'], true)): ?>
