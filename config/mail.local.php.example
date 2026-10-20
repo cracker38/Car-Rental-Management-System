@@ -1,0 +1,13 @@
+<?php
+// Copy this file to mail.local.php and replace the values with a Gmail account
+// and a Google app password. Keep mail.local.php out of source control.
+return [
+    'host' => 'smtp.gmail.com',
+    'port' => 587,
+    'encryption' => 'tls',
+    'username' => 'your-address@gmail.com',
+    'password' => 'your-google-app-password',
+    'from_address' => 'your-address@gmail.com',
+    'from_name' => 'CRMS',
+    'timeout' => 15,
+];
