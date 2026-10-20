@@ -34,6 +34,13 @@ $shown = array_merge($opsKeys, $hdevKeys, ['reservation_confirmation_required'])
       <?php endforeach; ?>
       <p class="eyebrow mt-4">HDEV</p>
       <h2 class="h4 mb-3">Payment and SMS</h2>
+      <?php if (!empty($smsCredentialsConfigured)): ?>
+        <div class="alert alert-success py-2">HDEV SMS API credentials are configured. A test message will confirm the sender ID and provider response.</div>
+      <?php else: ?>
+        <div class="alert alert-warning py-2">
+          HDEV SMS API credentials are missing. The payment API credentials do not fill in the SMS API fields. Set <code>HDEV_SMS_API_ID</code> and <code>HDEV_SMS_API_KEY</code> in the server environment, or add <code>sms_api_id</code> and <code>sms_api_key</code> to the ignored <code>config/hdev.local.php</code> file, then reload this page.
+        </div>
+      <?php endif; ?>
       <?php if (!empty($byKey['hdev_callback_url'])): $r = $byKey['hdev_callback_url']; ?>
         <div class="mb-3">
           <label class="form-label">Public callback URL</label>
@@ -57,7 +64,7 @@ $shown = array_merge($opsKeys, $hdevKeys, ['reservation_confirmation_required'])
           </select>
         </div>
       <?php endif; ?>
-      <p class="small text-muted">API IDs and keys stay in <code>config/hdev.php</code>.</p>
+      <p class="small text-muted">Keep API IDs and keys in server environment variables or the ignored <code>config/hdev.local.php</code> file. Do not store credentials in the database or commit them to source control.</p>
       <button class="btn btn-primary">Save settings</button>
     </form>
   </div>

@@ -44,7 +44,9 @@ final class HdevClient
     {
         $c = self::config();
         if (trim($c['sms_api_id']) === '' || trim($c['sms_api_key']) === '') {
-            throw new InvalidArgumentException('HDEV SMS credentials are not configured in the server environment.');
+            throw new InvalidArgumentException(
+                'HDEV SMS API ID and key are missing. Configure HDEV_SMS_API_ID and HDEV_SMS_API_KEY, or add sms_api_id and sms_api_key to config/hdev.local.php.'
+            );
         }
         if (!class_exists('hdev_sms', false)) {
             require dirname(__DIR__, 2) . '/lib/hdev/sms_parse.php';

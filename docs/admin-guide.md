@@ -5,7 +5,7 @@
 1. Configure the database connection in `config/database.php` or with the `CRMS_DB_*` environment variables.
 2. Open `install.php` once. It applies the additive schema and seed data; it does not drop existing tables. If the database is empty, it creates a starter administrator and sample fleet.
 3. Sign in with the credentials shown by the installer, change the starter password immediately, and remove or protect `install.php` from public access.
-4. In **Settings**, enter the business name, tax rate, deposit amount, turnaround buffer, mileage/late fees, and HDEV callback/SMS settings as applicable.
+4. In **Settings**, enter the business name, tax rate, deposit amount, turnaround buffer, mileage/late fees, and HDEV callback/SMS settings as applicable. HDEV SMS requires its own API ID and key, configured as `HDEV_SMS_API_ID` and `HDEV_SMS_API_KEY` in the server environment or as `sms_api_id` and `sms_api_key` in the ignored `config/hdev.local.php` file. Payment credentials do not configure SMS.
 
 ## Accounts and permissions
 

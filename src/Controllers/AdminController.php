@@ -12,6 +12,7 @@ use Crms\Settings;
 use Crms\Validator;
 use Crms\View;
 use Crms\Services\BackupService;
+use Crms\Services\HdevClient;
 use Crms\Services\SmsService;
 
 final class AdminController
@@ -270,7 +271,13 @@ final class AdminController
             );
         }
         $rows = Database::fetchAll('SELECT * FROM system_settings ORDER BY setting_key');
-        View::render('admin/settings', ['title' => 'Settings', 'rows' => $rows]);
+        $hdev = HdevClient::config();
+        $smsCredentialsConfigured = trim($hdev['sms_api_id']) !== '' && trim($hdev['sms_api_key']) !== '';
+        View::render('admin/settings', [
+            'title' => 'Settings',
+            'rows' => $rows,
+            'smsCredentialsConfigured' => $smsCredentialsConfigured,
+        ]);
     }
 
     public function audit(): void
