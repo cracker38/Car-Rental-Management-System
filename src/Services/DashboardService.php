@@ -41,43 +41,12 @@ final class DashboardService
     public function data(array $user): array
     {
         $role = (string) ($user['role_name'] ?? '');
-        if ($role === 'System Administrator') {
-            $notes = [];
-        } elseif ($role === 'Rental Officer') {
-            $notes = Database::fetchAll(
-                "SELECT * FROM notifications
-                 WHERE user_id = ? AND (related_entity_type = 'reservation' OR notification_type LIKE 'reservation_%')
-                 ORDER BY created_at DESC LIMIT 8",
-                [Auth::id()]
-            );
-        } elseif ($role === 'Vehicle Inspector/Maintenance Staff') {
-            $notes = [];
-        } elseif ($role === 'Driver') {
-            $notes = Database::fetchAll(
-                "SELECT * FROM notifications
-                 WHERE user_id = ?
-                   AND notification_type IN ('driver_assignment','driver_assignment_updated','driver_assignment_removed')
-                 ORDER BY created_at DESC LIMIT 8",
-                [Auth::id()]
-            );
-        } elseif ($role === 'Customer') {
-            $notes = Database::fetchAll(
-                "SELECT * FROM notifications
-                 WHERE customer_id = ?
-                   AND (notification_type LIKE 'reservation_%' OR notification_type LIKE 'payment_%'
-                        OR notification_type LIKE 'invoice_%' OR notification_type = 'rental_returned')
-                 ORDER BY created_at DESC LIMIT 8",
-                [Auth::customerId() ?: 0]
-            );
-        } else {
-            $notes = Database::fetchAll(
-                'SELECT * FROM notifications WHERE user_id = ? OR customer_id = ? ORDER BY created_at DESC LIMIT 8',
-                [Auth::id(), Auth::customerId()]
-            );
-        }
+        $notificationService = new NotificationService();
+        $notes = $notificationService->forUser(Auth::id(), Auth::customerId(), 12);
         $base = [
             'user' => $user,
             'notes' => $notes,
+            'unreadNotificationCount' => $notificationService->unreadCount(Auth::id(), Auth::customerId()),
             'role' => $role,
             'shortcuts' => $this->shortcuts($role),
             'duties' => $this->duties($role),
@@ -552,7 +521,7 @@ final class DashboardService
                 ['label' => 'To pay', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue')", [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
             ],
             'reservations' => Database::fetchAll(
-                'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status,
+                'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, r.payment_status,
                         v.make, v.model, v.registration_no, v.image_path FROM reservations r
                  JOIN vehicles v ON v.vehicle_id = r.vehicle_id WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 8',
                 [$cid]
@@ -560,6 +529,7 @@ final class DashboardService
             'invoices' => Database::fetchAll(
                 "SELECT i.invoice_id, i.invoice_number, i.status, i.created_at, i.notes,
                         b.outstanding_balance, c.phone, r.status AS reservation_status,
+                        r.approval_note, r.approver_signature, r.customer_signature,
                         COALESCE(pm.pending_momo, 0) AS pending_momo_amount
                  FROM invoices i
                  JOIN customers c ON c.customer_id = i.customer_id

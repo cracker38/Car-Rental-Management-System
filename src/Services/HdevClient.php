@@ -82,7 +82,10 @@ final class HdevClient
         if (in_array($status, ['pending', 'processing', 'initiated', 'queued'], true)) {
             return 'pending';
         }
-        if (in_array($status, ['failed', 'fail', 'error', 'cancelled', 'canceled', 'rejected', '0', 'false'], true)) {
+        if (in_array($status, ['cancelled', 'canceled'], true)) {
+            return 'cancelled';
+        }
+        if (in_array($status, ['failed', 'fail', 'error', 'rejected', '0', 'false'], true)) {
             return 'failed';
         }
         return $status !== '' ? $status : 'error';

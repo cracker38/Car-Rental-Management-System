@@ -4,8 +4,8 @@ foreach ($rows as $r) {
     $byKey[$r['setting_key']] = $r;
 }
 $hdevKeys = ['hdev_callback_url', 'hdev_sms_sender', 'hdev_sms_enabled'];
-$opsKeys = ['business_name', 'tax_rate_percent', 'default_deposit_amount', 'turnaround_minutes', 'extra_km_rate', 'included_km_per_day', 'late_fee_per_hour', 'reservation_confirmation_required'];
-$shown = array_merge($opsKeys, $hdevKeys);
+$opsKeys = ['business_name', 'tax_rate_percent', 'default_deposit_amount', 'turnaround_minutes', 'extra_km_rate', 'included_km_per_day', 'late_fee_per_hour'];
+$shown = array_merge($opsKeys, $hdevKeys, ['reservation_confirmation_required']);
 ?>
 <div class="row g-4">
   <div class="col-lg-7">
@@ -20,6 +20,7 @@ $shown = array_merge($opsKeys, $hdevKeys);
           <div class="form-text"><?= e((string)$r['description']) ?></div>
         </div>
       <?php endforeach; ?>
+      <div class="alert alert-info py-2 small">Reservations always require a signed staff decision before payment is enabled.</div>
       <?php foreach ($rows as $r): if (in_array($r['setting_key'], $shown, true)) continue; ?>
         <div class="mb-3">
           <label class="form-label"><?= e(str_replace('_', ' ', $r['setting_key'])) ?></label>

@@ -12,14 +12,14 @@ The application is a server-rendered PHP 8+ application using MySQL or a compati
 
 ## Data and security rules
 
-Use prepared statements through `Crms\Database`, escape view output with `e()`, and include `Crms\Csrf::field()` on every POST form. `Crms\Rbac` checks permissions; customer routes also check ownership. Reservation creation, pending-reservation edits, confirmation, rental handover, and financial posting recheck the relevant state in transactions. Availability periods use pickup-inclusive/return-exclusive intervals and support a configured turnaround buffer. Server-side pricing is authoritative.
+Use prepared statements through `Crms\Database`, escape view output with `e()`, and include `Crms\Csrf::field()` on every POST form. `Crms\Rbac` checks permissions; customer routes also check ownership. Reservation creation and edits require a validated PNG signature. A pending reservation can be approved or rejected only by a user with reservation-management permission, with a note and signature; those actions are serialized in a database transaction. HDEV payment requests are eligible only for signed, approved reservations. HDEV settlement is queried by transaction reference on the backend before the financial ledger, invoice, reservation payment status, and persisted notifications are updated. Availability periods use pickup-inclusive/return-exclusive intervals and support a configured turnaround buffer. Server-side pricing is authoritative.
 
 The financial transaction table is an append-only ledger at the service layer. Payments, refunds, deposits, and deductions are represented as separate transaction rows; corrections should be posted as new entries. Backups are SQL exports, not an in-app restore feature.
 
 ## Integrations and current boundaries
 
 - HDEV is used for MoMo and SMS when configured. Pending MoMo requests do not count as paid until a provider response confirms them.
-- In-app notifications are available. There is no outbound email provider configured by this codebase.
+- In-app notifications are persisted, scoped to their user/customer, marked read through authenticated POST requests, and polled by each role dashboard. There is no outbound email provider configured by this codebase.
 - Driver scheduling is internal to the system. Drivers need a linked Driver-role user account to sign in and see their assigned schedule.
 - Reports are date-filtered screen summaries. PDF/Excel export is not currently implemented.
 - The backup export can be created by an authorized user, but restore should be performed manually into a separate database and verified before recovery use.

@@ -272,6 +272,7 @@ final class InvoiceService
             $status = 'paid';
         }
         Database::execute('UPDATE invoices SET status = ? WHERE invoice_id = ?', [$status, $invoiceId]);
+        ReservationPaymentStatusService::syncForInvoice($invoiceId);
     }
 
     private function lockInvoice(PDO $pdo, int $id): array

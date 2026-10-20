@@ -31,11 +31,25 @@ final class Ui
     public static function statusClass(string $status): string
     {
         return match ($status) {
-            'available', 'paid', 'completed', 'active', 'confirmed', 'sent' => 'success',
-            'pending', 'awaiting_approval', 'scheduled', 'draft', 'queued', 'partially_paid' => 'warning',
-            'reserved', 'issued', 'inspected' => 'info',
-            'rented', 'overdue', 'failed', 'cancelled', 'rejected', 'void', 'blacklisted', 'maintenance', 'inactive' => 'danger',
+            'available', 'paid', 'Paid', 'completed', 'Completed', 'successful', 'Successful', 'active', 'confirmed', 'sent' => 'success',
+            'pending', 'Pending', 'Pending Approval', 'pending approval', 'unpaid', 'Unpaid', 'awaiting_approval', 'scheduled', 'draft', 'queued', 'partially_paid' => 'warning',
+            'Approved — Awaiting Payment' => 'info',
+            'reserved', 'issued', 'inspected', 'refunded', 'Refunded' => 'info',
+            'rented', 'overdue', 'failed', 'cancelled', 'Cancelled', 'rejected', 'Rejected', 'no_show', 'No Show', 'void', 'blacklisted', 'maintenance', 'inactive' => 'danger',
             default => 'secondary',
+        };
+    }
+
+    public static function reservationStatusLabel(string $status, string $paymentStatus = 'unpaid'): string
+    {
+        return match ($status) {
+            'pending' => 'Pending Approval',
+            'confirmed' => $paymentStatus === 'successful' ? 'Paid' : 'Approved — Awaiting Payment',
+            'rejected' => 'Rejected',
+            'cancelled' => 'Cancelled',
+            'completed' => 'Completed',
+            'no_show' => 'No Show',
+            default => ucwords(str_replace('_', ' ', $status)),
         };
     }
 }

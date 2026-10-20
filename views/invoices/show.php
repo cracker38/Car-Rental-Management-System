@@ -1,5 +1,5 @@
 <div class="detail-grid">
-  <?php $bookingPaymentBlocked = strncmp((string) ($row['notes'] ?? ''), 'Booking prepayment:', 19) === 0 && ($row['reservation_status'] ?? '') !== 'confirmed'; ?>
+  <?php $bookingPaymentBlocked = strncmp((string) ($row['notes'] ?? ''), 'Booking prepayment:', 19) === 0 && (($row['reservation_status'] ?? '') !== 'confirmed' || trim((string) ($row['approval_note'] ?? '')) === '' || empty($row['approver_signature']) || empty($row['customer_signature'])); ?>
   <section class="panel invoice-hero">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
@@ -37,7 +37,7 @@
   <?php elseif (!$bookingPaymentBlocked && (float) ($row['outstanding_balance'] ?? 0) > 0 && (float) ($pendingMomoAmount ?? 0) > 0): ?>
     <section class="panel"><p class="mb-0">Mobile Money confirmation is pending for <?= e(\Crms\Money::format($pendingMomoAmount)) ?>. Use Check status below before starting another request.</p></section>
   <?php elseif ($bookingPaymentBlocked && (float) ($row['outstanding_balance'] ?? 0) > 0): ?>
-    <section class="panel"><p class="mb-0">This booking invoice can be paid after the reservation is confirmed.</p></section>
+    <section class="panel"><p class="mb-0">This booking invoice can be paid after the signed reservation request receives an approval decision.</p></section>
   <?php endif; ?>
 </div>
 

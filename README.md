@@ -20,7 +20,7 @@ See [the administrator guide](docs/admin-guide.md) for setup and recovery detail
 ## Main workflows
 
 - Search live availability by dates, category, vehicle, fuel, transmission, and price.
-- Create, edit pending, confirm, or cancel reservations with server-side pricing and overlap checks.
+- Submit signed reservations for staff approval, then pay approved booking invoices through verified HDEV MoMo settlement.
 - Create rental agreements and record vehicle pickup, return, inspection, mileage, and fuel.
 - Maintain invoices and an append-only payment/deposit/refund ledger with printable receipts.
 - Manage maintenance blocks, driver records, chauffeur assignments, notifications, reports, audit logs, and SQL backup exports.

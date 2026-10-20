@@ -79,6 +79,7 @@ require dirname(__DIR__) . '/partials/kpis.php';
     </section>
   </div>
 </div>
+<?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
 
 <div class="row g-3 mb-3">
   <div class="col-lg-5">

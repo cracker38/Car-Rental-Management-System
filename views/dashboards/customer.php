@@ -21,7 +21,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
           <tbody><?php foreach ($reservations as $item): ?><tr>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
             <td><?= e($item['make'] . ' ' . $item['model']) ?></td><td><?= e($item['pickup_datetime']) ?><small class="d-block text-muted"><?= e($item['return_datetime']) ?></small></td>
-            <td><?= status_badge((string)$item['status']) ?></td>
+            <td><?= status_badge(\Crms\Ui::reservationStatusLabel((string) $item['status'], (string) ($item['payment_status'] ?? 'unpaid'))) ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>
@@ -37,7 +37,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
             $invoicePending = (float) ($invoice['pending_momo_amount'] ?? 0);
             $paymentRequestable = max(0, $invoiceBalance - $invoicePending);
             $bookingPaymentBlocked = strncmp((string) ($invoice['notes'] ?? ''), 'Booking prepayment:', 19) === 0
-              && ($invoice['reservation_status'] ?? '') !== 'confirmed';
+              && (($invoice['reservation_status'] ?? '') !== 'confirmed' || trim((string) ($invoice['approval_note'] ?? '')) === '' || empty($invoice['approver_signature']) || empty($invoice['customer_signature']));
           ?>
           <div class="mini-row d-flex justify-content-between gap-2">
             <span><a href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>"><?= e($invoice['invoice_number']) ?></a><small class="d-block text-muted"><?= e($invoice['status']) ?></small></span>
@@ -50,7 +50,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
             <p class="small text-muted mb-2">Mobile Money request pending for <?= e(\Crms\Money::format($invoicePending)) ?>. <a href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>">View payment status</a></p>
           <?php endif; ?>
           <?php if ($invoiceBalance > 0 && $bookingPaymentBlocked): ?>
-            <p class="small text-muted mb-3">Payment is available after the booking is confirmed.</p>
+            <p class="small text-muted mb-3">Payment is available after the signed reservation request receives an approval decision.</p>
           <?php elseif ($paymentRequestable > 0): ?>
             <form method="post" action="<?= e(url('payments/momo')) ?>" class="border rounded-3 p-3 mb-3">
               <?= \Crms\Csrf::field() ?>
@@ -110,7 +110,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
       <?php if (!$payments): ?><p class="text-muted mb-0">Your payments, deposits, and receipts will appear here.</p><?php else: ?>
         <div class="table-responsive"><table class="table align-middle mb-0">
           <thead><tr><th>Reference</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
-          <tbody><?php foreach ($payments as $payment): ?><tr>
+          <tbody><?php foreach ($payments as $payment): ?><tr <?= $payment['status'] === 'pending' && !empty($payment['external_reference']) ? 'data-payment-poll="' . e(url('payments/status', ['id' => $payment['transaction_id']])) . '"' : '' ?>>
             <td><?= e($payment['transaction_number']) ?><?php if (!empty($payment['external_reference'])): ?><small class="d-block text-muted"><?= e($payment['external_reference']) ?></small><?php endif; ?><small class="d-block text-muted"><?= e($payment['transaction_date']) ?></small></td>
             <td><?= e(ucwords(str_replace('_', ' ', $payment['transaction_type']))) ?></td>
             <td><?= e(\Crms\Money::format($payment['amount'])) ?></td>

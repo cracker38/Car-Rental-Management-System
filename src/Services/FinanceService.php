@@ -79,10 +79,7 @@ final class FinanceService
                     throw new InvalidArgumentException('The selected invoice does not belong to this customer.');
                 }
                 if ($type === 'payment' && strncmp((string) ($invoice['notes'] ?? ''), 'Booking prepayment:', 19) === 0) {
-                    $booking = Database::fetch('SELECT status FROM reservations WHERE reservation_id = ?', [(int) $invoice['reservation_id']]);
-                    if (!$booking || $booking['status'] !== 'confirmed') {
-                        throw new InvalidArgumentException('The booking invoice can be paid after the reservation is confirmed.');
-                    }
+                    HdevPaymentService::assertBookingPaymentAllowed((int) $invoice['reservation_id']);
                 }
                 if (in_array($invoice['status'], ['draft', 'void'], true) && in_array($type, ['payment', 'adjustment'], true)) {
                     throw new InvalidArgumentException('Payments and invoice adjustments require an issued invoice.');
@@ -196,6 +193,14 @@ final class FinanceService
                 (new NotificationService())->notifyUser(
                     null,
                     $customerId,
+                    'payment_received',
+                    $subject,
+                    $message,
+                    'financial_transaction',
+                    $id
+                );
+                (new NotificationService())->notifyUsersWithAnyPermission(
+                    ['transactions.view', 'transactions.manage', 'reservations.manage'],
                     'payment_received',
                     $subject,
                     $message,

@@ -22,6 +22,60 @@ if ($mysqli->connect_error) {
     $mysqli->query("CREATE DATABASE IF NOT EXISTS `{$db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $mysqli->select_db($cfg['name']);
 
+    // Additive reservation signature, decision and payment state fields.
+    $reservationTable = $mysqli->query("SHOW TABLES LIKE 'reservations'");
+    if ($reservationTable && $reservationTable->num_rows > 0) {
+        $columns = [];
+        $columnRows = $mysqli->query('SHOW COLUMNS FROM reservations');
+        while ($columnRows && ($column = $columnRows->fetch_assoc())) {
+            $columns[$column['Field']] = true;
+        }
+        $reservationMigrations = [
+            'payment_status' => "ALTER TABLE reservations ADD COLUMN payment_status ENUM('unpaid','pending','successful','failed','cancelled','refunded') NOT NULL DEFAULT 'unpaid' AFTER status",
+            'customer_signature' => 'ALTER TABLE reservations ADD COLUMN customer_signature MEDIUMBLOB NULL AFTER internal_notes',
+            'customer_signature_user_id' => 'ALTER TABLE reservations ADD COLUMN customer_signature_user_id BIGINT UNSIGNED NULL AFTER customer_signature',
+            'customer_signature_captured_by' => 'ALTER TABLE reservations ADD COLUMN customer_signature_captured_by BIGINT UNSIGNED NULL AFTER customer_signature_user_id',
+            'customer_signed_at' => 'ALTER TABLE reservations ADD COLUMN customer_signed_at DATETIME NULL AFTER customer_signature_captured_by',
+            'approval_note' => 'ALTER TABLE reservations ADD COLUMN approval_note VARCHAR(500) NULL AFTER customer_signed_at',
+            'approver_signature' => 'ALTER TABLE reservations ADD COLUMN approver_signature MEDIUMBLOB NULL AFTER approval_note',
+            'decision_by' => 'ALTER TABLE reservations ADD COLUMN decision_by BIGINT UNSIGNED NULL AFTER approver_signature',
+            'decision_at' => 'ALTER TABLE reservations ADD COLUMN decision_at DATETIME NULL AFTER decision_by',
+        ];
+        foreach ($reservationMigrations as $columnName => $alter) {
+            if (!isset($columns[$columnName]) && !$mysqli->query($alter)) {
+                $ok = false;
+                $messages[] = 'Reservation workflow schema update failed: ' . $mysqli->error;
+            }
+        }
+        $indexes = [];
+        $indexRows = $mysqli->query('SHOW INDEX FROM reservations');
+        while ($indexRows && ($index = $indexRows->fetch_assoc())) {
+            $indexes[$index['Key_name']] = true;
+        }
+        if (!isset($indexes['idx_res_payment_status']) && !$mysqli->query('ALTER TABLE reservations ADD KEY idx_res_payment_status (payment_status,updated_at)')) {
+            $ok = false;
+            $messages[] = 'Reservation payment index update failed: ' . $mysqli->error;
+        }
+        $foreignKeys = [];
+        $foreignKeyRows = $mysqli->query(
+            "SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'reservations'"
+        );
+        while ($foreignKeyRows && ($foreignKey = $foreignKeyRows->fetch_assoc())) {
+            $foreignKeys[$foreignKey['CONSTRAINT_NAME']] = true;
+        }
+        foreach ([
+            'fk_res_customer_signature_user' => 'ALTER TABLE reservations ADD CONSTRAINT fk_res_customer_signature_user FOREIGN KEY (customer_signature_user_id) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE',
+            'fk_res_customer_signature_captor' => 'ALTER TABLE reservations ADD CONSTRAINT fk_res_customer_signature_captor FOREIGN KEY (customer_signature_captured_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE',
+            'fk_res_decision_user' => 'ALTER TABLE reservations ADD CONSTRAINT fk_res_decision_user FOREIGN KEY (decision_by) REFERENCES users(user_id) ON DELETE SET NULL ON UPDATE CASCADE',
+        ] as $constraintName => $alter) {
+            if (!isset($foreignKeys[$constraintName]) && !$mysqli->query($alter)) {
+                $ok = false;
+                $messages[] = 'Reservation workflow integrity update failed: ' . $mysqli->error;
+            }
+        }
+    }
+
     // Prepare existing installations for the additive finance schema before its invoice-balance view is recreated.
     $financeTable = $mysqli->query("SHOW TABLES LIKE 'financial_transactions'");
     if ($financeTable && $financeTable->num_rows > 0) {

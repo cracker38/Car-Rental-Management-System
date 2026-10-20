@@ -42,9 +42,9 @@ final class PaymentController
             }
         } elseif (Auth::isCustomer() && $reservationId && Http::str('transaction_type') === 'deposit_received') {
             Rbac::assertCustomerOwns('reservation', $reservationId);
-            $reservation = Database::fetch('SELECT reservation_id, customer_id, status FROM reservations WHERE reservation_id = ?', [$reservationId]);
-            if (!$reservation || $reservation['status'] !== 'confirmed') {
-                Http::flash('danger', 'This reservation is not eligible for a security deposit payment.');
+            $reservation = Database::fetch('SELECT reservation_id, customer_id, status, approval_note, approver_signature, customer_signature FROM reservations WHERE reservation_id = ?', [$reservationId]);
+            if (!$reservation || $reservation['status'] !== 'confirmed' || trim((string) ($reservation['approval_note'] ?? '')) === '' || empty($reservation['approver_signature']) || empty($reservation['customer_signature'])) {
+                Http::flash('danger', 'This reservation must have a signed approval decision before payment.');
                 Http::redirect('reservations/show', ['id' => $reservationId]);
             }
             $customerId = (int) $reservation['customer_id'];

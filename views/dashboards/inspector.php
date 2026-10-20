@@ -81,3 +81,4 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
     </section>
   </div>
 </div>
+<?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>

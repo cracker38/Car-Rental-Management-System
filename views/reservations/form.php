@@ -5,7 +5,7 @@
     <div class="col-md-6"><label class="form-label" for="reservation-customer">Customer</label>
       <select class="form-select" id="reservation-customer" name="customer_id" required <?= \Crms\Auth::isCustomer() || $editing ? 'disabled' : '' ?>>
         <?php foreach ($customers as $c): ?>
-          <option value="<?= (int)$c['customer_id'] ?>" <?= ($editing && (int)$reservation['customer_id'] === (int)$c['customer_id']) || (\Crms\Auth::isCustomer() && (int)($customers[0]['customer_id'] ?? 0) === (int)$c['customer_id']) ? 'selected' : '' ?>><?= e($c['customer_code'] . ' · ' . $c['first_name'] . ' ' . $c['last_name']) ?></option>
+          <option value="<?= (int)$c['customer_id'] ?>" <?= (int) ($preCustomerId ?? 0) === (int) $c['customer_id'] ? 'selected' : '' ?>><?= e($c['customer_code'] . ' · ' . $c['first_name'] . ' ' . $c['last_name']) ?></option>
         <?php endforeach; ?>
       </select>
       <?php if (\Crms\Auth::isCustomer() || $editing): ?><input type="hidden" name="customer_id" value="<?= (int)($reservation['customer_id'] ?? $customers[0]['customer_id'] ?? 0) ?>"><?php endif; ?>
@@ -32,6 +32,78 @@
     <?php endif; ?>
     <div class="col-12"><label class="form-label" for="reservation-customer-notes">Customer notes</label><textarea class="form-control" id="reservation-customer-notes" name="customer_notes"><?= e($reservation['customer_notes'] ?? '') ?></textarea></div>
   </div>
-  <p class="small text-muted mt-3">Totals are calculated on the server. Availability is checked again when you save.</p>
-  <div class="d-flex gap-2 mt-2"><button class="btn btn-primary"><?= $editing ? 'Update reservation' : 'Save reservation' ?></button><?php if ($editing): ?><a class="btn btn-outline-secondary" href="<?= e(url('reservations/show', ['id' => $reservation['reservation_id']])) ?>">Cancel</a><?php endif; ?></div>
+  <section class="border rounded-3 p-3 mt-4" aria-labelledby="reservation-review-title">
+    <h2 class="h6" id="reservation-review-title">Review and sign the reservation request</h2>
+    <p class="small text-muted">Review the vehicle, dates, locations, and customer notes above. The final quote and availability are checked again by the server. A staff edit to an approved reservation returns it for a new approval.</p>
+    <label class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="reservation_reviewed" value="1" required>
+      <span class="form-check-label">I have reviewed these reservation details and agree to submit this signed request.</span>
+    </label>
+    <label class="form-label" for="customer-signature-canvas">Customer signature</label>
+    <canvas id="customer-signature-canvas" width="600" height="180" class="w-100 border rounded bg-white" style="height:180px;touch-action:none" role="img" aria-label="Draw customer signature here" tabindex="0"></canvas>
+    <input type="hidden" name="customer_signature" id="customer-signature-data">
+    <div class="d-flex justify-content-between align-items-center mt-2">
+      <small class="text-muted">Use a mouse, touch screen, or stylus to sign.</small>
+      <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-customer-signature">Clear signature</button>
+    </div>
+    <div class="small text-danger mt-2" id="customer-signature-error" role="alert" hidden>Draw your signature before submitting.</div>
+  </section>
+  <p class="small text-muted mt-3">After submission, the request remains pending until a Manager or Rental Officer records a signed decision. Payment is available only after approval.</p>
+  <div class="d-flex gap-2 mt-2"><button class="btn btn-primary"><?= $editing ? 'Sign and update request' : 'Sign and submit request' ?></button><?php if ($editing): ?><a class="btn btn-outline-secondary" href="<?= e(url('reservations/show', ['id' => $reservation['reservation_id']])) ?>">Cancel</a><?php endif; ?></div>
 </form>
+<script>
+(() => {
+  const canvas = document.getElementById('customer-signature-canvas');
+  const form = canvas?.closest('form');
+  const hidden = document.getElementById('customer-signature-data');
+  const error = document.getElementById('customer-signature-error');
+  const context = canvas?.getContext('2d');
+  if (!canvas || !form || !hidden || !context) return;
+  context.strokeStyle = '#172554';
+  context.lineWidth = 3;
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  let drawing = false;
+  let signed = false;
+  const point = event => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+  };
+  canvas.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    canvas.setPointerCapture(event.pointerId);
+    const p = point(event);
+    context.beginPath();
+    context.moveTo(p.x, p.y);
+    drawing = true;
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!drawing) return;
+    const p = point(event);
+    context.lineTo(p.x, p.y);
+    context.stroke();
+    signed = true;
+  });
+  const finish = () => {
+    if (!drawing) return;
+    drawing = false;
+    if (signed) hidden.value = canvas.toDataURL('image/png');
+  };
+  canvas.addEventListener('pointerup', finish);
+  canvas.addEventListener('pointercancel', finish);
+  document.getElementById('clear-customer-signature')?.addEventListener('click', () => {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    hidden.value = '';
+    signed = false;
+    error.hidden = true;
+  });
+  form.addEventListener('submit', event => {
+    if (signed) hidden.value = canvas.toDataURL('image/png');
+    if (!hidden.value) {
+      event.preventDefault();
+      error.hidden = false;
+      canvas.focus();
+    }
+  });
+})();
+</script>

@@ -130,3 +130,4 @@ $maxRevenue = max(1, ...array_column($trends, 'revenue'));
     </section>
   </div>
 </div>
+<?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>

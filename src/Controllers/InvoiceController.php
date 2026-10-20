@@ -49,7 +49,7 @@ final class InvoiceController
         $id = Http::int('id');
         Rbac::assertCustomerOwns('invoice', $id);
         $invoiceSql = 'SELECT i.*, c.first_name, c.last_name, c.phone, c.email, b.outstanding_balance, b.net_paid,
-                              r.status AS reservation_status
+                              r.status AS reservation_status, r.approval_note, r.approver_signature, r.customer_signature
                        FROM invoices i
                        JOIN customers c ON c.customer_id = i.customer_id
                        LEFT JOIN reservations r ON r.reservation_id = i.reservation_id

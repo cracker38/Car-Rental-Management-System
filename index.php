@@ -11,6 +11,7 @@ use Crms\Controllers\FinanceController;
 use Crms\Controllers\HomeController;
 use Crms\Controllers\InvoiceController;
 use Crms\Controllers\MaintenanceController;
+use Crms\Controllers\NotificationController;
 use Crms\Controllers\PaymentController;
 use Crms\Controllers\RentalController;
 use Crms\Controllers\ReservationController;
@@ -48,6 +49,7 @@ $routes = [
     'reservations/form' => [ReservationController::class, 'form'],
     'reservations/show' => [ReservationController::class, 'show'],
     'reservations/transition' => [ReservationController::class, 'transition'],
+    'reservations/decision' => [ReservationController::class, 'decision'],
     'rentals' => [RentalController::class, 'index'],
     'rentals/show' => [RentalController::class, 'show'],
     'rentals/create' => [RentalController::class, 'create'],
@@ -70,6 +72,8 @@ $routes = [
     'payments/sync' => [PaymentController::class, 'sync'],
     'payments/status' => [PaymentController::class, 'status'],
     'payments/receipt' => [PaymentController::class, 'receipt'],
+    'notifications/open' => [NotificationController::class, 'open'],
+    'notifications/poll' => [NotificationController::class, 'poll'],
     'maintenance' => [MaintenanceController::class, 'index'],
     'admin/users' => [AdminController::class, 'users'],
     'admin/roles' => [AdminController::class, 'roles'],

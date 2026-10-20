@@ -35,7 +35,7 @@ final class Audit
 
     private static function redact(array $data): array
     {
-        $blocked = ['password', 'password_hash', 'token', 'csrf', 'card_number', 'cvv', 'secret'];
+        $blocked = ['password', 'password_hash', 'token', 'csrf', 'card_number', 'cvv', 'secret', 'signature'];
         foreach ($data as $k => $v) {
             $lk = strtolower((string) $k);
             foreach ($blocked as $b) {

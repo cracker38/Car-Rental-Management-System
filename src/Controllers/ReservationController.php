@@ -60,6 +60,9 @@ final class ReservationController
         }
         $customers = Database::fetchAll("SELECT * FROM customers WHERE status = 'active' ORDER BY last_name");
         $vehicles = Database::fetchAll("SELECT * FROM vehicles WHERE status NOT IN ('inactive') ORDER BY registration_no");
+        $preCustomerId = $reservation
+            ? (int) $reservation['customer_id']
+            : (Auth::isCustomer() ? (int) (Auth::customerId() ?? 0) : Http::int('customer_id'));
         $preVehicle = Http::int('vehicle_id') ?: ($reservation ? (int) $reservation['vehicle_id'] : null);
         $pickup = Http::str('pickup_datetime', $reservation['pickup_datetime'] ?? '');
         $returnAt = Http::str('return_datetime', $reservation['return_datetime'] ?? '');
@@ -88,6 +91,8 @@ final class ReservationController
                     'discount_amount' => Auth::isCustomer() ? '0' : (Http::str('discount_amount') ?: '0'),
                     'customer_notes' => Http::str('customer_notes'),
                     'internal_notes' => Auth::isCustomer() ? null : Http::str('internal_notes'),
+                    'customer_signature' => Http::str('customer_signature'),
+                    'reservation_reviewed' => Http::str('reservation_reviewed'),
                 ];
                 if ($reservation) {
                     $svc->update($reservationId, $input, !Auth::isCustomer());
@@ -106,6 +111,7 @@ final class ReservationController
         View::render('reservations/form', [
             'title' => $reservation ? 'Edit reservation' : 'New reservation',
             'customers' => $customers,
+            'preCustomerId' => $preCustomerId,
             'vehicles' => $vehicles,
             'preVehicle' => $preVehicle,
             'pickup' => $pickup,
@@ -120,12 +126,15 @@ final class ReservationController
         $id = Http::int('id');
         Rbac::assertCustomerOwns('reservation', $id);
         $row = Database::fetch(
-            'SELECT r.reservation_id, r.customer_id, r.reservation_code, r.status, r.pickup_datetime, r.return_datetime,
-                    r.estimated_amount, r.security_deposit, c.first_name, c.last_name, c.phone,
-                    v.registration_no, v.make, v.model
+            'SELECT r.*, c.first_name, c.last_name, c.phone, c.email,
+                    v.registration_no, v.make, v.model,
+                    decider.first_name AS decision_first_name, decider.last_name AS decision_last_name,
+                    captor.first_name AS signature_captor_first_name, captor.last_name AS signature_captor_last_name
              FROM reservations r
              JOIN customers c ON c.customer_id = r.customer_id
              JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+             LEFT JOIN users decider ON decider.user_id = r.decision_by
+             LEFT JOIN users captor ON captor.user_id = r.customer_signature_captured_by
              WHERE r.reservation_id = ?',
             [$id]
         );
@@ -197,6 +206,30 @@ final class ReservationController
             Http::flash('success', 'Reservation status updated.');
         } catch (InvalidArgumentException $e) {
             Http::flash('danger', $e->getMessage());
+        }
+        Http::redirect('reservations/show', ['id' => $id]);
+    }
+
+    public function decision(): void
+    {
+        $id = Http::int('id');
+        Rbac::require('reservations.manage');
+        if (!Http::isPost()) {
+            Http::flash('danger', 'Submit the reservation decision form to continue.');
+            Http::redirect('reservations/show', ['id' => $id]);
+        }
+        try {
+            (new ReservationService())->decide(
+                $id,
+                Http::str('decision'),
+                Http::str('note'),
+                Http::str('approver_signature')
+            );
+            Http::flash('success', 'Reservation decision recorded and the customer has been notified.');
+        } catch (InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+        } catch (\Throwable) {
+            Http::flash('danger', 'Could not record the reservation decision.');
         }
         Http::redirect('reservations/show', ['id' => $id]);
     }

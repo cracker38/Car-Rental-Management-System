@@ -168,7 +168,7 @@ final class AdminController
             }
             $keys = [
                 'business_name', 'tax_rate_percent', 'default_deposit_amount', 'turnaround_minutes',
-                'extra_km_rate', 'included_km_per_day', 'late_fee_per_hour', 'reservation_confirmation_required',
+                'extra_km_rate', 'included_km_per_day', 'late_fee_per_hour',
                 'hdev_callback_url', 'hdev_sms_sender', 'hdev_sms_enabled',
             ];
             foreach ($keys as $k) {

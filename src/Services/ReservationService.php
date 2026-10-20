@@ -6,7 +6,8 @@ namespace Crms\Services;
 use Crms\Audit;
 use Crms\Auth;
 use Crms\Database;
-use Crms\Settings;
+use Crms\Rbac;
+use Crms\Signature;
 use InvalidArgumentException;
 use PDO;
 
@@ -17,7 +18,7 @@ final class ReservationService
 
     /** @var array<string,list<string>> */
     public const TRANSITIONS = [
-        'pending' => ['confirmed', 'cancelled', 'rejected'],
+        'pending' => ['cancelled'],
         'confirmed' => ['cancelled', 'no_show'],
         'cancelled' => [],
         'rejected' => [],
@@ -33,8 +34,22 @@ final class ReservationService
 
     public function create(array $input, bool $asStaff): array
     {
+        if (!Auth::check()) {
+            throw new InvalidArgumentException('Sign in before submitting a reservation.');
+        }
+        if (Auth::isCustomer()) {
+            if (!Auth::customerId() || (int) ($input['customer_id'] ?? 0) !== (int) Auth::customerId()) {
+                throw new InvalidArgumentException('Customers can submit reservations only for their own account.');
+            }
+        } elseif (!$asStaff || !Rbac::can('reservations.manage')) {
+            throw new InvalidArgumentException('You are not authorized to create reservations for customers.');
+        }
+        if ((string) ($input['reservation_reviewed'] ?? '') !== '1') {
+            throw new InvalidArgumentException('Review the reservation details before signing and submitting.');
+        }
+        $customerSignature = Signature::decodePng((string) ($input['customer_signature'] ?? ''));
         $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
-        $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff) {
+        $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff, $customerSignature) {
             $customerId = (int) $input['customer_id'];
             $vehicleId = (int) $input['vehicle_id'];
             $pickup = $input['pickup_datetime'];
@@ -69,47 +84,28 @@ final class ReservationService
             $quote = $this->pricing->quoteRates($vehicle, $pickup, $returnAt, (string) $discount);
             $code = $this->nextCode('RSV');
             $status = 'pending';
-            $needConfirm = Settings::get('reservation_confirmation_required', 'true') === 'true';
-            $confirmedBy = null;
-            $confirmedAt = null;
-            if ($asStaff && !$needConfirm) {
-                $status = 'confirmed';
-                $confirmedBy = Auth::id();
-                $confirmedAt = date('Y-m-d H:i:s');
-            }
+            $customerSignatureUserId = Auth::isCustomer() ? Auth::id() : null;
 
             Database::execute(
                 'INSERT INTO reservations (
                     reservation_code, customer_id, vehicle_id, pickup_datetime, return_datetime,
                     pickup_location, return_location, agreed_daily_rate, estimated_days, estimated_amount,
-                    discount_amount, tax_amount, security_deposit, status, customer_notes, internal_notes, created_by,
-                    confirmed_by, confirmed_at
-                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                    discount_amount, tax_amount, security_deposit, status, customer_notes, internal_notes,
+                    customer_signature, customer_signature_user_id, customer_signature_captured_by, customer_signed_at, created_by
+                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $code, $customerId, $vehicleId, $pickup, $returnAt,
                     $input['pickup_location'] ?? null, $input['return_location'] ?? null,
                     $quote['agreed_daily_rate'], $quote['estimated_days'], $quote['estimated_amount'],
                     $quote['discount_amount'], $quote['tax_amount'], $quote['security_deposit'],
-                    $status, $input['customer_notes'] ?? null, $input['internal_notes'] ?? null, Auth::id(),
-                    $confirmedBy, $confirmedAt,
+                    $status, $input['customer_notes'] ?? null, $input['internal_notes'] ?? null,
+                    $customerSignature, $customerSignatureUserId, Auth::id(), date('Y-m-d H:i:s'), Auth::id(),
                 ]
             );
             $id = (int) Database::lastId();
             (new InvoiceService())->createFromReservation($id);
-            if ($status === 'confirmed') {
-                (new InvoiceService())->issueBookingPrepayment($id);
-                $this->syncVehicleStatus($vehicleId);
-            }
-            $bookingInvoice = Database::fetch(
-                "SELECT invoice_number, total_amount FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' ORDER BY invoice_id DESC LIMIT 1",
-                [$id]
-            );
             $customerMessage = 'Reservation ' . $code . ' is ' . $status . '. Pickup ' . $pickup . '.';
-            if ($status === 'confirmed' && !empty($bookingInvoice['invoice_number']) && (float) $bookingInvoice['total_amount'] > 0) {
-                $customerMessage .= ' Invoice ' . $bookingInvoice['invoice_number'] . ' is ready; pay it before the rental agreement and pickup.';
-            } elseif ($status === 'pending') {
-                $customerMessage .= ' The booking invoice will be issued after staff confirms the reservation.';
-            }
+            $customerMessage .= ' A manager or rental officer will review the signed request before payment is available.';
             Audit::log('reservation.created', 'reservation', (string) $id, $code . ' ' . $status);
             $notifications = new NotificationService();
             $notifications->notifyUser(
@@ -121,28 +117,18 @@ final class ReservationService
                 'reservation',
                 $id
             );
-            $notifications->notifyRentalOfficers(
+            $notifications->notifyUsersWithPermission(
+                'reservations.manage',
                 'reservation_created',
                 'Reservation ' . $code,
-                'A new reservation was created. ' . $customerMessage,
+                'A signed reservation request is waiting for approval. ' . $customerMessage,
                 'reservation',
                 $id,
                 Auth::id()
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
-        $smsMessage = 'Reservation ' . $created['reservation_code'] . ' is ' . $created['status'] . '. Pickup ' . $created['pickup_datetime'] . '.';
-        if ($created['status'] === 'pending') {
-            $smsMessage .= ' The booking invoice will be issued after staff confirmation.';
-        } elseif ($created['status'] === 'confirmed') {
-            $bookingInvoice = Database::fetch(
-                "SELECT invoice_number, total_amount FROM invoices WHERE reservation_id = ? AND notes LIKE 'Booking prepayment:%' ORDER BY invoice_id DESC LIMIT 1",
-                [(int) $created['reservation_id']]
-            );
-            if (!empty($bookingInvoice['invoice_number']) && (float) $bookingInvoice['total_amount'] > 0) {
-                $smsMessage .= ' Pay booking invoice ' . $bookingInvoice['invoice_number'] . ' before pickup.';
-            }
-        }
+        $smsMessage = 'Reservation ' . $created['reservation_code'] . ' was submitted and is awaiting manager or rental officer review.';
         (new SmsService())->sendToCustomer(
             (int) $created['customer_id'],
             'reservation_created',
@@ -157,8 +143,21 @@ final class ReservationService
     /** Update a pending booking, or a future confirmed staff booking with no rental agreement. */
     public function update(int $id, array $input, bool $asStaff): array
     {
+        if (!Auth::check()) {
+            throw new InvalidArgumentException('Sign in before updating a reservation.');
+        }
+        if (Auth::isCustomer() && (!Auth::customerId() || (int) Auth::customerId() !== (int) ($input['customer_id'] ?? Auth::customerId()))) {
+            throw new InvalidArgumentException('Customers can update only their own reservations.');
+        }
+        if (!Auth::isCustomer() && (!$asStaff || !Rbac::can('reservations.manage'))) {
+            throw new InvalidArgumentException('You are not authorized to update reservations.');
+        }
+        if ((string) ($input['reservation_reviewed'] ?? '') !== '1') {
+            throw new InvalidArgumentException('Review the updated reservation details before signing and submitting.');
+        }
+        $customerSignature = Signature::decodePng((string) ($input['customer_signature'] ?? ''));
         $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
-        $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff) {
+        $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff, $customerSignature) {
             $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
             $stmt->execute([$id]);
             $reservation = $stmt->fetch();
@@ -168,6 +167,7 @@ final class ReservationService
             if ((string) $input['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
                 throw new InvalidArgumentException('Pickup must be scheduled in the future.');
             }
+            $wasApproved = $reservation['status'] === 'confirmed';
             $editable = $reservation['status'] === 'pending';
             if (!$editable && $asStaff && $reservation['status'] === 'confirmed') {
                 $now = (string) $pdo->query('SELECT NOW()')->fetchColumn();
@@ -214,21 +214,23 @@ final class ReservationService
             $quote = $this->pricing->quoteRates($vehicle, $pickup, $returnAt, $discount);
             (new InvoiceService())->replaceUnpaidBookingInvoice($id, 'Reservation updated before payment.');
             Database::execute(
-                'UPDATE reservations SET vehicle_id = ?, pickup_datetime = ?, return_datetime = ?,
+                'UPDATE reservations SET status = ?, payment_status = \'unpaid\', confirmed_by = NULL, confirmed_at = NULL,
+                    approval_note = NULL, approver_signature = NULL, decision_by = NULL, decision_at = NULL,
+                    vehicle_id = ?, pickup_datetime = ?, return_datetime = ?,
                     pickup_location = ?, return_location = ?, agreed_daily_rate = ?, estimated_days = ?,
                     estimated_amount = ?, discount_amount = ?, tax_amount = ?, security_deposit = ?,
-                    customer_notes = ?, internal_notes = ? WHERE reservation_id = ?',
+                    customer_notes = ?, internal_notes = ?, customer_signature = ?, customer_signature_user_id = ?,
+                    customer_signature_captured_by = ?, customer_signed_at = NOW() WHERE reservation_id = ?',
                 [
+                    $wasApproved ? 'pending' : $reservation['status'],
                     $vehicleId, $pickup, $returnAt, $input['pickup_location'] ?? null, $input['return_location'] ?? null,
                     $quote['agreed_daily_rate'], $quote['estimated_days'], $quote['estimated_amount'],
                     $quote['discount_amount'], $quote['tax_amount'], $quote['security_deposit'],
-                    $input['customer_notes'] ?? null, $asStaff ? ($input['internal_notes'] ?? null) : $reservation['internal_notes'], $id,
+                    $input['customer_notes'] ?? null, $asStaff ? ($input['internal_notes'] ?? null) : $reservation['internal_notes'],
+                    $customerSignature, Auth::isCustomer() ? Auth::id() : null, Auth::id(), $id,
                 ]
             );
             (new InvoiceService())->createFromReservation($id);
-            if ($reservation['status'] === 'confirmed') {
-                (new InvoiceService())->issueBookingPrepayment($id);
-            }
             if ((int) $reservation['vehicle_id'] !== $vehicleId) {
                 $this->syncVehicleStatus((int) $reservation['vehicle_id']);
             }
@@ -275,6 +277,9 @@ final class ReservationService
 
     public function transition(int $id, string $to, ?string $reason = null): void
     {
+        if (in_array($to, ['confirmed', 'rejected'], true)) {
+            throw new InvalidArgumentException('Use the signed reservation decision workflow to approve or reject a request.');
+        }
         $reason = trim((string) $reason);
         if (in_array($to, ['cancelled', 'rejected'], true)) {
             $reasonLength = function_exists('mb_strlen') ? mb_strlen($reason) : strlen($reason);
@@ -363,6 +368,9 @@ final class ReservationService
             }
             $sql = 'UPDATE reservations SET status = ?';
             $params = [$to];
+            if (in_array($to, ['cancelled', 'no_show'], true)) {
+                $sql .= ", payment_status = CASE WHEN payment_status IN ('successful','refunded') THEN payment_status ELSE 'cancelled' END";
+            }
             if ($to === 'confirmed') {
                 $sql .= ', confirmed_by = ?, confirmed_at = NOW()';
                 $params[] = Auth::id();
@@ -447,6 +455,143 @@ final class ReservationService
             'reservation',
             $id
         );
+    }
+
+    public function decide(int $id, string $decision, string $note, string $signatureData): array
+    {
+        if (!Auth::check() || Auth::isCustomer() || !Rbac::can('reservations.manage')) {
+            throw new InvalidArgumentException('You are not authorized to review reservations.');
+        }
+        if (!in_array($decision, ['approve', 'reject'], true)) {
+            throw new InvalidArgumentException('Choose approve or reject.');
+        }
+        $note = trim($note);
+        $noteLength = function_exists('mb_strlen') ? mb_strlen($note) : strlen($note);
+        if ($note === '' || $noteLength > 500) {
+            throw new InvalidArgumentException('Add a decision note of up to 500 characters.');
+        }
+        $approverSignature = Signature::decodePng($signatureData);
+
+        $decided = Database::transaction(function (PDO $pdo) use ($id, $decision, $note, $approverSignature) {
+            $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
+            $stmt->execute([$id]);
+            $reservation = $stmt->fetch();
+            if (!$reservation) {
+                throw new InvalidArgumentException('Reservation not found.');
+            }
+            if ($reservation['status'] !== 'pending') {
+                throw new InvalidArgumentException('This reservation has already been reviewed or changed.');
+            }
+            if (empty($reservation['customer_signature']) || empty($reservation['customer_signed_at'])) {
+                throw new InvalidArgumentException('The customer must sign the reservation request before it can be reviewed.');
+            }
+
+            $from = (string) $reservation['status'];
+            $to = $decision === 'approve' ? 'confirmed' : 'rejected';
+            $invoice = null;
+            if ($decision === 'approve') {
+                if ($reservation['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
+                    throw new InvalidArgumentException('This pickup time has passed. Update the request before approving it.');
+                }
+                $vehicle = $this->availability->lockVehicle($pdo, (int) $reservation['vehicle_id']);
+                $block = $this->availability->isOperationallyBookable($vehicle);
+                if ($block) {
+                    throw new InvalidArgumentException($block);
+                }
+                $conflict = $this->availability->hasConflict(
+                    (int) $reservation['vehicle_id'],
+                    (string) $reservation['pickup_datetime'],
+                    (string) $reservation['return_datetime'],
+                    (int) $reservation['reservation_id']
+                );
+                if ($conflict) {
+                    throw new InvalidArgumentException($conflict);
+                }
+            }
+
+            Database::execute(
+                'UPDATE reservations SET status = ?, payment_status = ?, approval_note = ?, approver_signature = ?,
+                    decision_by = ?, decision_at = NOW(), confirmed_by = ?, confirmed_at = ?,
+                    cancelled_at = ?, cancellation_reason = ? WHERE reservation_id = ? AND status = \'pending\'',
+                [
+                    $to,
+                    $decision === 'reject' ? 'cancelled' : 'unpaid',
+                    $note,
+                    $approverSignature,
+                    Auth::id(),
+                    $decision === 'approve' ? Auth::id() : null,
+                    $decision === 'approve' ? date('Y-m-d H:i:s') : null,
+                    $decision === 'reject' ? date('Y-m-d H:i:s') : null,
+                    $decision === 'reject' ? $note : null,
+                    $id,
+                ]
+            );
+            if ($decision === 'approve') {
+                $invoice = (new InvoiceService())->issueBookingPrepayment($id);
+            }
+            $this->syncVehicleStatus((int) $reservation['vehicle_id']);
+            Audit::log(
+                'reservation.' . ($decision === 'approve' ? 'approved' : 'rejected'),
+                'reservation',
+                (string) $id,
+                $note,
+                ['status' => $from],
+                ['status' => $to, 'note' => $note, 'approver_id' => Auth::id()]
+            );
+
+            $decisionLabel = $decision === 'approve' ? 'approved' : 'rejected';
+            $customerMessage = 'Reservation ' . $reservation['reservation_code'] . ' was ' . $decisionLabel . '. Decision note: ' . $note;
+            if ($decision === 'approve') {
+                $customerMessage .= ' Amount due: ' . \Crms\Money::format($invoice['total_amount'] ?? $reservation['estimated_amount']) . '. Pay the issued booking invoice before a rental agreement or pickup.';
+            }
+            $notifications = new NotificationService();
+            $notifications->notifyUser(
+                null,
+                (int) $reservation['customer_id'],
+                'reservation_' . ($decision === 'approve' ? 'approved' : 'rejected'),
+                'Reservation ' . $reservation['reservation_code'] . ' ' . ($decision === 'approve' ? 'approved' : 'rejected'),
+                $customerMessage,
+                'reservation',
+                $id
+            );
+            if ($decision === 'approve') {
+                $notifications->notifyUser(
+                    null,
+                    (int) $reservation['customer_id'],
+                    'payment_required',
+                    'Payment required for reservation ' . $reservation['reservation_code'],
+                    'The approved reservation is ready for payment. Amount due: ' . \Crms\Money::format($invoice['total_amount'] ?? $reservation['estimated_amount']) . '. Open the reservation to continue.',
+                    'reservation',
+                    $id
+                );
+            }
+            $notifications->notifyUsersWithPermission(
+                'reservations.manage',
+                'reservation_decided',
+                'Reservation ' . $reservation['reservation_code'] . ' ' . ($decision === 'approve' ? 'approved' : 'rejected'),
+                'A review decision was recorded. Note: ' . $note,
+                'reservation',
+                $id,
+                Auth::id()
+            );
+
+            $reservation['status'] = $to;
+            $reservation['approval_note'] = $note;
+            $reservation['decision_by'] = Auth::id();
+            $reservation['decision_at'] = date('Y-m-d H:i:s');
+            $reservation['payment_status'] = $decision === 'reject' ? 'cancelled' : 'unpaid';
+            return $reservation;
+        });
+
+        (new SmsService())->sendToCustomer(
+            (int) $decided['customer_id'],
+            'reservation_' . ($decision === 'approve' ? 'approved' : 'rejected'),
+            'Reservation ' . $decided['reservation_code'] . ' ' . ($decision === 'approve' ? 'approved' : 'rejected'),
+            'Decision note: ' . $note . ($decision === 'approve' ? ' Payment is now available. Sign in to pay the approved booking invoice.' : ''),
+            'reservation',
+            $id
+        );
+        return $decided;
     }
 
     public function syncVehicleStatus(int $vehicleId): void

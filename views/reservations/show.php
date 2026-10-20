@@ -6,7 +6,7 @@
       <p class="mb-1"><?= e($row['first_name'] . ' ' . $row['last_name']) ?></p>
       <p class="text-muted mb-0"><?= e($row['registration_no'] . ' · ' . $row['make'] . ' ' . $row['model']) ?></p>
     </div>
-    <?= status_badge((string) $row['status']) ?>
+    <?= status_badge(\Crms\Ui::reservationStatusLabel((string) $row['status'], (string) ($row['payment_status'] ?? 'unpaid'))) ?>
   </div>
   <div class="kpi-row">
     <div><span>Pickup</span><strong><?= e($row['pickup_datetime']) ?></strong></div>
@@ -17,6 +17,73 @@
   <?php $canEditReservation = ($row['status'] === 'pending' && (can('reservations.manage') || \Crms\Auth::isCustomer())) || (!\Crms\Auth::isCustomer() && !empty($canEditConfirmedStaffBooking)); ?>
   <?php if ($canEditReservation && empty($bookingInvoice['payment_activity'])): ?><a class="btn btn-outline-dark" href="<?= e(url('reservations/form', ['id' => $row['reservation_id']])) ?>">Edit reservation</a><?php endif; ?>
 </section>
+<?php $signedApprovalComplete = $row['status'] === 'confirmed' && trim((string) ($row['approval_note'] ?? '')) !== '' && !empty($row['approver_signature']) && !empty($row['customer_signature']); ?>
+<section class="panel mb-3">
+  <div class="panel-h">Reservation request and signatures</div>
+  <div class="row g-3">
+    <div class="col-md-6"><strong>Pickup location</strong><div><?= e($row['pickup_location'] ?: 'Not specified') ?></div></div>
+    <div class="col-md-6"><strong>Return location</strong><div><?= e($row['return_location'] ?: 'Not specified') ?></div></div>
+    <div class="col-md-6"><strong>Request submitted</strong><div><?= e($row['created_at']) ?></div></div>
+    <div class="col-md-6"><strong>Payment status</strong><div><?= status_badge(ucfirst(str_replace('_', ' ', (string) ($row['payment_status'] ?? 'unpaid')))) ?></div></div>
+    <?php if (!empty($row['customer_notes'])): ?><div class="col-12"><strong>Customer notes</strong><div><?= nl2br(e($row['customer_notes'])) ?></div></div><?php endif; ?>
+    <?php if (!\Crms\Auth::isCustomer() && !empty($row['internal_notes'])): ?><div class="col-12"><strong>Internal notes</strong><div><?= nl2br(e($row['internal_notes'])) ?></div></div><?php endif; ?>
+    <div class="col-md-6">
+      <strong>Customer signature</strong>
+      <?php if (!empty($row['customer_signature'])): ?>
+        <div><img class="border rounded bg-white mt-2" style="max-width:100%;height:90px;object-fit:contain" src="<?= e(\Crms\Signature::dataUri($row['customer_signature'])) ?>" alt="Customer signature"></div>
+        <small class="text-muted">Signed <?= e($row['customer_signed_at'] ?? '') ?><?php if (!empty($row['signature_captor_first_name'])): ?> · captured by <?= e($row['signature_captor_first_name'] . ' ' . $row['signature_captor_last_name']) ?><?php endif; ?></small>
+      <?php else: ?><p class="small text-muted mb-0">No customer signature recorded.</p><?php endif; ?>
+    </div>
+    <div class="col-md-6">
+      <strong>Approver signature</strong>
+      <?php if (!empty($row['approver_signature'])): ?>
+        <div><img class="border rounded bg-white mt-2" style="max-width:100%;height:90px;object-fit:contain" src="<?= e(\Crms\Signature::dataUri($row['approver_signature'])) ?>" alt="Approver signature"></div>
+        <small class="text-muted"><?= e(trim(($row['decision_first_name'] ?? '') . ' ' . ($row['decision_last_name'] ?? ''))) ?> · <?= e($row['decision_at'] ?? '') ?></small>
+        <p class="small mt-2 mb-0"><strong>Decision note:</strong> <?= nl2br(e($row['approval_note'] ?? '')) ?></p>
+      <?php else: ?><p class="small text-muted mb-0">No decision has been recorded.</p><?php endif; ?>
+    </div>
+  </div>
+</section>
+<?php if ($row['status'] === 'pending' && can('reservations.manage') && !\Crms\Auth::isCustomer()): ?>
+  <form method="post" action="<?= e(url('reservations/decision', ['id' => $row['reservation_id']])) ?>" class="panel mb-3" id="reservation-decision-form">
+    <?= \Crms\Csrf::field() ?>
+    <div class="panel-h">Review reservation request</div>
+    <p class="small text-muted">Approve only after confirming the vehicle and dates. A rejection or approval note and your signature are required. Approval creates the booking invoice and unlocks customer payment.</p>
+    <label class="form-label" for="reservation-decision-note">Decision note</label>
+    <textarea class="form-control mb-3" id="reservation-decision-note" name="note" maxlength="500" rows="3" required></textarea>
+    <label class="form-label" for="approver-signature-canvas">Approver signature</label>
+    <canvas id="approver-signature-canvas" width="600" height="180" class="w-100 border rounded bg-white" style="height:180px;touch-action:none" role="img" aria-label="Draw approver signature here" tabindex="0"></canvas>
+    <input type="hidden" name="approver_signature" id="approver-signature-data">
+    <div class="d-flex justify-content-between align-items-center mt-2">
+      <small class="text-muted">Sign using a mouse, touch screen, or stylus.</small>
+      <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-approver-signature">Clear signature</button>
+    </div>
+    <div class="small text-danger mt-2" id="approver-signature-error" role="alert" hidden>Draw your signature before recording the decision.</div>
+    <div class="d-flex gap-2 mt-3">
+      <button class="btn btn-primary" name="decision" value="approve">Approve reservation</button>
+      <button class="btn btn-outline-danger" name="decision" value="reject">Reject reservation</button>
+    </div>
+  </form>
+  <script>
+  (() => {
+    const canvas = document.getElementById('approver-signature-canvas');
+    const form = document.getElementById('reservation-decision-form');
+    const hidden = document.getElementById('approver-signature-data');
+    const error = document.getElementById('approver-signature-error');
+    const context = canvas?.getContext('2d');
+    if (!canvas || !form || !hidden || !context) return;
+    context.strokeStyle = '#172554'; context.lineWidth = 3; context.lineCap = 'round'; context.lineJoin = 'round';
+    let drawing = false; let signed = false;
+    const point = event => { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; };
+    canvas.addEventListener('pointerdown', event => { event.preventDefault(); canvas.setPointerCapture(event.pointerId); const p = point(event); context.beginPath(); context.moveTo(p.x, p.y); drawing = true; });
+    canvas.addEventListener('pointermove', event => { if (!drawing) return; const p = point(event); context.lineTo(p.x, p.y); context.stroke(); signed = true; });
+    const finish = () => { if (!drawing) return; drawing = false; if (signed) hidden.value = canvas.toDataURL('image/png'); };
+    canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish);
+    document.getElementById('clear-approver-signature')?.addEventListener('click', () => { context.clearRect(0, 0, canvas.width, canvas.height); hidden.value = ''; signed = false; error.hidden = true; });
+    form.addEventListener('submit', event => { if (signed) hidden.value = canvas.toDataURL('image/png'); if (!hidden.value) { event.preventDefault(); error.hidden = false; } });
+  })();
+  </script>
+<?php endif; ?>
 <?php if (!empty($bookingInvoice) && $bookingInvoice['status'] !== 'void'): ?>
   <section class="panel mb-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -28,11 +95,11 @@
       <?= status_badge((string) $bookingInvoice['status']) ?>
     </div>
     <?php if (\Crms\Auth::isCustomer() && (float) ($bookingInvoice['outstanding_balance'] ?? $bookingInvoice['total_amount']) > 0 && !in_array($bookingInvoice['status'], ['draft', 'void'], true)): ?>
-      <?php if ($row['status'] === 'confirmed'): ?>
+      <?php if ($signedApprovalComplete): ?>
         <p class="small text-muted mt-2 mb-2">Pay the confirmed hire quote before the rental agreement is issued and before vehicle pickup. Approved extra charges, if any, are invoiced after return inspection.</p>
         <a class="btn btn-primary" href="<?= e(url('invoices/show', ['id' => $bookingInvoice['invoice_id']])) ?>">Pay booking invoice</a>
       <?php else: ?>
-        <p class="small text-muted mt-2 mb-0">Your request is awaiting staff confirmation. The booking invoice will be issued when the vehicle and dates are confirmed, and must be paid before a rental agreement or pickup.</p>
+        <p class="small text-muted mt-2 mb-0">Payment is available after a Manager or Rental Officer records a signed decision on your signed request.</p>
       <?php endif; ?>
     <?php elseif (\Crms\Auth::isCustomer() && $bookingInvoice['status'] === 'draft'): ?>
       <p class="small text-muted mt-2 mb-0">Your booking invoice will be issued after the reservation is confirmed.</p>
@@ -64,7 +131,7 @@
       <span class="badge text-bg-warning">Deposit due <?= e(\Crms\Money::format($depositSummary['due'])) ?></span>
     <?php endif; ?>
   </div>
-  <?php if (\Crms\Auth::isCustomer() && $row['status'] === 'confirmed' && $depositSummary['requestable'] > 0): ?>
+  <?php if (\Crms\Auth::isCustomer() && $signedApprovalComplete && $depositSummary['requestable'] > 0): ?>
     <form method="post" action="<?= e(url('payments/momo')) ?>" class="mt-3">
       <?= \Crms\Csrf::field() ?>
       <input type="hidden" name="reservation_id" value="<?= (int) $row['reservation_id'] ?>">
@@ -77,13 +144,13 @@
         <div class="col-md-3 d-grid"><button class="btn btn-primary">Pay booking deposit</button></div>
       </div>
     </form>
-  <?php elseif ($depositSummary['requestable'] > 0 && $row['status'] === 'pending'): ?>
-    <p class="small text-muted mt-2 mb-0">The required deposit becomes payable after the reservation is confirmed.</p>
+  <?php elseif ($depositSummary['requestable'] > 0 && !$signedApprovalComplete): ?>
+    <p class="small text-muted mt-2 mb-0">The required deposit becomes payable after the signed reservation request is approved.</p>
   <?php endif; ?>
   <?php if (!empty($depositTransactions)): ?>
     <div class="table-responsive mt-3"><table class="table table-sm mb-0"><thead><tr><th>Deposit request</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
       <?php foreach ($depositTransactions as $depositTransaction): ?>
-        <tr><td><?= e($depositTransaction['transaction_number']) ?></td><td><?= e(\Crms\Money::format($depositTransaction['amount'])) ?></td><td><?= e(ucfirst($depositTransaction['status'])) ?></td><td><?php if ($depositTransaction['status'] === 'pending' && \Crms\Auth::isCustomer()): ?><form method="post" action="<?= e(url('payments/sync', ['id' => $depositTransaction['transaction_id']])) ?>"><?= \Crms\Csrf::field() ?><button class="btn btn-sm btn-outline-secondary">Check status</button></form><?php elseif ($depositTransaction['status'] === 'completed'): ?><a class="btn btn-sm btn-outline-dark" href="<?= e(url('payments/receipt', ['id' => $depositTransaction['transaction_id']])) ?>">Receipt</a><?php endif; ?></td></tr>
+        <tr <?= $depositTransaction['status'] === 'pending' && \Crms\Auth::isCustomer() ? 'data-payment-poll="' . e(url('payments/status', ['id' => $depositTransaction['transaction_id']])) . '"' : '' ?>><td><?= e($depositTransaction['transaction_number']) ?></td><td><?= e(\Crms\Money::format($depositTransaction['amount'])) ?></td><td><?= e(ucfirst($depositTransaction['status'])) ?></td><td><?php if ($depositTransaction['status'] === 'pending' && \Crms\Auth::isCustomer()): ?><form method="post" action="<?= e(url('payments/sync', ['id' => $depositTransaction['transaction_id']])) ?>"><?= \Crms\Csrf::field() ?><button class="btn btn-sm btn-outline-secondary">Check status</button></form><?php elseif ($depositTransaction['status'] === 'completed'): ?><a class="btn btn-sm btn-outline-dark" href="<?= e(url('payments/receipt', ['id' => $depositTransaction['transaction_id']])) ?>">Receipt</a><?php endif; ?></td></tr>
       <?php endforeach; ?>
     </tbody></table></div>
   <?php endif; ?>
