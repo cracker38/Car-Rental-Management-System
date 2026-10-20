@@ -54,7 +54,7 @@ if (!function_exists('crms_nav_link')) {
             if (can('maintenance.manage') || can('maintenance.view')) $ops[] = ['maintenance', 'Maintenance'];
             if (can('drivers.manage')) $ops[] = ['drivers', 'Drivers'];
             if (can('drivers.schedule')) $ops[] = ['drivers/schedule', 'Driver schedule'];
-            if (can('reports.operational') || can('reports.financial')) $ops[] = ['reports', 'Reports'];
+            if (report_mode() !== null) $ops[] = ['reports', 'Reports'];
             if (can('users.manage')) $ops[] = ['admin/users', 'Users'];
             if (can('settings.manage')) $ops[] = ['admin/settings', 'Settings'];
             if (can('audit.view')) $ops[] = ['admin/audit', 'Audit'];

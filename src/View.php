@@ -11,6 +11,14 @@ final class View
         $data['user'] = Auth::user();
         $data['title'] = $data['title'] ?? 'CRMS';
         $layout = $layout ?? self::layoutFor($template, $data);
+        if ($layout === 'app' && ($data['user']['role_name'] ?? '') === 'System Administrator'
+            && !array_key_exists('unreadNotificationCount', $data)) {
+            try {
+                $data['unreadNotificationCount'] = (new Services\NotificationService())->unreadCount(Auth::id(), Auth::customerId());
+            } catch (\Throwable) {
+                $data['unreadNotificationCount'] = 0;
+            }
+        }
         extract($data, EXTR_SKIP);
         $viewFile = dirname(__DIR__) . '/views/' . $template . '.php';
         if (!is_file($viewFile)) {

@@ -66,6 +66,41 @@ if (!function_exists('can')) {
     }
 }
 
+if (!function_exists('report_mode')) {
+    function report_mode(): ?string
+    {
+        $user = Auth::user();
+        if (!$user || !Auth::check()) {
+            return null;
+        }
+        $role = (string) ($user['role_name'] ?? '');
+        if (Auth::isCustomer()) {
+            return Auth::customerId() ? 'customer' : null;
+        }
+        if ($role === 'Driver' && \Crms\Rbac::can('drivers.schedule') && !\Crms\Rbac::can('drivers.manage')) {
+            return 'driver';
+        }
+        if ($role === 'Vehicle Inspector/Maintenance Staff' && \Crms\Rbac::can('maintenance.view')) {
+            return 'maintenance';
+        }
+        if ($role === 'Rental Officer' && \Crms\Rbac::can('reservations.view') && \Crms\Rbac::can('vehicles.view')) {
+            return 'operational';
+        }
+        $operational = \Crms\Rbac::can('reports.operational');
+        $financial = \Crms\Rbac::can('reports.financial');
+        if ($operational && $financial) {
+            return 'company';
+        }
+        if ($operational) {
+            return 'operational';
+        }
+        if ($financial) {
+            return 'financial';
+        }
+        return null;
+    }
+}
+
 if (!function_exists('nav_active')) {
     function nav_active(string ...$routes): string
     {

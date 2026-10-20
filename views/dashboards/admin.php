@@ -4,10 +4,7 @@
     <h1>System Overview</h1>
     <p class="text-muted mb-0">Manage access and configuration, review system records, and monitor activity.</p>
   </div>
-  <div class="d-flex flex-wrap gap-2">
-    <a class="btn btn-outline-dark" href="#dashboard-notifications"><i class="bi bi-bell me-1" aria-hidden="true"></i>Notifications <span class="badge text-bg-<?= (int) ($unreadNotificationCount ?? 0) > 0 ? 'primary' : 'secondary' ?>" data-notification-count><?= (int) ($unreadNotificationCount ?? 0) ?></span></a>
-    <a class="btn btn-primary" href="<?= e(url('admin/backup')) ?>"><i class="bi bi-hdd-stack me-1" aria-hidden="true"></i>Backup &amp; recovery</a>
-  </div>
+  <a class="btn btn-primary" href="<?= e(url('admin/backup')) ?>"><i class="bi bi-hdd-stack me-1" aria-hidden="true"></i>Backup &amp; recovery</a>
 </div>
 <?php require dirname(__DIR__) . '/partials/kpis.php'; ?>
 <div class="row g-3 admin-overview-panels">
@@ -63,4 +60,22 @@
     </section>
   </div>
 </div>
+<section class="panel mt-3">
+  <div class="admin-panel-heading">
+    <div><h2 class="panel-h mb-1">Fleet snapshot</h2><p class="small text-muted mb-0">Recently updated vehicles and their current status</p></div>
+    <a class="small fw-bold" href="<?= e(url('vehicles')) ?>">Open fleet <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+  </div>
+  <?php if (empty($recentVehicles)): ?><p class="text-muted mb-0">No vehicles are recorded yet.</p><?php else: ?>
+    <div class="row g-3">
+      <?php foreach ($recentVehicles as $vehicle): ?>
+        <div class="col-6 col-md-3">
+          <a class="dashboard-fleet-card d-block text-decoration-none" href="<?= e(url('vehicles/show', ['id' => $vehicle['vehicle_id']])) ?>">
+            <img src="<?= e(vehicle_img($vehicle['image_path'] ?? null, $vehicle['category_name'] ?? null)) ?>" alt="<?= e($vehicle['make'] . ' ' . $vehicle['model']) ?>">
+            <div class="dashboard-fleet-copy"><strong><?= e($vehicle['make'] . ' ' . $vehicle['model']) ?></strong><small><?= e($vehicle['registration_no']) ?> &middot; <?= e(ucfirst($vehicle['status'])) ?></small></div>
+          </a>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</section>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>

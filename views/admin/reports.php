@@ -8,39 +8,42 @@
   </div>
 </form>
 <div id="report-exports" class="report-toolbar d-flex flex-wrap gap-2 mb-4">
-  <a class="btn btn-outline-dark" href="<?= e(url('reports', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'export' => 'csv'])) ?>"><i class="bi bi-download"></i> Export Excel (CSV)</a>
+  <a class="btn btn-outline-dark" href="<?= e(url('reports', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'export' => 'csv'])) ?>"><i class="bi bi-download"></i> Export report (CSV)</a>
   <button class="btn btn-outline-dark" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Print / PDF</button>
 </div>
-<?php if ($fin): ?>
+<?php if ($summary): ?>
   <div class="row g-3 mb-4">
-    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Completed payments</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['payments'])) ?></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Payment refunds</div><div class="kpi-value"><?= e(\Crms\Money::format($fin['refunds'])) ?></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Net deposit movement</div><div class="kpi-value"><?= e(\Crms\Money::format((float) $fin['deposits'] - (float) $fin['deposit_deductions'] - (float) $fin['deposit_refunds'])) ?></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Awaiting approval</div><div class="kpi-value"><?= number_format((int) $fin['awaiting_approvals']) ?></div></div></div>
+    <?php foreach ($summary as $item): ?>
+      <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label"><?= e($item['label']) ?></div><div class="kpi-value"><?= e((string) $item['value']) ?></div></div></div>
+    <?php endforeach; ?>
   </div>
+<?php endif; ?>
+<?php if ($reportMode === 'company' && $financialDetails): ?>
   <section class="panel table-panel mb-4">
     <div class="panel-h">Deposit and adjustment detail</div>
-    <div class="table-responsive"><table class="table mb-0">
-      <tbody>
-        <tr><th scope="row">Deposits received</th><td><?= e(\Crms\Money::format($fin['deposits'])) ?></td></tr>
-        <tr><th scope="row">Deposit deductions</th><td><?= e(\Crms\Money::format($fin['deposit_deductions'])) ?></td></tr>
-        <tr><th scope="row">Deposit refunds</th><td><?= e(\Crms\Money::format($fin['deposit_refunds'])) ?></td></tr>
-        <tr><th scope="row">Invoice adjustment credits</th><td><?= e(\Crms\Money::format($fin['adjustment_credits'])) ?></td></tr>
-        <tr><th scope="row">Invoice adjustment debits</th><td><?= e(\Crms\Money::format($fin['adjustment_debits'])) ?></td></tr>
-      </tbody>
-    </table></div>
+    <div class="table-responsive"><table class="table mb-0"><tbody>
+      <?php foreach ($financialDetails as [$label, $amount]): ?>
+        <tr><th scope="row"><?= e($label) ?></th><td><?= e(\Crms\Money::format($amount)) ?></td></tr>
+      <?php endforeach; ?>
+    </tbody></table></div>
   </section>
 <?php endif; ?>
-<?php if (can('reports.operational')): ?>
-  <section class="panel table-panel">
-    <div class="panel-h">Fleet activity</div>
-    <p class="small text-muted">Bookings and rentals with pickup dates in the selected period.</p>
-    <div class="table-responsive"><table class="table mb-0">
-      <thead><tr><th>Vehicle</th><th>Current status</th><th>Bookings</th><th>Rentals</th></tr></thead>
+<section class="panel table-panel">
+  <div class="panel-h"><?= e($title) ?></div>
+  <p class="small text-muted">Activity in the selected reporting period: <?= e($dateFrom) ?> to <?= e($dateTo) ?>.</p>
+  <?php if (!$rows): ?><div class="empty-state"><?= e($emptyMessage) ?></div>
+  <?php else: ?>
+    <div class="table-responsive"><table class="table align-middle mb-0">
+      <thead><tr><?php foreach ($columns as $column): ?><th scope="col"><?= e($column) ?></th><?php endforeach; ?></tr></thead>
       <tbody>
-      <?php if (!$ops): ?><tr><td colspan="4"><div class="empty-state">No vehicles are recorded.</div></td></tr><?php endif; ?>
-      <?php foreach ($ops as $o): ?><tr><td><?= e($o['registration_no']) ?></td><td><?= status_badge($o['status']) ?></td><td><?= (int)$o['confirmed_bookings'] ?></td><td><?= (int)$o['live_rentals'] ?></td></tr><?php endforeach; ?>
+        <?php foreach ($rows as $row): $reportCells = array_slice($row, 0, count($columns)); ?><tr><?php foreach ($reportCells as $index => $cell): ?>
+          <td>
+            <?php if ($reportMode === 'customer' && $index === 0 && isset($row[0])): ?>
+              <a href="<?= e(url('reservations/show', ['id' => (int) ($row['_reservation_id'] ?? 0)])) ?>"><?= e((string) $cell) ?></a>
+            <?php else: ?><?= e((string) $cell) ?><?php endif; ?>
+          </td>
+        <?php endforeach; ?></tr><?php endforeach; ?>
       </tbody>
     </table></div>
-  </section>
-<?php endif; ?>
+  <?php endif; ?>
+</section>

@@ -88,6 +88,7 @@ final class DashboardService
                 ['route' => 'invoices', 'icon' => 'bi-receipt', 'label' => 'Outstanding payments', 'hint' => 'Review unpaid invoice balances'],
             ],
             'Rental Officer' => [
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Rental reports', 'hint' => 'Review fleet bookings and rental activity'],
                 ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Find available vehicles', 'hint' => 'Check dates, category, model and features'],
                 ['route' => 'reservations/form', 'icon' => 'bi-plus-circle', 'label' => 'New reservation', 'hint' => 'Create a booking request'],
                 ['route' => 'reservations', 'icon' => 'bi-calendar3', 'label' => 'Reservations', 'hint' => 'Review and update bookings'],
@@ -96,10 +97,12 @@ final class DashboardService
                 ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Pickups and returns', 'hint' => 'Agreements and handover records'],
             ],
             'Vehicle Inspector/Maintenance Staff' => [
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'Maintenance reports', 'hint' => 'Review maintenance activity and costs'],
                 ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Maintenance vehicles', 'hint' => 'Review open work and record readiness decisions'],
                 ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Vehicles in maintenance', 'hint' => 'View vehicles currently held out of service'],
             ],
             'Customer' => [
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'My reservation report', 'hint' => 'Review your bookings and payment history'],
                 ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Search vehicles', 'hint' => 'Filter dates, category, price and features'],
                 ['route' => 'reservations/form', 'icon' => 'bi-plus-circle', 'label' => 'Request a reservation', 'hint' => 'Choose a vehicle and rental dates'],
                 ['route' => 'fleet', 'icon' => 'bi-car-front', 'label' => 'Browse fleet', 'hint' => 'Photos and daily rates'],
@@ -109,6 +112,7 @@ final class DashboardService
                 ['route' => 'customers/profile', 'icon' => 'bi-person', 'label' => 'My profile', 'hint' => 'Update your contact details'],
             ],
             'Driver' => [
+                ['route' => 'reports', 'icon' => 'bi-graph-up', 'label' => 'My trip report', 'hint' => 'Review assigned, completed and delayed trips'],
                 ['route' => 'drivers/schedule', 'icon' => 'bi-calendar2-week', 'label' => 'My schedule', 'hint' => 'View your assigned trips and times'],
             ],
             default => [],
@@ -226,6 +230,11 @@ final class DashboardService
                 ['label' => 'Payments', 'value' => $this->count('SELECT COUNT(*) c FROM financial_transactions'), 'route' => 'finance', 'icon' => 'bi-wallet2'],
                 ['label' => 'Maintenance', 'value' => $this->count('SELECT COUNT(*) c FROM maintenance_records'), 'route' => 'maintenance', 'icon' => 'bi-wrench-adjustable'],
             ],
+            'recentVehicles' => Database::fetchAll(
+                'SELECT v.vehicle_id, v.registration_no, v.make, v.model, v.image_path, v.status, c.category_name
+                 FROM vehicles v JOIN vehicle_categories c ON c.category_id=v.category_id
+                 ORDER BY v.updated_at DESC, v.vehicle_id DESC LIMIT 4'
+            ),
             'users' => Database::fetchAll('SELECT u.first_name, u.last_name, u.email, u.status, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.created_at DESC LIMIT 8'),
             'audit' => Database::fetchAll('SELECT action, entity_type, result, created_at FROM audit_logs ORDER BY created_at DESC LIMIT 8'),
         ];
@@ -314,9 +323,10 @@ final class DashboardService
             'kpis' => $kpis,
             'pendingReservations' => Database::fetchAll(
                 "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
-                        c.first_name, c.last_name, v.registration_no
+                        c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id
                  JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 8"
             ),
             'trends' => $trends,
@@ -341,14 +351,17 @@ final class DashboardService
                  ORDER BY COALESCE(SUM(activity.bookings),0) + COALESCE(SUM(activity.rentals),0) DESC LIMIT 6"
             ),
             'maintAlerts' => Database::fetchAll(
-                "SELECT m.title, m.status, v.registration_no FROM maintenance_records m
+                "SELECT m.title, m.status, v.registration_no, v.make, v.model, v.image_path, vc.category_name FROM maintenance_records m
                  JOIN vehicles v ON v.vehicle_id = m.vehicle_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE m.status IN ('scheduled','in_progress')
                  ORDER BY COALESCE(m.expected_completion_date, m.start_date), m.start_date LIMIT 6"
             ),
             'due' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status, v.registration_no, c.first_name, c.last_name
+                "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status,
+                        v.registration_no, v.make, v.model, v.image_path, vc.category_name, c.first_name, c.last_name
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id JOIN customers c ON c.customer_id = rt.customer_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE rt.status IN ('active','overdue','scheduled')
                    AND (rt.expected_return_datetime < NOW() OR rt.expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))
                  ORDER BY rt.expected_return_datetime ASC LIMIT 10"
@@ -369,21 +382,26 @@ final class DashboardService
                 ['label' => 'Late returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Needs follow-up', 'href' => url('rentals')],
             ],
             'pending' => Database::fetchAll(
-                "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, c.first_name, c.last_name, v.registration_no
+                "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status,
+                        c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 8"
             ),
             'upcomingPickups' => Database::fetchAll(
-                "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.status, c.first_name, c.last_name, v.registration_no
+                "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.status,
+                        c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE r.status = 'confirmed' AND r.pickup_datetime >= NOW() AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)
                  ORDER BY r.pickup_datetime LIMIT 10"
             ),
             'upcomingReturns' => Database::fetchAll(
                 "SELECT rt.rental_id, rt.rental_number, rt.expected_return_datetime, rt.status,
                         CASE WHEN rt.status = 'active' AND rt.expected_return_datetime < NOW() THEN 'overdue' ELSE rt.status END AS display_status,
-                        v.registration_no, c.first_name, c.last_name
+                        v.registration_no, v.make, v.model, v.image_path, vc.category_name, c.first_name, c.last_name
                  FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id JOIN customers c ON c.customer_id = rt.customer_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE rt.status IN ('active','overdue')
                    AND (rt.expected_return_datetime < NOW() OR rt.expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY))
                  ORDER BY rt.expected_return_datetime LIMIT 10"
@@ -461,11 +479,12 @@ final class DashboardService
                 ['label' => 'Overdue open jobs', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m JOIN vehicles v ON v.vehicle_id=m.vehicle_id WHERE v.status='maintenance' AND m.status IN ('scheduled','in_progress') AND m.expected_completion_date < CURDATE()"), 'hint' => 'Past expected completion', 'href' => url('maintenance')],
             ],
             'maintenanceVehicles' => Database::fetchAll(
-                "SELECT v.vehicle_id, v.registration_no, v.make, v.model,
+                "SELECT v.vehicle_id, v.registration_no, v.make, v.model, v.image_path, c.category_name,
                         (SELECT COUNT(*) FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress')) AS open_jobs,
                         (SELECT m.title FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress') ORDER BY COALESCE(m.expected_completion_date,m.start_date),m.maintenance_id LIMIT 1) AS current_job,
                         (SELECT m.expected_completion_date FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress') ORDER BY COALESCE(m.expected_completion_date,m.start_date),m.maintenance_id LIMIT 1) AS expected_completion_date
-                 FROM vehicles v WHERE v.status='maintenance' ORDER BY v.registration_no LIMIT 100"
+                 FROM vehicles v JOIN vehicle_categories c ON c.category_id=v.category_id
+                 WHERE v.status='maintenance' ORDER BY v.registration_no LIMIT 100"
             ),
         ];
     }
@@ -483,8 +502,10 @@ final class DashboardService
             ],
             'reservations' => Database::fetchAll(
                 'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, r.payment_status,
-                        v.make, v.model, v.registration_no, v.image_path FROM reservations r
-                 JOIN vehicles v ON v.vehicle_id = r.vehicle_id WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 8',
+                        v.make, v.model, v.registration_no, v.image_path, vc.category_name FROM reservations r
+                 JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
+                 WHERE r.customer_id = ? ORDER BY r.created_at DESC LIMIT 8',
                 [$cid]
             ),
             'invoices' => Database::fetchAll(
@@ -508,10 +529,11 @@ final class DashboardService
             'rentals' => Database::fetchAll(
                 'SELECT rt.rental_id, rt.rental_number, rt.status, rt.agreement_status, rt.expected_return_datetime,
                         rt.actual_return_datetime, rt.created_at,
-                        r.reservation_code, v.make, v.model, v.registration_no
+                        r.reservation_code, v.make, v.model, v.registration_no, v.image_path, vc.category_name
                  FROM rentals rt
                  JOIN reservations r ON r.reservation_id = rt.reservation_id AND r.customer_id = rt.customer_id
                  JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
+                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE rt.customer_id = ? ORDER BY rt.created_at DESC LIMIT 8',
                 [$cid]
             ),
@@ -550,10 +572,11 @@ final class DashboardService
             "SELECT da.assignment_id, da.notes AS assignment_notes, da.trip_status, da.incident_report, da.status_updated_at,
                     r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
                     r.pickup_location, r.return_location, r.status AS reservation_status,
-                    c.first_name, c.last_name, c.phone, v.registration_no, v.make, v.model
+                    c.first_name, c.last_name, c.phone, v.registration_no, v.make, v.model, v.image_path, vc.category_name
              FROM drivers d JOIN driver_assignments da ON da.driver_id = d.driver_id
              JOIN reservations r ON r.reservation_id = da.reservation_id
              JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
+             JOIN vehicle_categories vc ON vc.category_id=v.category_id
              WHERE d.user_id = ? AND r.status IN ('pending','confirmed') AND da.trip_status <> 'completed'
              ORDER BY CASE WHEN r.pickup_datetime >= NOW() THEN 0 WHEN r.return_datetime >= NOW() THEN 1 ELSE 2 END,
                       CASE WHEN r.pickup_datetime >= NOW() THEN r.pickup_datetime ELSE r.return_datetime END ASC LIMIT 100",

@@ -3,6 +3,7 @@ $dashboardSubtitle = 'My Account - manage your bookings, rentals, payments, and 
 $dashboardNotificationHeading = 'Booking, payment, and return updates';
 $kpiColClass = 'col-6 col-lg';
 $dashboardActions = [
+  ['route' => 'reports', 'label' => 'My reservation report', 'icon' => 'bi-graph-up'],
   ['route' => 'search', 'label' => 'Search vehicles', 'icon' => 'bi-search'],
   ['route' => 'reservations/form', 'label' => 'Request a reservation', 'icon' => 'bi-plus-circle'],
   ['route' => 'customers/profile', 'label' => 'My profile', 'icon' => 'bi-person'],

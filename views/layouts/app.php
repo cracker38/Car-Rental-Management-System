@@ -24,10 +24,14 @@
         <div class="admin-topbar-title"><p class="eyebrow mb-0">System workspace</p><strong>Platform Administration</strong></div>
         <div class="app-topbar-actions admin-topbar-actions">
           <form class="admin-topbar-search" method="get" action="<?= e(url('admin/users')) ?>">
+            <input type="hidden" name="r" value="admin/users">
             <input class="form-control form-control-sm" type="search" name="q" value="<?= e((string)($q ?? '')) ?>" placeholder="Search users" aria-label="Search user accounts">
             <button class="btn btn-sm btn-outline-dark" type="submit" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></button>
           </form>
-          <a class="btn btn-sm btn-outline-dark admin-topbar-icon" href="<?= e(url('admin/audit')) ?>" title="Review audit events" aria-label="Review audit events"><i class="bi bi-bell"></i></a>
+          <a class="btn btn-sm btn-outline-dark admin-topbar-icon admin-notification-link" href="<?= e(url('dashboard')) ?>#dashboard-notifications" title="Notifications" aria-label="Notifications, <?= (int) ($unreadNotificationCount ?? 0) ?> unread">
+            <i class="bi bi-bell" aria-hidden="true"></i>
+            <span class="badge text-bg-<?= (int) ($unreadNotificationCount ?? 0) > 0 ? 'primary' : 'secondary' ?>" data-notification-count><?= (int) ($unreadNotificationCount ?? 0) ?></span>
+          </a>
           <div class="admin-user-chip"><span class="admin-user-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></span><span><strong><?= e($user['first_name'] ?? 'Admin') ?></strong><small>System Administrator</small></span></div>
           <a class="btn btn-sm btn-outline-dark admin-website-link" href="<?= e(url('home')) ?>">Website</a>
           <form method="post" action="<?= e(url('logout')) ?>"><?= \Crms\Csrf::field() ?><button class="btn btn-sm btn-dark">Sign out</button></form>

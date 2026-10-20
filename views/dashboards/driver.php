@@ -2,6 +2,7 @@
 $dashboardSubtitle = 'Your assigned chauffeur trips, schedule and trip updates.';
 $dashboardNotificationHeading = 'Trip assignment notifications';
 $dashboardActions = [
+  ['route' => 'reports', 'label' => 'My trip report', 'icon' => 'bi-graph-up'],
   ['route' => 'drivers/schedule', 'label' => 'Full schedule', 'icon' => 'bi-calendar2-week'],
 ];
 require dirname(__DIR__) . '/partials/dashboard-heading.php';

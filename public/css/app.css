@@ -720,6 +720,14 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
 .momo-card { border-color: #f4c49a; background: linear-gradient(180deg, #fffaf4, #fff); }
 .empty-state { padding: 1.5rem; color: var(--rcr-muted); text-align: center; }
 .app-content .home-vehicle-photo { height: 170px; }
+.dashboard-vehicle-cell { display: flex; align-items: center; gap: .65rem; min-width: 170px; }
+.dashboard-vehicle-thumb { display: block; width: 66px; height: 48px; flex: 0 0 auto; object-fit: cover; border: 1px solid #e6e2dc; border-radius: .55rem; background: #f4f2ee; }
+.dashboard-vehicle-thumb-lg { width: 88px; height: 64px; }
+.dashboard-fleet-card { height: 100%; overflow: hidden; border: 1px solid #eee8e1; border-radius: .85rem; background: #fff; }
+.dashboard-fleet-card img { display: block; width: 100%; height: 145px; object-fit: cover; background: #f4f2ee; }
+.dashboard-fleet-card .dashboard-fleet-copy { padding: .75rem; }
+.dashboard-fleet-card .dashboard-fleet-copy strong { display: block; }
+.dashboard-fleet-card .dashboard-fleet-copy small { color: var(--rcr-muted); }
 .duties-list { margin: 0; padding-left: 1.1rem; }
 .duties-list li { margin-bottom: .4rem; color: var(--rcr-ink); }
 .manager-dashboard-heading { margin-bottom: 1rem; }
@@ -790,6 +798,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
 .admin-topbar-search { display: flex; width: min(280px, 22vw); gap: .35rem; }
 .admin-topbar-search .form-control { min-width: 0; border-color: #e4e1dc; }
 .admin-topbar-icon { display: grid; width: 34px; height: 34px; place-items: center; padding: 0; }
+.admin-notification-link { position: relative; }
+.admin-notification-link .badge { position: absolute; top: -6px; right: -7px; min-width: 18px; height: 18px; padding: .15rem .25rem; border: 2px solid #fff; border-radius: 999px; font-size: .62rem; line-height: 1; }
 .admin-user-chip { display: flex; align-items: center; gap: .5rem; padding: 0 .25rem; white-space: nowrap; }
 .admin-user-chip > span:last-child { display: flex; flex-direction: column; line-height: 1.2; }
 .admin-user-chip strong { color: var(--rcr-ink); font-size: .78rem; }

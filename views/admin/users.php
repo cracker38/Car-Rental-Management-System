@@ -17,13 +17,6 @@
   </div>
   <button class="btn btn-primary mt-3">Create account</button>
 </form>
-<form class="page-toolbar" method="get">
-  <input type="hidden" name="r" value="admin/users">
-  <label class="visually-hidden" for="admin-user-search">Search user accounts</label>
-  <input class="form-control form-control-sm" style="max-width:340px" id="admin-user-search" type="search" name="q" value="<?= e($q ?? '') ?>" placeholder="Search users" aria-label="Search user accounts">
-  <button class="btn btn-outline-dark" type="submit"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button>
-  <?php if (($q ?? '') !== ''): ?><a class="btn btn-link" href="<?= e(url('admin/users')) ?>">Clear</a><?php endif; ?>
-</form>
 <div class="panel table-panel">
   <div class="table-responsive"><table class="table align-middle mb-0">
     <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Phone</th><th>Role</th><th>Account status</th><th>New password</th><th></th></tr></thead>
