@@ -266,7 +266,7 @@ final class DashboardService
             'kpis' => $kpis,
             'fleetPreview' => Database::fetchAll(
                 "SELECT v.vehicle_id, v.registration_no, v.make, v.model, v.image_path, v.status, vc.category_name
-                 FROM vehicles v JOIN vehicle_categories vc ON vc.category_id=v.category_id
+                 FROM vehicles v LEFT JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE v.status <> 'inactive'
                  ORDER BY CASE v.status WHEN 'available' THEN 0 WHEN 'maintenance' THEN 2 ELSE 1 END, v.updated_at DESC LIMIT 4"
             ),
@@ -275,7 +275,7 @@ final class DashboardService
                         c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id
                  JOIN vehicles v ON v.vehicle_id = r.vehicle_id
-                 JOIN vehicle_categories vc ON vc.category_id=v.category_id
+                 LEFT JOIN vehicle_categories vc ON vc.category_id=v.category_id
                  WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 8"
             ),
             'trends' => $trends,
