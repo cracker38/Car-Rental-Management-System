@@ -67,6 +67,46 @@ final class DashboardService
         };
     }
 
+    public function fallbackData(array $user): array
+    {
+        $role = (string) ($user['role_name'] ?? '');
+        $roleData = match ($role) {
+            'System Administrator' => [
+                'records' => [], 'recentVehicles' => [], 'users' => [], 'audit' => [],
+            ],
+            'Business Manager' => [
+                'fleetPreview' => [], 'pendingReservations' => [], 'trends' => [],
+                'canViewFinancial' => false, 'officers' => [], 'maintAlerts' => [], 'due' => [],
+                'fleet' => [], 'reservationPerformance' => [], 'rentalPerformance' => [],
+            ],
+            'Rental Officer' => [
+                'fleetPreview' => [], 'pending' => [], 'upcomingPickups' => [], 'upcomingReturns' => [],
+            ],
+            'Accountant/Cashier' => [
+                'invoices' => [], 'unbilledRentals' => [], 'pendingPay' => [], 'pendingApproval' => [],
+                'overdue' => [], 'recentTransactions' => [],
+            ],
+            'Vehicle Inspector/Maintenance Staff' => ['maintenanceVehicles' => []],
+            'Customer' => [
+                'reservations' => [], 'invoices' => [], 'rentals' => [], 'payments' => [], 'fleet' => [],
+                'deposit' => Money::format(0), 'upcomingReturn' => null, 'profile' => null,
+            ],
+            'Driver' => ['assignments' => [], 'profile' => null, 'nextTrip' => null],
+            default => [],
+        };
+
+        return [
+            'user' => $user,
+            'notes' => [],
+            'unreadNotificationCount' => 0,
+            'role' => $role,
+            'shortcuts' => $this->shortcuts($role),
+            'duties' => $this->duties($role),
+            'restriction' => $this->restriction($role),
+            'kpis' => [],
+        ] + $roleData;
+    }
+
     private function shortcuts(string $role): array
     {
         return match ($role) {

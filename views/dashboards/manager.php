@@ -1,3 +1,15 @@
+<?php
+// Keep the dashboard renderable when the controller falls back after a query error.
+foreach ([
+    'kpis', 'shortcuts', 'duties', 'fleetPreview', 'pendingReservations', 'trends', 'due',
+    'fleet', 'maintAlerts', 'reservationPerformance', 'rentalPerformance', 'officers', 'notes',
+] as $dataset) {
+    if (!isset($$dataset) || !is_array($$dataset)) {
+        $$dataset = [];
+    }
+}
+$canViewFinancial = (bool) ($canViewFinancial ?? false);
+?>
 <div class="dashboard-heading manager-dashboard-heading">
   <div>
     <p class="eyebrow mb-1">Business oversight</p>

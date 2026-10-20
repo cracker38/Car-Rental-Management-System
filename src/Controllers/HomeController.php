@@ -126,11 +126,12 @@ final class HomeController
         Auth::requireLogin();
         $user = Auth::user();
         $role = (string) ($user['role_name'] ?? '');
+        $dashboardService = new DashboardService();
         try {
-            $data = (new DashboardService())->data($user ?? []);
+            $data = $dashboardService->data($user ?? []);
         } catch (\Throwable $error) {
             error_log('Dashboard data loading failed: ' . $error->getMessage());
-            $data = ['user' => $user, 'notes' => [], 'role' => $role, 'shortcuts' => [], 'kpis' => [], 'duties' => [], 'restriction' => ''];
+            $data = $dashboardService->fallbackData($user ?? []);
             Http::flash('warning', 'Some dashboard figures could not be loaded. Check the database connection.');
         }
         View::render(DashboardService::templateFor($role), $data + ['title' => DashboardService::pageTitle($role)]);
