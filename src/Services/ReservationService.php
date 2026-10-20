@@ -201,6 +201,22 @@ final class ReservationService
             if (!$customer || $customer['status'] === 'blacklisted') {
                 throw new InvalidArgumentException('This customer is not allowed to book.');
             }
+            $customerSignatureToSave = $customerSignature;
+            $customerSignatureUserIdToSave = Auth::isCustomer() ? Auth::id() : null;
+            $customerSignatureCapturedByToSave = Auth::isCustomer() ? Auth::id() : null;
+            $customerSignedAtToSave = $customerSignedAt;
+            $customerSignatureRetained = false;
+            if (!Auth::isCustomer()
+                && !empty($reservation['customer_signature'])
+                && !empty($reservation['customer_signed_at'])
+                && !empty($reservation['customer_signature_user_id'])
+                && (int) $reservation['customer_signature_user_id'] === (int) ($customer['linked_user_id'] ?? 0)) {
+                $customerSignatureToSave = $reservation['customer_signature'];
+                $customerSignatureUserIdToSave = $reservation['customer_signature_user_id'];
+                $customerSignatureCapturedByToSave = $reservation['customer_signature_captured_by'];
+                $customerSignedAtToSave = $reservation['customer_signed_at'];
+                $customerSignatureRetained = true;
+            }
             if (!empty($customer['license_expiry_date']) && $customer['license_expiry_date'] < date('Y-m-d')) {
                 throw new InvalidArgumentException('Driving licence has expired.');
             }
@@ -242,8 +258,8 @@ final class ReservationService
                     $quote['agreed_daily_rate'], $quote['estimated_days'], $quote['estimated_amount'],
                     $quote['discount_amount'], $quote['tax_amount'], $quote['security_deposit'],
                     $input['customer_notes'] ?? null, $asStaff ? ($input['internal_notes'] ?? null) : $reservation['internal_notes'],
-                    $customerSignature, Auth::isCustomer() ? Auth::id() : null,
-                    Auth::isCustomer() ? Auth::id() : null, $customerSignedAt, $id,
+                    $customerSignatureToSave, $customerSignatureUserIdToSave,
+                    $customerSignatureCapturedByToSave, $customerSignedAtToSave, $id,
                 ]
             );
             (new InvoiceService())->createFromReservation($id);
@@ -257,7 +273,9 @@ final class ReservationService
                 Auth::id(), $customerId, 'reservation_updated', 'Reservation ' . $reservation['reservation_code'],
                 Auth::isCustomer()
                     ? 'Reservation details were updated and signed. A Rental Officer will review the request.'
-                    : 'Reservation details were updated. Please sign the revised request in your account before approval.',
+                    : ($customerSignatureRetained
+                        ? 'Reservation details were updated. Your existing signature remains on file; no new signature is needed.'
+                        : 'Reservation details were updated. Please sign the revised request in your account before approval.'),
                 'reservation', $id
             );
             $notifications->notifyRentalOfficers(
@@ -265,7 +283,9 @@ final class ReservationService
                 'Reservation ' . $reservation['reservation_code'],
                 Auth::isCustomer()
                     ? 'Reservation ' . $reservation['reservation_code'] . ' has been signed by the customer and is ready for review.'
-                    : 'Reservation ' . $reservation['reservation_code'] . ' was updated and now needs the customer signature.',
+                    : ($customerSignatureRetained
+                        ? 'Reservation ' . $reservation['reservation_code'] . ' was updated; the existing customer signature remains on file and the request is ready for review.'
+                        : 'Reservation ' . $reservation['reservation_code'] . ' was updated and now needs the customer signature.'),
                 'reservation',
                 $id,
                 Auth::id()

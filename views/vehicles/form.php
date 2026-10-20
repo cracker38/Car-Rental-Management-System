@@ -30,12 +30,12 @@
         <?php endforeach; ?>
       </select>
     </div>
+    <div class="col-md-2"><label class="form-label">Daily rate</label><input class="form-control" type="number" name="daily_rate" required min="0" max="9999999999.99" step="0.01" value="<?= e((string)($vehicle['daily_rate'] ?? '')) ?>"></div>
     <?php if (empty($rentalOfficer)): ?>
-      <div class="col-md-2"><label class="form-label">Daily rate</label><input class="form-control" name="daily_rate" required value="<?= e((string)($vehicle['daily_rate'] ?? '')) ?>"></div>
-      <div class="col-md-2"><label class="form-label">Weekly</label><input class="form-control" name="weekly_rate" value="<?= e((string)($vehicle['weekly_rate'] ?? '')) ?>"></div>
-      <div class="col-md-2"><label class="form-label">Monthly</label><input class="form-control" name="monthly_rate" value="<?= e((string)($vehicle['monthly_rate'] ?? '')) ?>"></div>
+    <div class="col-md-2"><label class="form-label">Weekly</label><input class="form-control" type="number" name="weekly_rate" min="0" max="9999999999.99" step="0.01" value="<?= e((string)($vehicle['weekly_rate'] ?? '')) ?>"></div>
+    <div class="col-md-2"><label class="form-label">Monthly</label><input class="form-control" type="number" name="monthly_rate" min="0" max="9999999999.99" step="0.01" value="<?= e((string)($vehicle['monthly_rate'] ?? '')) ?>"></div>
     <?php else: ?>
-      <div class="col-12"><div class="alert alert-info mb-0">Pricing is controlled by approved category rates. New vehicles use the selected category’s default rates; existing rates cannot be changed here.</div></div>
+      <div class="col-12"><div class="form-text">Weekly and monthly rates are calculated from the daily rate and category schedule. Longer rental totals are calculated by the system. Changing the daily rate will not rewrite existing reservation prices.</div></div>
     <?php endif; ?>
     <div class="col-md-2"><label class="form-label">Mileage</label><input class="form-control" type="number" name="current_mileage" value="<?= e((string)($vehicle['current_mileage'] ?? '0')) ?>" <?= !empty($rentalOfficer) && !empty($vehicle) ? 'readonly' : '' ?>></div>
     <div class="col-md-2"><label class="form-label">Fuel %</label><input class="form-control" name="fuel_level_percent" value="<?= e((string)($vehicle['fuel_level_percent'] ?? '')) ?>" <?= !empty($rentalOfficer) && !empty($vehicle) ? 'readonly' : '' ?>></div>

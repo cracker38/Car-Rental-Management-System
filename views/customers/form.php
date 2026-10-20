@@ -4,7 +4,7 @@
     <div class="col-md-6"><label class="form-label">First name</label><input class="form-control" name="first_name" required value="<?= e($customer['first_name'] ?? '') ?>"></div>
     <div class="col-md-6"><label class="form-label">Last name</label><input class="form-control" name="last_name" required value="<?= e($customer['last_name'] ?? '') ?>"></div>
     <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" required value="<?= e($customer['phone'] ?? '') ?>"></div>
-    <div class="col-md-6"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="<?= e($customer['email'] ?? '') ?>"></div>
+    <div class="col-md-6"><label class="form-label">Email<?= empty($customer) ? ' (login)' : '' ?></label><input class="form-control" type="email" name="email" <?= empty($customer) || !empty($customer['linked_user_id']) ? 'required' : '' ?> value="<?= e($customer['email'] ?? '') ?>"><?php if (empty($customer)): ?><small class="form-text">A temporary password will be generated for the customer.</small><?php endif; ?></div>
     <div class="col-12"><label class="form-label">Address</label><input class="form-control" name="address" value="<?= e($customer['address'] ?? '') ?>"></div>
     <div class="col-md-4"><label class="form-label">ID type</label>
       <select class="form-select" name="identification_type">

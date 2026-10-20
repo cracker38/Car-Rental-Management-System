@@ -1,4 +1,36 @@
-<p class="lead-muted mb-3">Create staff accounts, edit user details, change roles, and activate or deactivate access here. Customers register on the website. Driver accounts also need a linked driver record.</p>
+<p class="lead-muted mb-3">Manage staff and customer login accounts here. New Rental Officer customers appear in the user list; older customer records needing a login appear below. Temporary passwords must be changed at first sign-in. Driver accounts also need a linked driver record.</p>
+<?php if (!empty($unlinkedCustomers)): ?>
+<div class="panel table-panel mb-4">
+  <div class="panel-h">Rental customers without a login</div>
+  <div class="table-responsive"><table class="table align-middle mb-0">
+    <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Customer status</th><th>Login setup</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($unlinkedCustomers as $customer): ?>
+      <?php $validCustomerEmail = filter_var((string) ($customer['email'] ?? ''), FILTER_VALIDATE_EMAIL) !== false; ?>
+      <tr>
+        <td><?= e($customer['first_name'] . ' ' . $customer['last_name']) ?><small class="d-block text-muted"><?= e($customer['customer_code']) ?></small></td>
+        <td><?= e((string) ($customer['email'] ?? '')) ?: '-' ?></td>
+        <td><?= e($customer['phone']) ?></td>
+        <td><?= e(ucfirst((string) $customer['status'])) ?></td>
+        <td><?php if (!$validCustomerEmail): ?>Add a valid email<?php elseif ($customer['login_setup_status'] === 'email_in_use'): ?>Email already belongs to an account<?php else: ?>Ready to create<?php endif; ?></td>
+        <td>
+          <?php if (!$validCustomerEmail || $customer['login_setup_status'] === 'email_in_use'): ?>
+            <a class="btn btn-sm btn-outline-secondary" href="<?= e(url('customers/form', ['id' => (int) $customer['customer_id']])) ?>">Edit customer</a>
+          <?php else: ?>
+            <form method="post" class="m-0">
+              <?= \Crms\Csrf::field() ?>
+              <input type="hidden" name="action" value="create_customer_login">
+              <input type="hidden" name="customer_id" value="<?= (int) $customer['customer_id'] ?>">
+              <button class="btn btn-sm btn-primary">Create login</button>
+            </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+</div>
+<?php endif; ?>
 <form method="post" class="panel mb-4">
   <?= \Crms\Csrf::field() ?>
   <input type="hidden" name="action" value="create">

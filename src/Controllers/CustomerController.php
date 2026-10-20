@@ -36,37 +36,78 @@ final class CustomerController
         $customer = $id ? Database::fetch('SELECT * FROM customers WHERE customer_id = ?', [$id]) : null;
         if (Http::isPost()) {
             $v = new Validator();
-            $v->require($_POST, ['first_name', 'last_name', 'phone']);
-            $v->in('status', Http::str('status'), ['active', 'inactive', 'blacklisted']);
+            $linkedAccount = !empty($customer['linked_user_id']);
+            $v->require($_POST, $customer
+                ? ['first_name', 'last_name', 'phone']
+                : ['first_name', 'last_name', 'phone', 'email']);
+            $email = strtolower(Http::str('email'));
+            $v->email('email', $email);
+            if ($linkedAccount && $email === '') {
+                $v->errors['email'] = 'An email address is required for a customer login.';
+            }
+            $status = Http::str('status') ?: 'active';
+            $v->in('status', $status, ['active', 'inactive', 'blacklisted']);
             if ($v->ok()) {
                 $fields = [
-                    Http::str('first_name'), Http::str('last_name'), Http::str('phone'), Http::str('email') ?: null,
+                    Http::str('first_name'), Http::str('last_name'), Http::str('phone'), $email ?: null,
                     Http::str('address') ?: null, Http::str('identification_type') ?: null,
                     Http::str('identification_number') ?: null, Http::str('driving_license_number') ?: null,
-                    Http::str('license_expiry_date') ?: null, Http::str('status') ?: 'active',
+                    Http::str('license_expiry_date') ?: null, $status,
                 ];
                 try {
                     if ($customer) {
-                        Database::execute(
-                            'UPDATE customers SET first_name=?, last_name=?, phone=?, email=?, address=?, identification_type=?, identification_number=?, driving_license_number=?, license_expiry_date=?, status=? WHERE customer_id=?',
-                            [...$fields, $id]
-                        );
-                        Audit::log('customer.updated', 'customer', (string) $id);
+                        Database::transaction(function () use ($fields, $id, $customer, $status, $email): void {
+                            Database::execute(
+                                'UPDATE customers SET first_name=?, last_name=?, phone=?, email=?, address=?, identification_type=?, identification_number=?, driving_license_number=?, license_expiry_date=?, status=? WHERE customer_id=?',
+                                [...$fields, $id]
+                            );
+                            if (!empty($customer['linked_user_id'])) {
+                                $accountStatus = $status === 'active' ? 'active' : ($status === 'blacklisted' ? 'suspended' : 'inactive');
+                                Database::execute(
+                                    'UPDATE users SET first_name=?, last_name=?, phone=?, email=?, status=? WHERE user_id=?',
+                                    [$fields[0], $fields[1], $fields[2], $email, $accountStatus, (int) $customer['linked_user_id']]
+                                );
+                            }
+                            Audit::log('customer.updated', 'customer', (string) $id);
+                        });
                         Http::flash('success', 'Customer updated.');
                     } else {
                         $code = 'CUS-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
-                        Database::execute(
-                            'INSERT INTO customers (customer_code, first_name, last_name, phone, email, address, identification_type, identification_number, driving_license_number, license_expiry_date, status, created_by)
-                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-                            [$code, ...$fields, Auth::id()]
-                        );
-                        Audit::log('customer.created', 'customer', Database::lastId(), $code);
-                        Http::flash('success', 'Customer created.');
+                        if (Database::fetch('SELECT user_id FROM users WHERE email = ? LIMIT 1', [$email])) {
+                            throw new \InvalidArgumentException('That email already has a login account. Use a different email address.');
+                        }
+                        $role = Database::fetch("SELECT role_id FROM roles WHERE role_name = 'Customer' LIMIT 1");
+                        if (!$role) {
+                            throw new \RuntimeException('Customer role is not configured.');
+                        }
+                        $temporaryPassword = bin2hex(random_bytes(8));
+                        $accountStatus = $status === 'active' ? 'active' : ($status === 'blacklisted' ? 'suspended' : 'inactive');
+                        Database::transaction(function () use ($role, $fields, $email, $temporaryPassword, $accountStatus, $code): void {
+                            Database::execute(
+                                'INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, must_change_password, status)
+                                 VALUES (?,?,?,?,?,?,1,?)',
+                                [(int) $role['role_id'], $fields[0], $fields[1], $email, $fields[2], password_hash($temporaryPassword, PASSWORD_DEFAULT), $accountStatus]
+                            );
+                            $userId = (int) Database::lastId();
+                            Database::execute(
+                                'INSERT INTO customers (linked_user_id, customer_code, first_name, last_name, phone, email, address, identification_type, identification_number, driving_license_number, license_expiry_date, status, created_by)
+                                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                                [$userId, $code, ...$fields, Auth::id()]
+                            );
+                            Audit::log('user.created', 'user', (string) $userId, $email);
+                            Audit::log('customer.created', 'customer', Database::lastId(), $code);
+                        });
+                        Http::flash('success', 'Customer account created. Login email: ' . $email . '. Temporary password: ' . $temporaryPassword . '. The customer must change it at first sign-in.');
                     }
                     Http::redirect('customers');
+                } catch (\InvalidArgumentException $error) {
+                    Http::flash('danger', $error->getMessage());
                 } catch (\Throwable) {
                     Http::flash('danger', 'Could not save the customer. Check unique identity details.');
                 }
+            } else {
+                $errors = $v->errors;
+                Http::flash('danger', reset($errors));
             }
         }
         View::render('customers/form', ['title' => $customer ? 'Edit customer' : 'Add customer', 'customer' => $customer]);

@@ -7,6 +7,7 @@ use Crms\Audit;
 use Crms\Auth;
 use Crms\Database;
 use Crms\Http;
+use Crms\Money;
 use Crms\Rbac;
 use Crms\Upload;
 use Crms\Validator;
@@ -56,21 +57,27 @@ final class VehicleController
         if (Http::isPost()) {
             $v = new Validator();
             $categoryId = $rentalOfficer && $vehicle ? (int) $vehicle['category_id'] : Http::int('category_id');
-            $required = ['registration_no', 'make', 'model'];
+            $required = ['registration_no', 'make', 'model', 'daily_rate'];
             if (!$rentalOfficer || !$vehicle) {
                 $required[] = 'category_id';
-            }
-            if (!$rentalOfficer) {
-                $required[] = 'daily_rate';
             }
             $v->require($_POST, $required);
             $categoryIds = array_map(static fn(array $category): string => (string) $category['category_id'], $categories);
             $v->in('category_id', (string) $categoryId, $categoryIds);
+            $v->decimal('daily_rate', Http::str('daily_rate'));
             if (!$rentalOfficer) {
-                $v->in('status', Http::str('status'), ['available', 'reserved', 'rented', 'maintenance', 'inactive']);
-                $v->decimal('daily_rate', Http::str('daily_rate'));
                 $v->decimal('weekly_rate', Http::str('weekly_rate'), true);
                 $v->decimal('monthly_rate', Http::str('monthly_rate'), true);
+            }
+            $rateFields = $rentalOfficer ? ['daily_rate'] : ['daily_rate', 'weekly_rate', 'monthly_rate'];
+            foreach ($rateFields as $rateField) {
+                $rate = trim(Http::str($rateField));
+                if ($rate !== '' && is_numeric($rate) && (float) $rate > 9999999999.99) {
+                    $v->errors[$rateField] = 'Rates must be no greater than 9,999,999,999.99.';
+                }
+            }
+            if (!$rentalOfficer) {
+                $v->in('status', Http::str('status'), ['available', 'reserved', 'rented', 'maintenance', 'inactive']);
             }
             $fuelLevel = Http::str('fuel_level_percent');
             if ($fuelLevel !== '' && (!is_numeric($fuelLevel) || (float) $fuelLevel < 0 || (float) $fuelLevel > 100)) {
@@ -104,17 +111,21 @@ final class VehicleController
                     return;
                 }
                 if ($rentalOfficer) {
+                    $dailyRate = Http::str('daily_rate');
+                    $categoryDailyRate = (float) $selectedCategory['default_daily_rate'];
+                    $categoryWeeklyRate = $selectedCategory['default_weekly_rate'];
+                    $categoryMonthlyRate = $selectedCategory['default_monthly_rate'];
+                    $weeklyRate = $categoryDailyRate > 0 && (float) $categoryWeeklyRate > 0
+                        ? Money::mul($dailyRate, (float) $categoryWeeklyRate / $categoryDailyRate)
+                        : Money::mul($dailyRate, 7);
+                    $monthlyRate = $categoryDailyRate > 0 && (float) $categoryMonthlyRate > 0
+                        ? Money::mul($dailyRate, (float) $categoryMonthlyRate / $categoryDailyRate)
+                        : Money::mul($dailyRate, 30);
                     if ($vehicle) {
-                        $dailyRate = $vehicle['daily_rate'];
-                        $weeklyRate = $vehicle['weekly_rate'];
-                        $monthlyRate = $vehicle['monthly_rate'];
                         $status = $vehicle['status'];
                         $currentMileage = (int) $vehicle['current_mileage'];
                         $vehicleFuelLevel = $vehicle['fuel_level_percent'];
                     } else {
-                        $dailyRate = $selectedCategory['default_daily_rate'];
-                        $weeklyRate = $selectedCategory['default_weekly_rate'];
-                        $monthlyRate = $selectedCategory['default_monthly_rate'];
                         $status = 'available';
                         $currentMileage = Http::int('current_mileage');
                         $vehicleFuelLevel = Http::str('fuel_level_percent') !== '' ? Http::str('fuel_level_percent') : null;

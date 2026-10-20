@@ -22,6 +22,52 @@ final class AdminController
     {
         Rbac::require('users.manage');
         if (Http::isPost()) {
+            if (Http::str('action') === 'create_customer_login') {
+                $customerId = Http::int('customer_id');
+                $temporaryPassword = bin2hex(random_bytes(8));
+                try {
+                    $account = Database::transaction(function () use ($customerId, $temporaryPassword): array {
+                        $customer = Database::fetch('SELECT * FROM customers WHERE customer_id = ? FOR UPDATE', [$customerId]);
+                        if (!$customer) {
+                            throw new \InvalidArgumentException('That customer record no longer exists.');
+                        }
+                        if (!empty($customer['linked_user_id'])) {
+                            throw new \InvalidArgumentException('This customer already has a login account.');
+                        }
+                        $email = strtolower(trim((string) ($customer['email'] ?? '')));
+                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            throw new \InvalidArgumentException('Add a valid email address to this customer record before creating a login.');
+                        }
+                        if (Database::fetch('SELECT user_id FROM users WHERE email = ? LIMIT 1', [$email])) {
+                            throw new \InvalidArgumentException('This email already belongs to a login account. Update the customer email before creating another login.');
+                        }
+                        $role = Database::fetch("SELECT role_id FROM roles WHERE role_name = 'Customer' LIMIT 1");
+                        if (!$role) {
+                            throw new \RuntimeException('Customer role is not configured.');
+                        }
+                        $customerStatus = (string) $customer['status'];
+                        $accountStatus = $customerStatus === 'active' ? 'active' : ($customerStatus === 'blacklisted' ? 'suspended' : 'inactive');
+                        Database::execute(
+                            'INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, must_change_password, status)
+                             VALUES (?,?,?,?,?,?,1,?)',
+                            [(int) $role['role_id'], $customer['first_name'], $customer['last_name'], $email, $customer['phone'], password_hash($temporaryPassword, PASSWORD_DEFAULT), $accountStatus]
+                        );
+                        $userId = (int) Database::lastId();
+                        if (Database::execute('UPDATE customers SET linked_user_id = ? WHERE customer_id = ? AND linked_user_id IS NULL', [$userId, $customerId]) !== 1) {
+                            throw new \RuntimeException('Could not link the customer login.');
+                        }
+                        Audit::log('user.created', 'user', (string) $userId, $email);
+                        Audit::log('customer.login_linked', 'customer', (string) $customerId, $customer['customer_code']);
+                        return ['email' => $email];
+                    });
+                    Http::flash('success', 'Customer login created for ' . $account['email'] . '. Temporary password: ' . $temporaryPassword . '. The customer must change it at first sign-in.');
+                } catch (\InvalidArgumentException $error) {
+                    Http::flash('danger', $error->getMessage());
+                } catch (\Throwable) {
+                    Http::flash('danger', 'Could not create the customer login. Check that the email is unique and the customer details are valid.');
+                }
+                Http::redirect('admin/users');
+            }
             if (Http::str('action') === 'create') {
                 $v = new Validator();
                 $v->require($_POST, ['first_name', 'last_name', 'email', 'password', 'role_id', 'status']);
@@ -235,8 +281,17 @@ final class AdminController
         }
         $userSql .= ' ORDER BY u.created_at DESC';
         $users = Database::fetchAll($userSql, $userParams);
+        $unlinkedCustomers = Database::fetchAll(
+            "SELECT c.customer_id, c.customer_code, c.first_name, c.last_name, c.email, c.phone, c.status,
+                    CASE WHEN c.email IS NULL OR TRIM(c.email) = '' THEN 'missing_email'
+                         WHEN EXISTS (SELECT 1 FROM users u WHERE u.email = TRIM(c.email)) THEN 'email_in_use'
+                         ELSE 'ready' END AS login_setup_status
+             FROM customers c
+             WHERE c.linked_user_id IS NULL
+             ORDER BY c.created_at DESC, c.customer_id DESC LIMIT 100"
+        );
         $roles = Database::fetchAll('SELECT * FROM roles ORDER BY role_name');
-        View::render('admin/users', ['title' => 'Users', 'users' => $users, 'roles' => $roles, 'q' => $q]);
+        View::render('admin/users', ['title' => 'Users', 'users' => $users, 'roles' => $roles, 'q' => $q, 'unlinkedCustomers' => $unlinkedCustomers]);
     }
 
     public function roles(): void

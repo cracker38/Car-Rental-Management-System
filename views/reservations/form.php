@@ -1,4 +1,4 @@
-<?php $reservation = $reservation ?? null; $editing = $reservation !== null; $rentalOfficer = (\Crms\Auth::user()['role_name'] ?? '') === 'Rental Officer'; $customerSigning = \Crms\Auth::isCustomer(); ?>
+<?php $reservation = $reservation ?? null; $editing = $reservation !== null; $rentalOfficer = (\Crms\Auth::user()['role_name'] ?? '') === 'Rental Officer'; $customerSigning = \Crms\Auth::isCustomer(); $customerSignatureOnFile = $customerSignatureOnFile ?? false; ?>
 <form method="post" action="<?= e(url('reservations/form', $editing ? ['id' => $reservation['reservation_id']] : [])) ?>" class="card card-body reservation-form" data-min-rental-hours="8">
   <?= \Crms\Csrf::field() ?>
   <div class="row g-3">
@@ -34,7 +34,7 @@
   </div>
   <section class="border rounded-3 p-3 mt-4" aria-labelledby="reservation-review-title">
     <h2 class="h6" id="reservation-review-title"><?= $customerSigning ? 'Review and sign the reservation request' : 'Review the reservation request' ?></h2>
-    <p class="small text-muted">Review the vehicle, dates, locations, and customer notes above. The final quote and availability are checked again by the server. Staff changes require the customer to sign again before approval.</p>
+    <p class="small text-muted">Review the vehicle, dates, locations, and customer notes above. The final quote and availability are checked again by the server. Staff updates retain the customer signature already on file.</p>
     <label class="form-check mb-3">
       <input class="form-check-input" type="checkbox" name="reservation_reviewed" value="1" required>
       <span class="form-check-label"><?= $customerSigning ? 'I have reviewed these reservation details and agree to submit this signed request.' : 'I have reviewed these reservation details and agree to save this request.' ?></span>
@@ -49,10 +49,10 @@
     </div>
     <div class="small text-danger mt-2" id="customer-signature-error" role="alert" hidden>Draw your signature before submitting.</div>
     <?php else: ?>
-      <p class="small text-muted mb-0">The customer must sign this request from their account before a Rental Officer can approve it.</p>
+      <p class="small text-muted mb-0"><?= $customerSignatureOnFile ? 'The customer has already signed this request. Their signature will be retained when staff saves updates.' : 'The customer must sign this request from their account before a Rental Officer can approve it.' ?></p>
     <?php endif; ?>
   </section>
-  <p class="small text-muted mt-3"><?= $customerSigning ? 'After submission, the request remains pending until a Rental Officer records a signed decision. Payment is available only after approval.' : 'The request remains pending until the customer signs and a Rental Officer records a signed decision.' ?></p>
+  <p class="small text-muted mt-3"><?= $customerSigning ? 'After submission, the request remains pending until a Rental Officer records a signed decision. Payment is available only after approval.' : ($customerSignatureOnFile ? 'The request remains pending until a Rental Officer records a signed decision.' : 'The request remains pending until the customer signs and a Rental Officer records a signed decision.') ?></p>
   <div class="d-flex gap-2 mt-2"><button class="btn btn-primary"><?= $customerSigning ? ($editing ? 'Sign and update request' : 'Sign and submit request') : ($editing ? 'Save request' : 'Save reservation request') ?></button><?php if ($editing): ?><a class="btn btn-outline-secondary" href="<?= e(url('reservations/show', ['id' => $reservation['reservation_id']])) ?>">Cancel</a><?php endif; ?></div>
 </form>
 <?php if ($customerSigning): ?>

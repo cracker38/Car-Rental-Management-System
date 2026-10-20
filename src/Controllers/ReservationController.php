@@ -45,7 +45,12 @@ final class ReservationController
         $reservation = null;
         if ($reservationId > 0) {
             Rbac::assertCustomerOwns('reservation', $reservationId);
-            $reservation = Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$reservationId]);
+            $reservation = Database::fetch(
+                'SELECT r.*, c.linked_user_id AS customer_user_id
+                 FROM reservations r JOIN customers c ON c.customer_id = r.customer_id
+                 WHERE r.reservation_id = ?',
+                [$reservationId]
+            );
             if (!$reservation) {
                 http_response_code(404);
                 View::render('errors/404', ['title' => 'Not found']);
@@ -110,6 +115,11 @@ final class ReservationController
                 Http::flash('danger', 'Could not create the reservation.');
             }
         }
+        $customerSignatureOnFile = $reservation
+            && !empty($reservation['customer_signature'])
+            && !empty($reservation['customer_signed_at'])
+            && !empty($reservation['customer_signature_user_id'])
+            && (int) $reservation['customer_signature_user_id'] === (int) ($reservation['customer_user_id'] ?? 0);
         View::render('reservations/form', [
             'title' => $reservation ? 'Edit reservation' : 'New reservation',
             'customers' => $customers,
@@ -119,6 +129,7 @@ final class ReservationController
             'pickup' => $pickup,
             'returnAt' => $returnAt,
             'reservation' => $reservation,
+            'customerSignatureOnFile' => $customerSignatureOnFile,
         ]);
     }
 
