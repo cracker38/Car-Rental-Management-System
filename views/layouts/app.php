@@ -13,7 +13,10 @@
   <link href="<?= e(asset('public/css/app.css') . '?v=' . (string) filemtime(dirname(__DIR__, 2) . '/public/css/app.css')) ?>" rel="stylesheet">
 </head>
 <?php $isSystemAdmin = ($user['role_name'] ?? '') === 'System Administrator'; ?>
-<body class="site-body app-body<?= $isSystemAdmin ? ' admin-workspace' : '' ?><?= !empty($printAgreement) ? ' rental-agreement-print' : '' ?><?= !empty($reportPrint) ? ' report-print' : '' ?>">
+<?php $isDashboardPage = (string) ($_GET['r'] ?? '') === 'dashboard'; ?>
+<?php $isReportsPage = (string) ($_GET['r'] ?? '') === 'reports'; ?>
+<?php $isAdminUsersPage = (string) ($_GET['r'] ?? '') === 'admin/users'; ?>
+<body class="site-body app-body<?= $isDashboardPage ? ' dashboard-workspace' : '' ?><?= $isReportsPage ? ' reports-workspace' : '' ?><?= $isAdminUsersPage ? ' admin-users-workspace' : '' ?><?= $isSystemAdmin ? ' admin-workspace' : '' ?><?= !empty($printAgreement) ? ' rental-agreement-print' : '' ?><?= !empty($reportPrint) ? ' report-print' : '' ?>">
 <div class="app-shell">
   <?php require dirname(__DIR__) . '/partials/sidebar.php'; ?>
   <div class="app-main">
