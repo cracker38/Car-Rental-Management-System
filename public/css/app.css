@@ -1123,6 +1123,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
 .dashboard-workspace .dashboard-fleet-card .dashboard-fleet-copy small { font-size: .72rem; }
 .dashboard-workspace .driver-trip-form { min-width: 190px; }
 .dashboard-workspace .panel > p.px-3 { padding-inline: 0 !important; }
+.app-body .app-content .panel { height: auto !important; }
 .admin-workspace.dashboard-workspace .app-content { padding-top: 1rem; }
 .admin-workspace.dashboard-workspace .app-content > .row.g-3 { --bs-gutter-y: .8rem; }
 .admin-workspace.dashboard-workspace .admin-overview-panels .panel { padding: .9rem; }

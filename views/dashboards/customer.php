@@ -14,7 +14,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
 ?>
 <div class="row g-3">
   <div class="col-xl-8">
-    <section class="panel table-panel h-100">
+    <section class="panel table-panel">
       <div class="panel-h d-flex justify-content-between">My recent reservations <a class="small fw-normal" href="<?= e(url('reservations')) ?>">All reservations</a></div>
       <?php if (!$reservations): ?><p class="text-muted mb-0">You have no reservations yet. <a href="<?= e(url('search')) ?>">Search vehicles to get started.</a></p><?php else: ?>
         <div class="table-responsive"><table class="table align-middle mb-0">
