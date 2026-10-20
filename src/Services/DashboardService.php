@@ -192,7 +192,7 @@ final class DashboardService
                    AND transaction_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND transaction_date <= NOW()"
             );
             $monthNetPayments = (float) ($fin['net_payments'] ?? 0);
-            $outstanding = $this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances
+            $outstanding = $this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM " . InvoiceBalanceSql::table('b') . "
                                        WHERE status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0");
         }
         $fleetSize = $this->count("SELECT COUNT(*) c FROM vehicles WHERE status <> 'inactive'");
@@ -375,8 +375,8 @@ final class DashboardService
         );
         return [
             'kpis' => [
-                ['label' => 'Outstanding balance', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0")), 'hint' => 'Across open invoices', 'href' => url('invoices')],
-                ['label' => 'Overdue invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices i JOIN vw_invoice_balances b ON b.invoice_id=i.invoice_id WHERE b.status IN ('overdue','issued','partially_paid') AND b.outstanding_balance > 0 AND i.due_date IS NOT NULL AND i.due_date < CURDATE()"), 'hint' => 'Past due with a balance', 'href' => url('invoices')],
+                ['label' => 'Outstanding balance', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM " . InvoiceBalanceSql::table('b') . " WHERE status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0")), 'hint' => 'Across open invoices', 'href' => url('invoices')],
+                ['label' => 'Overdue invoices', 'value' => $this->count("SELECT COUNT(*) c FROM invoices i JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id=i.invoice_id WHERE b.status IN ('overdue','issued','partially_paid') AND b.outstanding_balance > 0 AND i.due_date IS NOT NULL AND i.due_date < CURDATE()"), 'hint' => 'Past due with a balance', 'href' => url('invoices')],
                 ['label' => 'Held deposits', 'value' => Money::format($depositBalance), 'hint' => 'Net deposit balance', 'href' => url('finance')],
                 ['label' => 'Payments received today', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(amount),0) s FROM financial_transactions WHERE transaction_type='payment' AND status='completed' AND transaction_date >= CURDATE() AND transaction_date < DATE_ADD(CURDATE(), INTERVAL 1 DAY)")), 'hint' => 'Completed payments', 'href' => url('finance')],
                 ['label' => 'Requests awaiting approval', 'value' => $this->count("SELECT COUNT(*) c FROM financial_transactions WHERE status='awaiting_approval' AND approval_requested_by = ?", [Auth::id()]), 'hint' => 'Refunds and adjustments', 'href' => url('finance')],
@@ -385,7 +385,7 @@ final class DashboardService
             'invoices' => Database::fetchAll(
                 "SELECT i.invoice_id, i.invoice_number, i.total_amount, i.status, b.outstanding_balance, c.first_name, c.last_name
                  FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
-                 LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                 LEFT JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
                  WHERE i.status IN ('draft','issued','partially_paid','overdue')
                  ORDER BY CASE WHEN i.status = 'draft' THEN 0 ELSE 1 END, i.issue_date DESC LIMIT 10"
             ),
@@ -418,7 +418,7 @@ final class DashboardService
             'overdue' => Database::fetchAll(
                 "SELECT i.invoice_id, i.invoice_number, i.due_date, b.outstanding_balance, c.first_name, c.last_name
                  FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
-                 LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                 LEFT JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
                  WHERE i.status IN ('overdue','issued','partially_paid') AND i.due_date IS NOT NULL AND i.due_date < CURDATE()
                    AND COALESCE(b.outstanding_balance, i.total_amount) > 0
                  ORDER BY i.due_date ASC LIMIT 8"
@@ -454,8 +454,8 @@ final class DashboardService
                 ['label' => 'My bookings', 'value' => $this->count('SELECT COUNT(*) c FROM reservations WHERE customer_id = ?', [$cid]), 'hint' => 'All reservations', 'href' => url('reservations')],
                 ['label' => 'Upcoming', 'value' => $this->count("SELECT COUNT(*) c FROM reservations WHERE customer_id = ? AND status IN ('pending','confirmed') AND pickup_datetime >= NOW()", [$cid]), 'hint' => 'Future pickups', 'href' => url('reservations')],
                 ['label' => 'My rentals', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE customer_id = ?', [$cid]), 'hint' => 'Agreements and return dates', 'href' => url('rentals')],
-                ['label' => 'Open invoices', 'value' => $this->count("SELECT COUNT(*) c FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0", [$cid]), 'hint' => 'Invoices with an unpaid balance', 'href' => url('invoices')],
-                ['label' => 'To pay', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM vw_invoice_balances WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0", [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
+                ['label' => 'Open invoices', 'value' => $this->count("SELECT COUNT(*) c FROM " . InvoiceBalanceSql::table('b') . " WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0", [$cid]), 'hint' => 'Invoices with an unpaid balance', 'href' => url('invoices')],
+                ['label' => 'To pay', 'value' => Money::format($this->sum("SELECT COALESCE(SUM(outstanding_balance),0) s FROM " . InvoiceBalanceSql::table('b') . " WHERE customer_id = ? AND status IN ('issued','partially_paid','overdue') AND outstanding_balance > 0", [$cid])), 'hint' => 'Outstanding RWF', 'href' => url('invoices')],
             ],
             'reservations' => Database::fetchAll(
                 'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, r.payment_status,
@@ -473,7 +473,7 @@ final class DashboardService
                         COALESCE(pm.pending_momo, 0) AS pending_momo_amount
                  FROM invoices i
                  JOIN customers c ON c.customer_id = i.customer_id
-                 LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                 LEFT JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
                  LEFT JOIN reservations r ON r.reservation_id = i.reservation_id
                  LEFT JOIN (
                     SELECT invoice_id, SUM(amount) AS pending_momo

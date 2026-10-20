@@ -542,20 +542,6 @@ INSERT IGNORE INTO system_settings (setting_key,setting_value,value_type,descrip
  ('reservation_confirmation_required','true','boolean','Reservations require staff confirmation'),
  ('default_deposit_amount','0','number','Business-defined default deposit');
 
-CREATE OR REPLACE VIEW vw_invoice_balances AS
-SELECT i.invoice_id,i.invoice_number,i.customer_id,i.total_amount,
- COALESCE(SUM(CASE WHEN ft.transaction_type='payment' AND ft.status='completed' THEN ft.amount
-                   WHEN ft.transaction_type='payment_refund' AND ft.status='completed' THEN -ft.amount
-                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='credit' THEN ft.amount
-                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='debit' THEN -ft.amount ELSE 0 END),0) AS net_paid,
- GREATEST(i.total_amount-COALESCE(SUM(CASE WHEN ft.transaction_type='payment' AND ft.status='completed' THEN ft.amount
-                   WHEN ft.transaction_type='payment_refund' AND ft.status='completed' THEN -ft.amount
-                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='credit' THEN ft.amount
-                   WHEN ft.transaction_type='adjustment' AND ft.status='completed' AND ft.adjustment_direction='debit' THEN -ft.amount ELSE 0 END),0),0) AS outstanding_balance,
- i.status
-FROM invoices i LEFT JOIN financial_transactions ft ON ft.invoice_id=i.invoice_id
-GROUP BY i.invoice_id,i.invoice_number,i.customer_id,i.total_amount,i.status;
-
 -- REQUIRED APPLICATION RULES (not safely expressible as simple UNIQUE constraints):
 -- 1. Confirm booking inside a transaction. Lock the vehicle row SELECT ... FOR UPDATE,
 --    then query conflicting confirmed reservations where existing.pickup < requested.return

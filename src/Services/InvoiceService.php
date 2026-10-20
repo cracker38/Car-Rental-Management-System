@@ -75,7 +75,7 @@ final class InvoiceService
     {
         $invoice = Database::fetch(
             "SELECT i.invoice_id, i.status, COALESCE(b.outstanding_balance, i.total_amount) AS outstanding_balance
-             FROM invoices i LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+             FROM invoices i LEFT JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
              WHERE i.reservation_id = ? AND i.notes LIKE 'Booking prepayment:%'
              ORDER BY i.invoice_id DESC LIMIT 1",
             [$reservationId]
@@ -258,7 +258,7 @@ final class InvoiceService
         if (!$inv || in_array($inv['status'], ['draft', 'void'], true)) {
             return;
         }
-        $bal = Database::fetch('SELECT outstanding_balance, net_paid FROM vw_invoice_balances WHERE invoice_id = ?', [$invoiceId]);
+        $bal = Database::fetch('SELECT outstanding_balance, net_paid FROM ' . InvoiceBalanceSql::table('b') . ' WHERE invoice_id = ?', [$invoiceId]);
         $outstanding = (float) ($bal['outstanding_balance'] ?? $inv['total_amount']);
         $paid = (float) ($bal['net_paid'] ?? 0);
         $status = $inv['status'];

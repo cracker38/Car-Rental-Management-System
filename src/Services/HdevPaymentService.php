@@ -111,7 +111,7 @@ final class HdevPaymentService
                     throw new InvalidArgumentException('Payments can only be requested against issued invoices.');
                 }
                 if ($type === 'payment') {
-                    $balance = Database::fetch('SELECT outstanding_balance FROM vw_invoice_balances WHERE invoice_id = ?', [$invoiceId]);
+                    $balance = Database::fetch('SELECT outstanding_balance FROM ' . InvoiceBalanceSql::table('b') . ' WHERE invoice_id = ?', [$invoiceId]);
                     $pending = Database::fetch(
                         "SELECT COUNT(*) AS total FROM financial_transactions
                          WHERE invoice_id = ? AND transaction_type = 'payment' AND status = 'pending'",

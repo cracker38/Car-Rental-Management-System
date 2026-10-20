@@ -19,7 +19,7 @@ final class ReservationPaymentStatusService
             return;
         }
 
-        $balance = Database::fetch('SELECT outstanding_balance, net_paid FROM vw_invoice_balances WHERE invoice_id = ?', [$invoiceId]);
+        $balance = Database::fetch('SELECT outstanding_balance, net_paid FROM ' . InvoiceBalanceSql::table('b') . ' WHERE invoice_id = ?', [$invoiceId]);
         $activity = Database::fetch(
             "SELECT
                 COALESCE(SUM(CASE WHEN transaction_type = 'payment' AND status = 'completed' THEN amount

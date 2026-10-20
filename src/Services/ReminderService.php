@@ -74,7 +74,7 @@ final class ReminderService
             "SELECT i.invoice_id, i.invoice_number, i.due_date, i.currency, b.outstanding_balance,
                     c.customer_id, c.linked_user_id
              FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
-             JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+             JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
              WHERE i.status IN ('issued','partially_paid','overdue')
                AND i.due_date IS NOT NULL
                AND i.due_date <= DATE_ADD(CURDATE(), INTERVAL 1 DAY)

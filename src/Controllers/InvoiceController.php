@@ -9,6 +9,7 @@ use Crms\Http;
 use Crms\Rbac;
 use Crms\View;
 use Crms\Services\InvoiceService;
+use Crms\Services\InvoiceBalanceSql;
 use Crms\Services\SmsService;
 use InvalidArgumentException;
 
@@ -20,7 +21,7 @@ final class InvoiceController
         $sql = 'SELECT i.*, c.first_name, c.last_name, b.outstanding_balance, b.net_paid
                 FROM invoices i
                 JOIN customers c ON c.customer_id = i.customer_id
-                LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id';
+                LEFT JOIN ' . InvoiceBalanceSql::table('b') . ' ON b.invoice_id = i.invoice_id';
         $params = [];
         if (Auth::isCustomer()) {
             $sql .= " WHERE i.customer_id = ? AND i.status NOT IN ('draft','void')";
@@ -54,7 +55,8 @@ final class InvoiceController
                        FROM invoices i
                        JOIN customers c ON c.customer_id = i.customer_id
                        LEFT JOIN reservations r ON r.reservation_id = i.reservation_id
-                       LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+                       LEFT JOIN ' . InvoiceBalanceSql::table('b') . '
+                       ON b.invoice_id = i.invoice_id
                        WHERE i.invoice_id = ?';
         $invoiceParams = [$id];
         if (Auth::isCustomer()) {

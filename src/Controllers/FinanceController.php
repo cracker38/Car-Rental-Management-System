@@ -8,6 +8,7 @@ use Crms\Http;
 use Crms\Rbac;
 use Crms\View;
 use Crms\Services\FinanceService;
+use Crms\Services\InvoiceBalanceSql;
 use InvalidArgumentException;
 
 final class FinanceController
@@ -80,7 +81,7 @@ final class FinanceController
         if (Http::int('invoice_id')) {
             $invoice = Database::fetch(
                 'SELECT i.*, b.outstanding_balance FROM invoices i
-                 LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id WHERE i.invoice_id = ?',
+                 LEFT JOIN ' . InvoiceBalanceSql::table('b') . ' ON b.invoice_id = i.invoice_id WHERE i.invoice_id = ?',
                 [Http::int('invoice_id')]
             );
         }
@@ -88,7 +89,7 @@ final class FinanceController
         $openInvoices = Database::fetchAll(
             "SELECT i.invoice_id, i.invoice_number, i.customer_id, c.first_name, c.last_name, b.outstanding_balance
              FROM invoices i JOIN customers c ON c.customer_id = i.customer_id
-             JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+             JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
              WHERE i.status IN ('issued','partially_paid','overdue','paid')
              ORDER BY i.due_date, i.invoice_id DESC LIMIT 200"
         );

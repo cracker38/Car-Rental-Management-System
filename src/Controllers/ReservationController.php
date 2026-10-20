@@ -7,6 +7,7 @@ use Crms\Auth;
 use Crms\Database;
 use Crms\Http;
 use Crms\Rbac;
+use Crms\Services\InvoiceBalanceSql;
 use Crms\Services\DriverAccess;
 use Crms\View;
 use Crms\Services\ReservationService;
@@ -156,7 +157,7 @@ final class ReservationController
         $bookingInvoice = Database::fetch(
             "SELECT i.invoice_id, i.invoice_number, i.status, i.total_amount, b.outstanding_balance, b.net_paid,
                     EXISTS(SELECT 1 FROM financial_transactions ft WHERE ft.invoice_id = i.invoice_id AND ft.status IN ('pending','completed','awaiting_approval')) AS payment_activity
-             FROM invoices i LEFT JOIN vw_invoice_balances b ON b.invoice_id = i.invoice_id
+             FROM invoices i LEFT JOIN " . InvoiceBalanceSql::table('b') . " ON b.invoice_id = i.invoice_id
              WHERE i.reservation_id = ? AND i.notes LIKE 'Booking prepayment:%'
              ORDER BY i.invoice_id DESC LIMIT 1",
             [$id]

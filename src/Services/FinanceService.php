@@ -85,7 +85,7 @@ final class FinanceService
                     throw new InvalidArgumentException('Payments and invoice adjustments require an issued invoice.');
                 }
                 if ($type === 'payment') {
-                    $balance = Database::fetch('SELECT outstanding_balance FROM vw_invoice_balances WHERE invoice_id = ?', [$invoiceId]);
+                    $balance = Database::fetch('SELECT outstanding_balance FROM ' . InvoiceBalanceSql::table('b') . ' WHERE invoice_id = ?', [$invoiceId]);
                     $reserved = Database::fetch(
                         "SELECT COALESCE(SUM(amount),0) AS amount FROM financial_transactions
                          WHERE invoice_id = ? AND transaction_type = 'payment' AND payment_method = 'mobile_money' AND status = 'pending'",
