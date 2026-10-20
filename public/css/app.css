@@ -1022,7 +1022,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
 .role-dashboard .shortcut-icon { margin-bottom: .35rem; }
 
 .role-dashboard .table { margin-bottom: 0; }
-.role-dashboard .table > thead th { padding-top: .65rem; padding-bottom: .65rem; border-bottom: 1px solid #ece9e4; background: #faf9f7; color: var(--rcr-muted); font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.role-dashboard .table > thead th { padding-top: .65rem; padding-bottom: .65rem; border-bottom: 1px solid #ece9e4; background: #fbfaf7; color: var(--rcr-muted); font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .role-dashboard .table > thead th:first-child { border-top-left-radius: .55rem; }
 .role-dashboard .table > thead th:last-child { border-top-right-radius: .55rem; }
 .role-dashboard .table > tbody th { border-color: #f0ede8; vertical-align: middle; }
