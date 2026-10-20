@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-customer">
 <?php
 $dashboardSubtitle = 'My Account - manage your bookings, rentals, payments, and contact details.';
 $dashboardNotificationHeading = 'Booking, payment, and return updates';
@@ -154,3 +155,4 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
   <?php endif; ?>
 </section>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+</div>

@@ -982,3 +982,85 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
   .hire-sort-control .form-select { flex: 1; }
   .hire-car-photo { height: 195px; }
 }
+
+/* Role dashboards: shared layout rhythm and component polish (presentation only). */
+.role-dashboard { display: flex; flex-direction: column; gap: 1.25rem; }
+.role-dashboard > :not(.row) { margin-top: 0 !important; margin-bottom: 0 !important; }
+.role-dashboard > .row { margin-bottom: 0 !important; }
+.role-dashboard > .panel, .role-dashboard > section { height: auto; }
+.role-dashboard .panel { border: 1px solid #ece9e4; border-radius: .9rem; box-shadow: 0 10px 30px rgba(26,28,30,.045); }
+.role-dashboard .panel-h { color: var(--rcr-ink); font-size: .98rem; font-weight: 800; letter-spacing: -.01em; }
+.role-dashboard .admin-panel-heading,
+.role-dashboard .manager-subsection-heading { margin-bottom: .9rem; padding-bottom: .8rem; border-bottom: 1px solid #f0ede8; }
+.role-dashboard .admin-panel-heading .panel-h { margin-bottom: .15rem !important; }
+
+.role-dashboard .dashboard-heading,
+.role-dashboard .admin-dashboard-heading {
+  align-items: center;
+  padding: 1.35rem 1.5rem;
+  border: 1px solid #ece9e4;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: inset 4px 0 0 var(--rcr-orange), 0 10px 30px rgba(26,28,30,.045);
+}
+.role-dashboard .dashboard-heading .eyebrow,
+.role-dashboard .admin-dashboard-heading .eyebrow { display: inline-block; margin-bottom: .35rem; letter-spacing: .12em; text-transform: uppercase; }
+.role-dashboard .dashboard-heading p,
+.role-dashboard .admin-dashboard-heading p { max-width: 62ch; margin-bottom: 0; color: var(--rcr-muted); }
+.role-dashboard .dashboard-heading-actions .btn,
+.role-dashboard .admin-dashboard-heading .btn { display: inline-flex; align-items: center; gap: .1rem; border-radius: .6rem; font-weight: 600; }
+
+.role-dashboard .kpi-card { position: relative; display: flex; flex-direction: column; min-height: 112px; overflow: hidden; border-color: #ece9e4; border-radius: .9rem; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.role-dashboard .kpi-card::before { position: absolute; top: 0; left: 0; right: 0; height: 3px; content: ""; background: var(--rcr-orange); opacity: .85; }
+.role-dashboard .kpi-card-link:hover { transform: translateY(-3px); border-color: #f4c49a; box-shadow: 0 16px 34px rgba(26,28,30,.08); }
+.role-dashboard .kpi-label { letter-spacing: .02em; }
+.role-dashboard .kpi-value { font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.15; }
+.role-dashboard .kpi-hint { margin-top: auto; padding-top: .3rem; }
+
+.role-dashboard .dashboard-shortcuts { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.role-dashboard .shortcut-card { min-height: 0; padding: 1.05rem 1.1rem; gap: .4rem; border-radius: .9rem; }
+.role-dashboard .shortcut-icon { margin-bottom: .35rem; }
+
+.role-dashboard .table { margin-bottom: 0; }
+.role-dashboard .table > thead th { padding-top: .65rem; padding-bottom: .65rem; border-bottom: 1px solid #ece9e4; background: #faf9f7; color: var(--rcr-muted); font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.role-dashboard .table > thead th:first-child { border-top-left-radius: .55rem; }
+.role-dashboard .table > thead th:last-child { border-top-right-radius: .55rem; }
+.role-dashboard .table > tbody th { border-color: #f0ede8; vertical-align: middle; }
+.role-dashboard .table > tbody td { padding-top: .75rem; padding-bottom: .75rem; border-color: #f0ede8; vertical-align: middle; }
+.role-dashboard .table > tbody tr:last-child td { border-bottom: 0; }
+.role-dashboard .table-hover > tbody > tr:hover > *,
+.role-dashboard .table > tbody tr:hover td { --bs-table-bg-state: #fffaf5; background-color: #fffaf5; }
+.role-dashboard .badge { padding: .38em .62em; border-radius: 999px; font-weight: 700; letter-spacing: .01em; }
+
+.role-dashboard .mini-row { padding: .75rem .25rem; border-radius: .5rem; transition: background-color .2s ease; }
+.role-dashboard .mini-row:hover { background: #fffaf5; }
+.role-dashboard .duties-list { padding-left: 0; list-style: none; }
+.role-dashboard .duties-list li { position: relative; margin-bottom: .55rem; padding-left: 1.3rem; line-height: 1.45; }
+.role-dashboard .duties-list li::before { position: absolute; top: .5em; left: .2rem; width: .45rem; height: .45rem; content: ""; border-radius: 50%; background: var(--rcr-orange); }
+
+.role-dashboard .dashboard-fleet-card,
+.role-dashboard .home-vehicle-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.role-dashboard .dashboard-fleet-card:hover { transform: translateY(-3px); border-color: #f4c49a; box-shadow: 0 16px 34px rgba(26,28,30,.08); }
+.role-dashboard .dashboard-fleet-card img { transition: transform .45s ease; }
+.role-dashboard .dashboard-fleet-card:hover img { transform: scale(1.04); }
+.role-dashboard .invoice-hero { box-shadow: inset 4px 0 0 var(--rcr-orange), 0 10px 30px rgba(26,28,30,.045); }
+.role-dashboard .row > [class*="col"]:has(> .panel ~ .panel) { display: flex; flex-direction: column; gap: 1rem; }
+.role-dashboard .row > [class*="col"]:has(> .panel ~ .panel) > .panel { height: auto !important; margin-top: 0 !important; }
+.role-dashboard .row > [class*="col"]:has(> .panel ~ .panel) > .panel:first-child { flex: 1 1 auto; }
+
+@media (min-width: 992px) {
+  .role-dashboard .row:has(> [class*="col"] > .kpi-card) { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin: 0 !important; }
+  .role-dashboard .row:has(> [class*="col"] > .kpi-card) > * { width: auto; max-width: none; margin: 0; padding: 0; }
+}
+
+@media (max-width: 767.98px) {
+  .role-dashboard { gap: 1rem; }
+  .role-dashboard .dashboard-heading,
+  .role-dashboard .admin-dashboard-heading { flex-direction: column; align-items: stretch; padding: 1.1rem 1.15rem; }
+  .role-dashboard .dashboard-heading-actions { width: 100%; }
+  .role-dashboard .dashboard-heading-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .role-dashboard .panel { padding: 1rem; }
+  .role-dashboard .kpi-card { min-height: 100px; padding: .95rem; }
+  .role-dashboard .kpi-value { font-size: 1.3rem; }
+  .role-dashboard .dashboard-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+}

@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-officer">
 <?php
 $dashboardEyebrow = 'Daily rental operations';
 $dashboardHeading = 'Rental Operations';
@@ -63,3 +64,4 @@ require dirname(__DIR__) . '/partials/dashboard-fleet-preview.php';
   </div>
 </div>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+</div>

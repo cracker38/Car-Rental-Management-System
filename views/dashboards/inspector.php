@@ -1,3 +1,4 @@
+<div class="role-dashboard role-dashboard-inspector">
 <?php
 $dashboardSubtitle = 'Review vehicles held for maintenance and record a safe return-to-service decision.';
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
@@ -24,3 +25,4 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
   </table></div>
 </section>
 <?php require dirname(__DIR__) . '/partials/dashboard-notifications.php'; ?>
+</div>
