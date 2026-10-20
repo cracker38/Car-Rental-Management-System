@@ -45,11 +45,14 @@ final class ReservationService
             throw new InvalidArgumentException('You are not authorized to create reservations for customers.');
         }
         if ((string) ($input['reservation_reviewed'] ?? '') !== '1') {
-            throw new InvalidArgumentException('Review the reservation details before signing and submitting.');
+            throw new InvalidArgumentException('Review the reservation details before submitting.');
         }
-        $customerSignature = Signature::decodePng((string) ($input['customer_signature'] ?? ''));
+        $customerSignature = Auth::isCustomer()
+            ? Signature::decodePng((string) ($input['customer_signature'] ?? ''))
+            : null;
+        $customerSignedAt = Auth::isCustomer() ? date('Y-m-d H:i:s') : null;
         $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
-        $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff, $customerSignature) {
+        $created = Database::transaction(function (PDO $pdo) use ($input, $asStaff, $customerSignature, $customerSignedAt) {
             $customerId = (int) $input['customer_id'];
             $vehicleId = (int) $input['vehicle_id'];
             $pickup = $input['pickup_datetime'];
@@ -99,13 +102,15 @@ final class ReservationService
                     $quote['agreed_daily_rate'], $quote['estimated_days'], $quote['estimated_amount'],
                     $quote['discount_amount'], $quote['tax_amount'], $quote['security_deposit'],
                     $status, $input['customer_notes'] ?? null, $input['internal_notes'] ?? null,
-                    $customerSignature, $customerSignatureUserId, Auth::id(), date('Y-m-d H:i:s'), Auth::id(),
+                    $customerSignature, $customerSignatureUserId, $customerSignatureUserId, $customerSignedAt, Auth::id(),
                 ]
             );
             $id = (int) Database::lastId();
             (new InvoiceService())->createFromReservation($id);
             $customerMessage = 'Reservation ' . $code . ' is ' . $status . '. Pickup ' . $pickup . '.';
-            $customerMessage .= ' A Rental Officer will review the signed request before payment is available.';
+            $customerMessage .= Auth::isCustomer()
+                ? ' A Rental Officer will review the signed request before payment is available.'
+                : ' Sign in to review and sign this request before a Rental Officer can approve it.';
             Audit::log('reservation.created', 'reservation', (string) $id, $code . ' ' . $status);
             $notifications = new NotificationService();
             $notifications->notifyUser(
@@ -121,14 +126,18 @@ final class ReservationService
                 'reservations.view',
                 'reservation_created',
                 'Reservation ' . $code,
-                'A signed reservation request is waiting for approval. ' . $customerMessage,
+                Auth::isCustomer()
+                    ? 'A signed reservation request is waiting for approval. ' . $customerMessage
+                    : 'A reservation request is waiting for the customer signature. ' . $customerMessage,
                 'reservation',
                 $id,
                 Auth::id()
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
-        $smsMessage = 'Reservation ' . $created['reservation_code'] . ' was submitted and is awaiting Rental Officer review.';
+        $smsMessage = Auth::isCustomer()
+            ? 'Reservation ' . $created['reservation_code'] . ' was submitted and is awaiting Rental Officer review.'
+            : 'Reservation ' . $created['reservation_code'] . ' is waiting for your signature before Rental Officer review.';
         (new SmsService())->sendToCustomer(
             (int) $created['customer_id'],
             'reservation_created',
@@ -153,16 +162,22 @@ final class ReservationService
             throw new InvalidArgumentException('You are not authorized to update reservations.');
         }
         if ((string) ($input['reservation_reviewed'] ?? '') !== '1') {
-            throw new InvalidArgumentException('Review the updated reservation details before signing and submitting.');
+            throw new InvalidArgumentException('Review the updated reservation details before submitting.');
         }
-        $customerSignature = Signature::decodePng((string) ($input['customer_signature'] ?? ''));
+        $customerSignature = Auth::isCustomer()
+            ? Signature::decodePng((string) ($input['customer_signature'] ?? ''))
+            : null;
+        $customerSignedAt = Auth::isCustomer() ? date('Y-m-d H:i:s') : null;
         $this->availability->assertValidPeriod((string) ($input['pickup_datetime'] ?? ''), (string) ($input['return_datetime'] ?? ''));
-        $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff, $customerSignature) {
+        $updated = Database::transaction(function (PDO $pdo) use ($id, $input, $asStaff, $customerSignature, $customerSignedAt) {
             $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
             $stmt->execute([$id]);
             $reservation = $stmt->fetch();
             if (!$reservation) {
                 throw new InvalidArgumentException('Reservation not found.');
+            }
+            if (Auth::isCustomer() && (int) $reservation['customer_id'] !== (int) Auth::customerId()) {
+                throw new InvalidArgumentException('Customers can update only their own reservations.');
             }
             if ((string) $input['pickup_datetime'] <= (string) $pdo->query('SELECT NOW()')->fetchColumn()) {
                 throw new InvalidArgumentException('Pickup must be scheduled in the future.');
@@ -220,14 +235,15 @@ final class ReservationService
                     pickup_location = ?, return_location = ?, agreed_daily_rate = ?, estimated_days = ?,
                     estimated_amount = ?, discount_amount = ?, tax_amount = ?, security_deposit = ?,
                     customer_notes = ?, internal_notes = ?, customer_signature = ?, customer_signature_user_id = ?,
-                    customer_signature_captured_by = ?, customer_signed_at = NOW() WHERE reservation_id = ?',
+                    customer_signature_captured_by = ?, customer_signed_at = ? WHERE reservation_id = ?',
                 [
                     $wasApproved ? 'pending' : $reservation['status'],
                     $vehicleId, $pickup, $returnAt, $input['pickup_location'] ?? null, $input['return_location'] ?? null,
                     $quote['agreed_daily_rate'], $quote['estimated_days'], $quote['estimated_amount'],
                     $quote['discount_amount'], $quote['tax_amount'], $quote['security_deposit'],
                     $input['customer_notes'] ?? null, $asStaff ? ($input['internal_notes'] ?? null) : $reservation['internal_notes'],
-                    $customerSignature, Auth::isCustomer() ? Auth::id() : null, Auth::id(), $id,
+                    $customerSignature, Auth::isCustomer() ? Auth::id() : null,
+                    Auth::isCustomer() ? Auth::id() : null, $customerSignedAt, $id,
                 ]
             );
             (new InvoiceService())->createFromReservation($id);
@@ -239,12 +255,17 @@ final class ReservationService
             $notifications = new NotificationService();
             $notifications->notifyUser(
                 Auth::id(), $customerId, 'reservation_updated', 'Reservation ' . $reservation['reservation_code'],
-                'Reservation details have been updated.', 'reservation', $id
+                Auth::isCustomer()
+                    ? 'Reservation details were updated and signed. A Rental Officer will review the request.'
+                    : 'Reservation details were updated. Please sign the revised request in your account before approval.',
+                'reservation', $id
             );
             $notifications->notifyRentalOfficers(
                 'reservation_updated',
                 'Reservation ' . $reservation['reservation_code'],
-                'Reservation ' . $reservation['reservation_code'] . ' was updated.',
+                Auth::isCustomer()
+                    ? 'Reservation ' . $reservation['reservation_code'] . ' has been signed by the customer and is ready for review.'
+                    : 'Reservation ' . $reservation['reservation_code'] . ' was updated and now needs the customer signature.',
                 'reservation',
                 $id,
                 Auth::id()
@@ -269,7 +290,9 @@ final class ReservationService
 
         (new SmsService())->sendToCustomer(
             (int) $updated['customer_id'], 'reservation_updated', 'Reservation ' . $updated['reservation_code'],
-            'Reservation ' . $updated['reservation_code'] . ' details were updated. Pickup ' . $updated['pickup_datetime'] . '.',
+            'Reservation ' . $updated['reservation_code'] . ' details were updated. '
+                . (Auth::isCustomer() ? 'The signed request is awaiting Rental Officer review. ' : 'Please sign in to sign the revised request. ')
+                . 'Pickup ' . $updated['pickup_datetime'] . '.',
             'reservation', $id
         );
         return $updated;
@@ -473,7 +496,11 @@ final class ReservationService
         $approverSignature = Signature::decodePng($signatureData);
 
         $decided = Database::transaction(function (PDO $pdo) use ($id, $decision, $note, $approverSignature) {
-            $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
+            $stmt = $pdo->prepare(
+                'SELECT r.*, c.linked_user_id AS customer_user_id FROM reservations r
+                 JOIN customers c ON c.customer_id = r.customer_id
+                 WHERE r.reservation_id = ? FOR UPDATE'
+            );
             $stmt->execute([$id]);
             $reservation = $stmt->fetch();
             if (!$reservation) {
@@ -482,7 +509,9 @@ final class ReservationService
             if ($reservation['status'] !== 'pending') {
                 throw new InvalidArgumentException('This reservation has already been reviewed or changed.');
             }
-            if (empty($reservation['customer_signature']) || empty($reservation['customer_signed_at'])) {
+            if (empty($reservation['customer_signature']) || empty($reservation['customer_signed_at'])
+                || empty($reservation['customer_signature_user_id'])
+                || (int) $reservation['customer_signature_user_id'] !== (int) ($reservation['customer_user_id'] ?? 0)) {
                 throw new InvalidArgumentException('The customer must sign the reservation request before it can be reviewed.');
             }
 

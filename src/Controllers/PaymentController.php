@@ -42,8 +42,18 @@ final class PaymentController
             }
         } elseif (Auth::isCustomer() && $reservationId && Http::str('transaction_type') === 'deposit_received') {
             Rbac::assertCustomerOwns('reservation', $reservationId);
-            $reservation = Database::fetch('SELECT reservation_id, customer_id, status, approval_note, approver_signature, customer_signature FROM reservations WHERE reservation_id = ?', [$reservationId]);
-            if (!$reservation || $reservation['status'] !== 'confirmed' || trim((string) ($reservation['approval_note'] ?? '')) === '' || empty($reservation['approver_signature']) || empty($reservation['customer_signature'])) {
+            $reservation = Database::fetch(
+                'SELECT r.reservation_id, r.customer_id, r.status, r.approval_note, r.approver_signature,
+                        r.customer_signature, r.customer_signed_at, r.customer_signature_user_id,
+                        c.linked_user_id AS customer_user_id
+                 FROM reservations r JOIN customers c ON c.customer_id = r.customer_id WHERE r.reservation_id = ?',
+                [$reservationId]
+            );
+            if (!$reservation || $reservation['status'] !== 'confirmed'
+                || trim((string) ($reservation['approval_note'] ?? '')) === ''
+                || empty($reservation['approver_signature']) || empty($reservation['customer_signature'])
+                || empty($reservation['customer_signed_at']) || empty($reservation['customer_signature_user_id'])
+                || (int) $reservation['customer_signature_user_id'] !== (int) ($reservation['customer_user_id'] ?? 0)) {
                 Http::flash('danger', 'This reservation must have a signed approval decision before payment.');
                 Http::redirect('reservations/show', ['id' => $reservationId]);
             }

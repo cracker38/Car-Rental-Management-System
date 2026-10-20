@@ -17,7 +17,8 @@ final class ReservationController
     public function index(): void
     {
         Rbac::require('reservations.view');
-        $sql = 'SELECT r.*, EXISTS(SELECT 1 FROM rentals rt WHERE rt.reservation_id = r.reservation_id) AS has_rental,
+        $sql = 'SELECT r.*, c.linked_user_id AS customer_user_id,
+                       EXISTS(SELECT 1 FROM rentals rt WHERE rt.reservation_id = r.reservation_id) AS has_rental,
                        c.first_name, c.last_name, v.registration_no, v.make, v.model
                 FROM reservations r
                 JOIN customers c ON c.customer_id = r.customer_id
@@ -126,7 +127,7 @@ final class ReservationController
         $id = Http::int('id');
         Rbac::assertCustomerOwns('reservation', $id);
         $row = Database::fetch(
-            'SELECT r.*, c.first_name, c.last_name, c.phone, c.email,
+            'SELECT r.*, c.first_name, c.last_name, c.phone, c.email, c.linked_user_id AS customer_user_id,
                     v.registration_no, v.make, v.model,
                     decider.first_name AS decision_first_name, decider.last_name AS decision_last_name,
                     captor.first_name AS signature_captor_first_name, captor.last_name AS signature_captor_last_name

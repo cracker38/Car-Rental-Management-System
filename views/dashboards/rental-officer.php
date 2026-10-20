@@ -21,11 +21,12 @@ require dirname(__DIR__) . '/partials/dashboard-fleet-preview.php';
       <div class="panel-h d-flex justify-content-between">Pending reservation approvals <a class="small fw-normal" href="<?= e(url('reservations')) ?>">All reservations</a></div>
       <?php if (!$pending): ?><p class="text-muted mb-0">No reservations are waiting for a booking decision.</p><?php else: ?>
         <div class="table-responsive"><table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Pickup</th><th></th></tr></thead>
+          <thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Pickup</th><th>Customer signature</th><th></th></tr></thead>
           <tbody><?php foreach ($pending as $item): ?><tr>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
             <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td><td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td><td><?= e($item['pickup_datetime']) ?></td>
-            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>">Review &amp; decide</a></td>
+            <td><?= !empty($item['customer_signed']) ? '<span class="badge text-bg-success">Signed</span>' : '<span class="badge text-bg-warning">Awaiting customer</span>' ?></td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= !empty($item['customer_signed']) ? 'Review &amp; decide' : 'View request' ?></a></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>

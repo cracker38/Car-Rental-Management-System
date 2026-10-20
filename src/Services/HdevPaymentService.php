@@ -18,11 +18,15 @@ final class HdevPaymentService
     public static function assertBookingPaymentAllowed(int $reservationId): void
     {
         $booking = Database::fetch(
-            'SELECT status, approval_note, approver_signature, customer_signature FROM reservations WHERE reservation_id = ?',
+            'SELECT r.status, r.approval_note, r.approver_signature, r.customer_signature,
+                    r.customer_signed_at, r.customer_signature_user_id, c.linked_user_id AS customer_user_id
+             FROM reservations r JOIN customers c ON c.customer_id = r.customer_id WHERE r.reservation_id = ?',
             [$reservationId]
         );
         if (!$booking || $booking['status'] !== 'confirmed' || trim((string) ($booking['approval_note'] ?? '')) === ''
-            || empty($booking['approver_signature']) || empty($booking['customer_signature'])) {
+            || empty($booking['approver_signature']) || empty($booking['customer_signature'])
+            || empty($booking['customer_signed_at']) || empty($booking['customer_signature_user_id'])
+            || (int) $booking['customer_signature_user_id'] !== (int) ($booking['customer_user_id'] ?? 0)) {
             throw new InvalidArgumentException('Payment is available only after the signed reservation request has a signed approval decision.');
         }
     }
@@ -67,14 +71,19 @@ final class HdevPaymentService
                 if ($invoiceId || !$reservationId) {
                     throw new InvalidArgumentException('Select a reservation to pay its security deposit.');
                 }
-                $stmt = $pdo->prepare('SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE');
+                $stmt = $pdo->prepare(
+                    'SELECT r.*, c.linked_user_id AS customer_user_id FROM reservations r
+                     JOIN customers c ON c.customer_id = r.customer_id WHERE r.reservation_id = ? FOR UPDATE'
+                );
                 $stmt->execute([$reservationId]);
                 $reservation = $stmt->fetch();
                 if (!$reservation || (int) $reservation['customer_id'] !== (int) ($input['customer_id'] ?? 0)) {
                     throw new InvalidArgumentException('The selected reservation does not belong to this customer.');
                 }
                 if ($reservation['status'] !== 'confirmed' || trim((string) ($reservation['approval_note'] ?? '')) === ''
-                    || empty($reservation['approver_signature']) || empty($reservation['customer_signature'])) {
+                    || empty($reservation['approver_signature']) || empty($reservation['customer_signature'])
+                    || empty($reservation['customer_signed_at']) || empty($reservation['customer_signature_user_id'])
+                    || (int) $reservation['customer_signature_user_id'] !== (int) ($reservation['customer_user_id'] ?? 0)) {
                     throw new InvalidArgumentException('Pay the security deposit after the signed reservation request is approved.');
                 }
                 $deposit = (new SecurityDepositService())->reservationSummary($reservationId);

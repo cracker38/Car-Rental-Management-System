@@ -355,6 +355,8 @@ final class DashboardService
             ),
             'pending' => Database::fetchAll(
                 "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status,
+                        CASE WHEN r.customer_signature IS NOT NULL AND r.customer_signed_at IS NOT NULL
+                                  AND r.customer_signature_user_id = c.linked_user_id THEN 1 ELSE 0 END AS customer_signed,
                         c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name
                  FROM reservations r JOIN customers c ON c.customer_id = r.customer_id JOIN vehicles v ON v.vehicle_id = r.vehicle_id
                  JOIN vehicle_categories vc ON vc.category_id=v.category_id
@@ -474,6 +476,7 @@ final class DashboardService
             ],
             'reservations' => Database::fetchAll(
                 'SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status, r.payment_status,
+                        r.customer_signed_at, r.customer_signature_user_id,
                         v.make, v.model, v.registration_no, v.image_path, vc.category_name FROM reservations r
                  JOIN vehicles v ON v.vehicle_id = r.vehicle_id
                  JOIN vehicle_categories vc ON vc.category_id=v.category_id
@@ -482,8 +485,8 @@ final class DashboardService
             ),
             'invoices' => Database::fetchAll(
                 "SELECT i.invoice_id, i.invoice_number, i.status, i.created_at, i.notes,
-                        b.outstanding_balance, c.phone, r.status AS reservation_status,
-                        r.approval_note, r.approver_signature, r.customer_signature,
+                        b.outstanding_balance, c.phone, c.linked_user_id AS customer_user_id, r.status AS reservation_status,
+                        r.approval_note, r.approver_signature, r.customer_signature, r.customer_signed_at, r.customer_signature_user_id,
                         COALESCE(pm.pending_momo, 0) AS pending_momo_amount
                  FROM invoices i
                  JOIN customers c ON c.customer_id = i.customer_id

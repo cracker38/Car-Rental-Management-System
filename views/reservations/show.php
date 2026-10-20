@@ -17,7 +17,16 @@
   <?php $canEditReservation = ($row['status'] === 'pending' && (can('reservations.manage') || \Crms\Auth::isCustomer())) || (!\Crms\Auth::isCustomer() && !empty($canEditConfirmedStaffBooking)); ?>
   <?php if ($canEditReservation && empty($bookingInvoice['payment_activity'])): ?><a class="btn btn-outline-dark" href="<?= e(url('reservations/form', ['id' => $row['reservation_id']])) ?>">Edit reservation</a><?php endif; ?>
 </section>
-<?php $signedApprovalComplete = $row['status'] === 'confirmed' && trim((string) ($row['approval_note'] ?? '')) !== '' && !empty($row['approver_signature']) && !empty($row['customer_signature']); ?>
+<?php
+$customerHasSigned = !empty($row['customer_signature'])
+  && !empty($row['customer_signed_at'])
+  && !empty($row['customer_signature_user_id'])
+  && (int) $row['customer_signature_user_id'] === (int) ($row['customer_user_id'] ?? 0);
+$signedApprovalComplete = $row['status'] === 'confirmed'
+  && trim((string) ($row['approval_note'] ?? '')) !== ''
+  && !empty($row['approver_signature'])
+  && $customerHasSigned;
+?>
 <section class="panel mb-3">
   <div class="panel-h">Reservation request and signatures</div>
   <div class="row g-3">
@@ -29,10 +38,10 @@
     <?php if (!\Crms\Auth::isCustomer() && !empty($row['internal_notes'])): ?><div class="col-12"><strong>Internal notes</strong><div><?= nl2br(e($row['internal_notes'])) ?></div></div><?php endif; ?>
     <div class="col-md-6">
       <strong>Customer signature</strong>
-      <?php if (!empty($row['customer_signature'])): ?>
+      <?php if ($customerHasSigned): ?>
         <div><img class="border rounded bg-white mt-2" style="max-width:100%;height:90px;object-fit:contain" src="<?= e(\Crms\Signature::dataUri($row['customer_signature'])) ?>" alt="Customer signature"></div>
         <small class="text-muted">Signed <?= e($row['customer_signed_at'] ?? '') ?><?php if (!empty($row['signature_captor_first_name'])): ?> · captured by <?= e($row['signature_captor_first_name'] . ' ' . $row['signature_captor_last_name']) ?><?php endif; ?></small>
-      <?php else: ?><p class="small text-muted mb-0">No customer signature recorded.</p><?php endif; ?>
+      <?php else: ?><p class="small text-muted mb-0">Awaiting the customer's signature.</p><?php endif; ?>
     </div>
     <div class="col-md-6">
       <strong>Approver signature</strong>
@@ -44,7 +53,17 @@
     </div>
   </div>
 </section>
-<?php if ($row['status'] === 'pending' && can('reservations.decide') && !\Crms\Auth::isCustomer()): ?>
+<?php if ($row['status'] === 'pending' && \Crms\Auth::isCustomer() && !$customerHasSigned): ?>
+  <section class="panel mb-3">
+    <div class="panel-h">Your signature is required</div>
+    <p class="small text-muted">Review and sign this request before a Rental Officer can approve it.</p>
+    <a class="btn btn-primary" href="<?= e(url('reservations/form', ['id' => $row['reservation_id']])) ?>">Review and sign request</a>
+  </section>
+<?php endif; ?>
+<?php if ($row['status'] === 'pending' && can('reservations.decide') && !\Crms\Auth::isCustomer() && !$customerHasSigned): ?>
+  <div class="alert alert-info">Awaiting the customer's signature. This reservation cannot be approved yet.</div>
+<?php endif; ?>
+<?php if ($row['status'] === 'pending' && can('reservations.decide') && !\Crms\Auth::isCustomer() && $customerHasSigned): ?>
   <form method="post" action="<?= e(url('reservations/decision', ['id' => $row['reservation_id']])) ?>" class="panel mb-3" id="reservation-decision-form">
     <?= \Crms\Csrf::field() ?>
     <div class="panel-h">Review reservation request</div>

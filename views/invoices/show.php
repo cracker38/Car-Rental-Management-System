@@ -1,5 +1,5 @@
 <div class="detail-grid">
-  <?php $bookingPaymentBlocked = strncmp((string) ($row['notes'] ?? ''), 'Booking prepayment:', 19) === 0 && (($row['reservation_status'] ?? '') !== 'confirmed' || trim((string) ($row['approval_note'] ?? '')) === '' || empty($row['approver_signature']) || empty($row['customer_signature'])); ?>
+  <?php $bookingPaymentBlocked = strncmp((string) ($row['notes'] ?? ''), 'Booking prepayment:', 19) === 0 && (($row['reservation_status'] ?? '') !== 'confirmed' || trim((string) ($row['approval_note'] ?? '')) === '' || empty($row['approver_signature']) || empty($row['customer_signature']) || empty($row['customer_signed_at']) || empty($row['customer_signature_user_id']) || (int) $row['customer_signature_user_id'] !== (int) ($row['customer_user_id'] ?? 0)); ?>
   <section class="panel invoice-hero">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>

@@ -18,7 +18,7 @@
         <td><?= e($r['return_datetime']) ?></td>
         <td><?= e(\Crms\Money::format($r['estimated_amount'])) ?></td>
         <td><?= status_badge(\Crms\Ui::reservationStatusLabel((string) $r['status'], (string) ($r['payment_status'] ?? 'unpaid'))) ?></td>
-        <td><?php if (($r['status'] === 'pending' && (can('reservations.manage') || \Crms\Auth::isCustomer())) || (can('reservations.manage') && $r['status'] === 'confirmed' && $r['pickup_datetime'] > date('Y-m-d H:i:s') && empty($r['has_rental']))): ?><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/form', ['id' => $r['reservation_id']])) ?>">Edit</a><?php endif; ?></td>
+        <td><?php if (($r['status'] === 'pending' && (can('reservations.manage') || \Crms\Auth::isCustomer())) || (can('reservations.manage') && $r['status'] === 'confirmed' && $r['pickup_datetime'] > date('Y-m-d H:i:s') && empty($r['has_rental']))): ?><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/form', ['id' => $r['reservation_id']])) ?>"><?= \Crms\Auth::isCustomer() && $r['status'] === 'pending' && ((int) ($r['customer_signature_user_id'] ?? 0) !== (int) ($r['customer_user_id'] ?? 0) || empty($r['customer_signed_at'])) ? 'Review &amp; sign' : 'Edit' ?></a><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>

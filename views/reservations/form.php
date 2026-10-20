@@ -1,4 +1,4 @@
-<?php $reservation = $reservation ?? null; $editing = $reservation !== null; $rentalOfficer = (\Crms\Auth::user()['role_name'] ?? '') === 'Rental Officer'; ?>
+<?php $reservation = $reservation ?? null; $editing = $reservation !== null; $rentalOfficer = (\Crms\Auth::user()['role_name'] ?? '') === 'Rental Officer'; $customerSigning = \Crms\Auth::isCustomer(); ?>
 <form method="post" action="<?= e(url('reservations/form', $editing ? ['id' => $reservation['reservation_id']] : [])) ?>" class="card card-body">
   <?= \Crms\Csrf::field() ?>
   <div class="row g-3">
@@ -33,12 +33,13 @@
     <div class="col-12"><label class="form-label" for="reservation-customer-notes">Customer notes</label><textarea class="form-control" id="reservation-customer-notes" name="customer_notes"><?= e($reservation['customer_notes'] ?? '') ?></textarea></div>
   </div>
   <section class="border rounded-3 p-3 mt-4" aria-labelledby="reservation-review-title">
-    <h2 class="h6" id="reservation-review-title">Review and sign the reservation request</h2>
-    <p class="small text-muted">Review the vehicle, dates, locations, and customer notes above. The final quote and availability are checked again by the server. A staff edit to an approved reservation returns it for a new approval.</p>
+    <h2 class="h6" id="reservation-review-title"><?= $customerSigning ? 'Review and sign the reservation request' : 'Review the reservation request' ?></h2>
+    <p class="small text-muted">Review the vehicle, dates, locations, and customer notes above. The final quote and availability are checked again by the server. Staff changes require the customer to sign again before approval.</p>
     <label class="form-check mb-3">
       <input class="form-check-input" type="checkbox" name="reservation_reviewed" value="1" required>
-      <span class="form-check-label">I have reviewed these reservation details and agree to submit this signed request.</span>
+      <span class="form-check-label"><?= $customerSigning ? 'I have reviewed these reservation details and agree to submit this signed request.' : 'I have reviewed these reservation details and agree to save this request.' ?></span>
     </label>
+    <?php if ($customerSigning): ?>
     <label class="form-label" for="customer-signature-canvas">Customer signature</label>
     <canvas id="customer-signature-canvas" width="600" height="180" class="w-100 border rounded bg-white" style="height:180px;touch-action:none" role="img" aria-label="Draw customer signature here" tabindex="0"></canvas>
     <input type="hidden" name="customer_signature" id="customer-signature-data">
@@ -47,10 +48,14 @@
       <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-customer-signature">Clear signature</button>
     </div>
     <div class="small text-danger mt-2" id="customer-signature-error" role="alert" hidden>Draw your signature before submitting.</div>
+    <?php else: ?>
+      <p class="small text-muted mb-0">The customer must sign this request from their account before a Rental Officer can approve it.</p>
+    <?php endif; ?>
   </section>
-  <p class="small text-muted mt-3">After submission, the request remains pending until a Rental Officer records a signed decision. Payment is available only after approval.</p>
-  <div class="d-flex gap-2 mt-2"><button class="btn btn-primary"><?= $editing ? 'Sign and update request' : 'Sign and submit request' ?></button><?php if ($editing): ?><a class="btn btn-outline-secondary" href="<?= e(url('reservations/show', ['id' => $reservation['reservation_id']])) ?>">Cancel</a><?php endif; ?></div>
+  <p class="small text-muted mt-3"><?= $customerSigning ? 'After submission, the request remains pending until a Rental Officer records a signed decision. Payment is available only after approval.' : 'The request remains pending until the customer signs and a Rental Officer records a signed decision.' ?></p>
+  <div class="d-flex gap-2 mt-2"><button class="btn btn-primary"><?= $customerSigning ? ($editing ? 'Sign and update request' : 'Sign and submit request') : ($editing ? 'Save request' : 'Save reservation request') ?></button><?php if ($editing): ?><a class="btn btn-outline-secondary" href="<?= e(url('reservations/show', ['id' => $reservation['reservation_id']])) ?>">Cancel</a><?php endif; ?></div>
 </form>
+<?php if ($customerSigning): ?>
 <script>
 (() => {
   const canvas = document.getElementById('customer-signature-canvas');
@@ -107,3 +112,4 @@
   });
 })();
 </script>
+<?php endif; ?>

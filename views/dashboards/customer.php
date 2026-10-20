@@ -18,11 +18,12 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
       <div class="panel-h d-flex justify-content-between">My recent reservations <a class="small fw-normal" href="<?= e(url('reservations')) ?>">All reservations</a></div>
       <?php if (!$reservations): ?><p class="text-muted mb-0">You have no reservations yet. <a href="<?= e(url('search')) ?>">Search vehicles to get started.</a></p><?php else: ?>
         <div class="table-responsive"><table class="table align-middle mb-0">
-          <thead><tr><th>Booking</th><th>Vehicle</th><th>Dates</th><th>Status</th></tr></thead>
+          <thead><tr><th>Booking</th><th>Vehicle</th><th>Dates</th><th>Status</th><th></th></tr></thead>
           <tbody><?php foreach ($reservations as $item): ?><tr>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
             <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td><td><?= e($item['pickup_datetime']) ?><small class="d-block text-muted"><?= e($item['return_datetime']) ?></small></td>
-            <td><?= status_badge(\Crms\Ui::reservationStatusLabel((string) $item['status'], (string) ($item['payment_status'] ?? 'unpaid'))) ?></td>
+            <td><?= status_badge(\Crms\Ui::reservationStatusLabel((string) $item['status'], (string) ($item['payment_status'] ?? 'unpaid'))) ?><?php $signatureMissing = $item['status'] === 'pending' && (empty($item['customer_signed_at']) || (int) ($item['customer_signature_user_id'] ?? 0) !== (int) \Crms\Auth::id()); ?><?php if ($signatureMissing): ?><small class="d-block text-warning-emphasis">Your signature is needed</small><?php endif; ?></td>
+            <td><?php if ($signatureMissing): ?><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>">Review &amp; sign</a><?php endif; ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>
@@ -38,7 +39,9 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
             $invoicePending = (float) ($invoice['pending_momo_amount'] ?? 0);
             $paymentRequestable = max(0, $invoiceBalance - $invoicePending);
             $bookingPaymentBlocked = strncmp((string) ($invoice['notes'] ?? ''), 'Booking prepayment:', 19) === 0
-              && (($invoice['reservation_status'] ?? '') !== 'confirmed' || trim((string) ($invoice['approval_note'] ?? '')) === '' || empty($invoice['approver_signature']) || empty($invoice['customer_signature']));
+              && (($invoice['reservation_status'] ?? '') !== 'confirmed' || trim((string) ($invoice['approval_note'] ?? '')) === ''
+                || empty($invoice['approver_signature']) || empty($invoice['customer_signature']) || empty($invoice['customer_signed_at'])
+                || empty($invoice['customer_signature_user_id']) || (int) $invoice['customer_signature_user_id'] !== (int) ($invoice['customer_user_id'] ?? 0));
           ?>
           <div class="mini-row d-flex justify-content-between gap-2">
             <span><a href="<?= e(url('invoices/show', ['id' => $invoice['invoice_id']])) ?>"><?= e($invoice['invoice_number']) ?></a><small class="d-block text-muted"><?= e($invoice['status']) ?></small></span>
