@@ -534,6 +534,7 @@ final class AdminController
             'title' => $titles[$mode] ?? 'Reports', 'reportMode' => $mode, 'summary' => $summary,
             'columns' => $columns, 'rows' => $rows, 'emptyMessage' => $emptyMessage,
             'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'financialDetails' => $financialDetails,
+            'reportPrint' => true, 'autoPrintReport' => Http::str('print') === '1',
         ]);
     }
 }

@@ -1,4 +1,4 @@
-<form method="get" class="panel mb-4">
+<form method="get" class="report-filters panel mb-4">
   <input type="hidden" name="r" value="reports">
   <div class="panel-h">Reporting period</div>
   <div class="row g-3 align-items-end">
@@ -11,6 +11,7 @@
   <a class="btn btn-outline-dark" href="<?= e(url('reports', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'export' => 'csv'])) ?>"><i class="bi bi-download"></i> Export report (CSV)</a>
   <button class="btn btn-outline-dark" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Print / PDF</button>
 </div>
+<div class="report-print-area">
 <?php if ($summary): ?>
   <div class="row g-3 mb-4">
     <?php foreach ($summary as $item): ?>
@@ -47,3 +48,7 @@
     </table></div>
   <?php endif; ?>
 </section>
+<?php if (!empty($autoPrintReport)): ?>
+<script>window.addEventListener('load', function () { window.print(); });</script>
+<?php endif; ?>
+</div>

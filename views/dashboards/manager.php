@@ -7,7 +7,7 @@
   <div class="dashboard-heading-actions">
     <a class="btn btn-primary" href="<?= e(url('reports')) ?>"><i class="bi bi-graph-up" aria-hidden="true"></i>Business reports</a>
     <a class="btn btn-outline-dark" href="<?= e(url('reports', ['export' => 'csv'])) ?>"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>Export Excel (CSV)</a>
-    <a class="btn btn-outline-dark" href="<?= e(url('reports') . '#report-exports') ?>"><i class="bi bi-printer" aria-hidden="true"></i>Print / PDF</a>
+    <a class="btn btn-outline-dark" href="<?= e(url('reports', ['print' => '1'])) ?>"><i class="bi bi-printer" aria-hidden="true"></i>Print / PDF</a>
   </div>
 </div>
 <?php require dirname(__DIR__) . '/partials/dashboard-duties.php'; ?>

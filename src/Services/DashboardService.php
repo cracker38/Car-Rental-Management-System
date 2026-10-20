@@ -133,16 +133,6 @@ final class DashboardService
                 'Monitor security events and account access',
                 'Generate system-wide reports',
             ],
-            'Business Manager' => [
-                'View business KPIs, revenue, bookings, active rentals and vehicle utilization',
-                'Review operational and financial reports',
-                'Monitor outstanding payments and upcoming returns',
-                'Review fleet availability and maintenance alerts',
-                'Monitor rental officers\' operational activity',
-                'Review reservation and rental performance',
-                'Export permitted reports to PDF or Excel',
-                'Review business trends to support decisions',
-            ],
             'Rental Officer' => [
                 'Register and update customer records',
                 'Register vehicles and update permitted vehicle details',
@@ -204,7 +194,6 @@ final class DashboardService
     {
         return match ($role) {
             'System Administrator' => 'Do not automatically approve financial transactions or refunds. Approve them only when explicitly authorized by business policy.',
-            'Business Manager' => 'Do not manage system security settings or change payment records without an explicitly assigned permission.',
             'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
             'Vehicle Inspector/Maintenance Staff' => 'Must not delete financial transactions or confirm rentals unless specifically authorized.',
