@@ -584,13 +584,13 @@ final class AdminController
             ) : ['total' => 0];
             $offset = $setPage((int) ($driverCount['total'] ?? 0));
             $driverRows = $driverId ? Database::fetchAll(
-                'SELECT r.reservation_code, r.pickup_datetime, r.return_datetime, r.status AS reservation_status,
+                "SELECT r.reservation_code, r.pickup_datetime, r.return_datetime, r.status AS reservation_status,
                         da.trip_status, v.registration_no, v.make, v.model
                  FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
                  JOIN vehicles v ON v.vehicle_id=r.vehicle_id
                  WHERE da.driver_id=? AND r.status IN ('pending','confirmed','completed')
                    AND r.pickup_datetime >= ? AND r.pickup_datetime < ?
-                 ORDER BY r.pickup_datetime DESC, da.assignment_id DESC' . $limitForPage($offset),
+                  ORDER BY r.pickup_datetime DESC, da.assignment_id DESC" . $limitForPage($offset),
                 [$driverId, $rangeStart, $rangeEnd]
             ) : [];
             $columns = ['Reservation', 'Pickup', 'Return', 'Vehicle', 'Trip status', 'Reservation status'];
