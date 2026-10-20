@@ -34,6 +34,29 @@ final class DriverController
             View::render('errors/404', ['title' => 'Not found']);
             return;
         }
+        $requestedUserId = !$id ? Http::int('user_id') : 0;
+        $returnToSchedule = $requestedUserId > 0 && Http::str('return_to') === 'schedule';
+        if (!$id && $requestedUserId > 0) {
+            $account = Database::fetch(
+                "SELECT u.user_id,u.first_name,u.last_name,u.email,u.phone
+                 FROM users u JOIN roles r ON r.role_id=u.role_id
+                 LEFT JOIN drivers d ON d.user_id=u.user_id
+                 WHERE u.user_id=? AND r.role_name='Driver' AND u.status='active' AND d.driver_id IS NULL",
+                [$requestedUserId]
+            );
+            if (!$account) {
+                Http::flash('warning', 'That account is not an active Driver account awaiting a driver profile.');
+                Http::redirect('drivers');
+            }
+            $driver = [
+                'user_id' => (int) $account['user_id'],
+                'first_name' => $account['first_name'],
+                'last_name' => $account['last_name'],
+                'email' => $account['email'],
+                'phone' => $account['phone'] ?? '',
+                'status' => 'active',
+            ];
+        }
         $users = Database::fetchAll(
             "SELECT u.user_id,u.first_name,u.last_name,u.email FROM users u JOIN roles r ON r.role_id=u.role_id
              LEFT JOIN drivers d ON d.user_id=u.user_id WHERE r.role_name='Driver' AND u.status='active'
@@ -42,8 +65,11 @@ final class DriverController
         );
         if (Http::isPost()) {
             try {
-                (new DriverService())->save($_POST, $id ?: null);
+                $savedDriver = (new DriverService())->save($_POST, $id ?: null);
                 Http::flash('success', $id ? 'Driver record updated.' : 'Driver record created.');
+                if ($returnToSchedule) {
+                    Http::redirect('drivers/schedule', ['driver_id' => (int) $savedDriver['driver_id']]);
+                }
                 Http::redirect('drivers');
             } catch (InvalidArgumentException $e) {
                 Http::flash('danger', $e->getMessage());
@@ -97,7 +123,18 @@ final class DriverController
         $drivers = $canManage ? Database::fetchAll(
             'SELECT d.driver_id,d.first_name,d.last_name FROM drivers d WHERE ' . DriverAccess::scopeSql('d') . ' ORDER BY d.last_name,d.first_name'
         ) : [];
-        View::render('drivers/schedule', ['title' => $canManage ? 'Driver schedule' : 'My schedule', 'rows' => $rows, 'drivers' => $drivers, 'driverId' => $driverId, 'canManage' => $canManage]);
+        $unlinkedDriverAccounts = $canManage ? Database::fetchAll(
+            "SELECT u.user_id,u.first_name,u.last_name
+             FROM users u JOIN roles r ON r.role_id=u.role_id
+             LEFT JOIN drivers d ON d.user_id=u.user_id
+             WHERE r.role_name='Driver' AND u.status='active' AND d.driver_id IS NULL
+             ORDER BY u.last_name,u.first_name"
+        ) : [];
+        View::render('drivers/schedule', [
+            'title' => $canManage ? 'Driver schedule' : 'My schedule', 'rows' => $rows,
+            'drivers' => $drivers, 'driverId' => $driverId, 'canManage' => $canManage,
+            'unlinkedDriverAccounts' => $unlinkedDriverAccounts,
+        ]);
     }
 
     public function trip(): void

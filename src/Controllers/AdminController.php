@@ -42,6 +42,20 @@ final class AdminController
                 if (!$role || $role['role_name'] === 'Customer') {
                     $v->errors['role_id'] = 'Choose a staff role. Customers should register on the website.';
                 }
+                $driverLicense = strtoupper(trim(Http::str('driving_license_number')));
+                $licenseExpiry = Http::str('license_expiry_date');
+                if ($role && $role['role_name'] === 'Driver') {
+                    if ($phone === null) {
+                        $v->errors['phone'] = 'A phone number is required for Driver accounts.';
+                    }
+                    if ($driverLicense === '' || strlen($driverLicense) > 100) {
+                        $v->errors['driving_license_number'] = 'Enter a driving licence number of 100 characters or fewer for this Driver account.';
+                    }
+                    if ($licenseExpiry !== '' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $licenseExpiry)
+                        || !checkdate((int) substr($licenseExpiry, 5, 2), (int) substr($licenseExpiry, 8, 2), (int) substr($licenseExpiry, 0, 4)))) {
+                        $v->errors['license_expiry_date'] = 'Enter a valid driving licence expiry date.';
+                    }
+                }
                 if (Database::fetch('SELECT user_id FROM users WHERE email = ?', [$email])) {
                     $v->errors['email'] = 'That email is already registered.';
                 }
@@ -51,16 +65,25 @@ final class AdminController
                     Http::redirect('admin/users');
                 }
                 try {
-                    Database::transaction(function () use ($roleId, $email, $firstName, $lastName, $phone, $status, $password): void {
+                    Database::transaction(function () use ($roleId, $role, $email, $firstName, $lastName, $phone, $status, $password, $driverLicense, $licenseExpiry): void {
                         Database::execute(
                             'INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, status) VALUES (?,?,?,?,?,?,?)',
                             [$roleId, $firstName, $lastName, $email, $phone, password_hash($password, PASSWORD_DEFAULT), $status]
                         );
-                        Audit::log('user.created', 'user', (string) Database::lastId(), $email);
+                        $userId = Database::lastId();
+                        if ($role['role_name'] === 'Driver') {
+                            Database::execute(
+                                'INSERT INTO drivers (user_id,first_name,last_name,phone,email,driving_license_number,license_expiry_date,status,created_by)
+                                 VALUES (?,?,?,?,?,?,?,?,?)',
+                                [$userId, $firstName, $lastName, $phone, $email, $driverLicense, $licenseExpiry ?: null, $status === 'active' ? 'active' : 'inactive', Auth::id()]
+                            );
+                            Audit::log('driver.created', 'driver', (string) Database::lastId(), $firstName . ' ' . $lastName);
+                        }
+                        Audit::log('user.created', 'user', (string) $userId, $email);
                     });
                     Http::flash('success', 'User account created.');
                 } catch (\Throwable) {
-                    Http::flash('danger', 'Could not create the account. Check whether the email is already in use.');
+                    Http::flash('danger', 'Could not create the account. Check whether the email or driving licence number is already in use.');
                 }
                 Http::redirect('admin/users');
             }
@@ -171,8 +194,16 @@ final class AdminController
                             [$firstName, $lastName, $email, $phone ?? $customerProfile['phone'], (int) $customerProfile['customer_id']]
                         );
                     }
+                    if ($driver) {
+                        Database::execute(
+                            'UPDATE drivers SET first_name=?,last_name=?,phone=?,email=? WHERE driver_id=?',
+                            [$firstName, $lastName, $phone ?? $driver['phone'], $email, (int) $driver['driver_id']]
+                        );
+                    }
                     if ($disableDriver && $driver['status'] !== 'inactive') {
                         Database::execute("UPDATE drivers SET status='inactive' WHERE driver_id=?", [(int) $driver['driver_id']]);
+                    } elseif ($driver && $newRole['role_name'] === 'Driver' && $status === 'active' && $driver['status'] === 'inactive') {
+                        Database::execute("UPDATE drivers SET status='active' WHERE driver_id=?", [(int) $driver['driver_id']]);
                     }
                     Audit::log('user.updated', 'user', (string) $userId, $email, $before, [
                         'first_name' => $firstName, 'last_name' => $lastName, 'email' => $email, 'phone' => $phone,
@@ -192,7 +223,7 @@ final class AdminController
         }
         $q = trim(Http::str('q'));
         $q = function_exists('mb_substr') ? mb_substr($q, 0, 120) : substr($q, 0, 120);
-        $userSql = 'SELECT u.*, r.role_name FROM users u JOIN roles r ON r.role_id = u.role_id';
+        $userSql = 'SELECT u.*, r.role_name, d.driver_id FROM users u JOIN roles r ON r.role_id = u.role_id LEFT JOIN drivers d ON d.user_id = u.user_id';
         $userParams = [];
         if ($q !== '') {
             $userSql .= ' WHERE (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR r.role_name LIKE ?)';
@@ -470,7 +501,7 @@ final class AdminController
             $driverSummary = $driverId ? (Database::fetch(
                 "SELECT COUNT(*) AS trips,
                         SUM(da.trip_status='completed') AS completed,
-                        SUM(da.trip_status='delayed') AS delayed
+                        SUM(da.trip_status='delayed') AS delayed_trips
                  FROM driver_assignments da JOIN reservations r ON r.reservation_id=da.reservation_id
                  WHERE da.driver_id=? AND DATE(r.pickup_datetime) BETWEEN ? AND ?",
                 [$driverId, $dateFrom, $dateTo]
@@ -478,7 +509,7 @@ final class AdminController
             $summary = [
                 ['label' => 'Assigned trips', 'value' => (int) ($driverSummary['trips'] ?? 0)],
                 ['label' => 'Completed trips', 'value' => (int) ($driverSummary['completed'] ?? 0)],
-                ['label' => 'Delayed trips', 'value' => (int) ($driverSummary['delayed'] ?? 0)],
+                ['label' => 'Delayed trips', 'value' => (int) ($driverSummary['delayed_trips'] ?? 0)],
             ];
             $driverRows = $driverId ? Database::fetchAll(
                 'SELECT r.reservation_code, r.pickup_datetime, r.return_datetime, r.status AS reservation_status,

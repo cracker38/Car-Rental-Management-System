@@ -7,16 +7,39 @@
     <div class="col-md-3"><label class="form-label">First name</label><input class="form-control" name="first_name" required></div>
     <div class="col-md-3"><label class="form-label">Last name</label><input class="form-control" name="last_name" required></div>
     <div class="col-md-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
-    <div class="col-md-3"><label class="form-label">Phone</label><input class="form-control" name="phone"></div>
+    <div class="col-md-3"><label class="form-label">Phone</label><input class="form-control" id="new-user-phone" name="phone"></div>
     <div class="col-md-3"><label class="form-label">Temporary password</label><input class="form-control" type="password" name="password" minlength="8" required></div>
-    <div class="col-md-3"><label class="form-label">Role</label><select class="form-select" name="role_id" required>
+    <div class="col-md-3"><label class="form-label" for="new-user-role">Role</label><select class="form-select" id="new-user-role" name="role_id" required>
       <option value="">Choose a staff role</option>
-      <?php foreach ($roles as $r): ?><?php if ($r['role_name'] !== 'Customer'): ?><option value="<?= (int)$r['role_id'] ?>"><?= e($r['role_name']) ?></option><?php endif; ?><?php endforeach; ?>
+      <?php foreach ($roles as $r): ?><?php if ($r['role_name'] !== 'Customer'): ?><option value="<?= (int)$r['role_id'] ?>" data-role-name="<?= e($r['role_name']) ?>"><?= e($r['role_name']) ?></option><?php endif; ?><?php endforeach; ?>
     </select></div>
     <div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><option value="active">active</option><option value="inactive">inactive</option><option value="suspended">suspended</option><option value="pending">pending</option></select></div>
+    <div class="col-12 d-none" id="new-driver-profile-fields">
+      <div class="row g-2 rounded border bg-light p-2 mx-0">
+        <div class="col-md-6"><label class="form-label" for="new-driver-license">Driving licence number</label><input class="form-control" id="new-driver-license" name="driving_license_number" maxlength="100"><small class="form-text">Required to make a Driver account available for scheduling.</small></div>
+        <div class="col-md-6"><label class="form-label" for="new-driver-license-expiry">Licence expiry date</label><input class="form-control" id="new-driver-license-expiry" name="license_expiry_date" type="date"></div>
+      </div>
+    </div>
   </div>
   <button class="btn btn-primary mt-3">Create account</button>
 </form>
+<script>
+(() => {
+  const role = document.getElementById('new-user-role');
+  const fields = document.getElementById('new-driver-profile-fields');
+  const phone = document.getElementById('new-user-phone');
+  const license = document.getElementById('new-driver-license');
+  if (!role || !fields || !phone || !license) return;
+  const syncDriverFields = () => {
+    const isDriver = role.selectedOptions[0]?.dataset.roleName === 'Driver';
+    fields.classList.toggle('d-none', !isDriver);
+    phone.required = isDriver;
+    license.required = isDriver;
+  };
+  role.addEventListener('change', syncDriverFields);
+  syncDriverFields();
+})();
+</script>
 <div class="panel table-panel">
   <div class="table-responsive"><table class="table align-middle mb-0">
     <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Phone</th><th>Role</th><th>Account status</th><th>New password</th><th></th></tr></thead>
@@ -42,6 +65,9 @@
               <option value="<?= (int)$r['role_id'] ?>" <?= (int)$r['role_id'] === (int)$u['role_id'] ? 'selected' : '' ?>><?= e($r['role_name']) ?></option>
             <?php endforeach; ?>
           </select>
+          <?php if (($u['role_name'] ?? '') === 'Driver' && ($u['status'] ?? '') === 'active' && empty($u['driver_id'])): ?>
+            <small class="d-block text-warning-emphasis mt-1">Driver profile missing. <a href="<?= e(url('drivers/form', ['user_id' => (int) $u['user_id']])) ?>">Complete profile</a></small>
+          <?php endif; ?>
         </td>
         <td>
           <select class="form-select form-select-sm" name="status" form="<?= e($formId) ?>" aria-label="Status for <?= e($u['email']) ?>">

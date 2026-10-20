@@ -1,4 +1,15 @@
 <?php if ($canManage): ?>
+<?php if (!empty($unlinkedDriverAccounts)): ?>
+<div class="alert alert-warning">
+  <strong>Driver profiles need setup before scheduling.</strong>
+  <p class="mb-2">These active Driver accounts do not yet have a driver profile and licence record:</p>
+  <ul class="mb-0">
+    <?php foreach ($unlinkedDriverAccounts as $account): ?>
+      <li><?= e($account['first_name'] . ' ' . $account['last_name']) ?> — <a href="<?= e(url('drivers/form', ['user_id' => (int) $account['user_id'], 'return_to' => 'schedule'])) ?>">Complete driver profile</a></li>
+    <?php endforeach; ?>
+  </ul>
+</div>
+<?php endif; ?>
 <form class="panel mb-4" method="get">
   <input type="hidden" name="r" value="drivers/schedule">
   <div class="panel-h">Choose a driver</div>

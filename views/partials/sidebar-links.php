@@ -44,6 +44,7 @@ $isSystemAdmin = $role === 'System Administrator';
   <?php if (can('rentals.view')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-key"></i> Rentals</a><?php endif; ?>
   <?php if (can('transactions.view')): ?><a class="nav-link <?= nav_active('finance') ?>" href="<?= e(url('finance')) ?>"><i class="bi bi-wallet2"></i> Payments</a><?php endif; ?>
   <?php if (can('maintenance.view')): ?><a class="nav-link <?= nav_active('maintenance') ?>" href="<?= e(url('maintenance')) ?>"><i class="bi bi-wrench-adjustable"></i> Maintenance</a><?php endif; ?>
+  <?php if (can('drivers.manage')): ?><a class="nav-link <?= nav_active('drivers') ?>" href="<?= e(url('drivers')) ?>"><i class="bi bi-person-badge"></i> Drivers</a><?php endif; ?>
   <div class="nav-label">Reporting</div>
   <?php if (report_mode() !== null): ?><a class="nav-link <?= nav_active('reports') ?>" href="<?= e(url('reports')) ?>"><i class="bi bi-graph-up"></i> System Reports</a><?php endif; ?>
 <?php else: ?>

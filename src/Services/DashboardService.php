@@ -168,16 +168,7 @@ final class DashboardService
                 'View outstanding balances and upcoming return dates',
                 'Receive booking, payment and return notifications',
             ],
-            'Driver' => [
-                'View your own profile and contact details',
-                'View assigned trips and schedules',
-                'View pickup locations, destinations and trip times',
-                'View only the vehicle and customer information needed for each assigned trip',
-                'Check assignment status and trip instructions',
-                'Update trip progress or completion where enabled by the business',
-                'Report delays, incidents or vehicle problems',
-                'Receive assignment notifications',
-            ],
+            'Driver' => [],
             default => [],
         };
     }
@@ -189,7 +180,7 @@ final class DashboardService
             'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
             'Customer' => 'You can only access your own account, reservations, rentals and financial records. Changing a URL or record ID cannot show another customer’s records.',
-            'Driver' => 'You cannot see other drivers\' private records, all customer accounts, financial reports or unassigned trips.',
+            'Driver' => '',
             default => '',
         };
     }
