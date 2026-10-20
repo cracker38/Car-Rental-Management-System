@@ -63,16 +63,41 @@ final class AdminController
                 }
                 Http::redirect('admin/users');
             }
-            $status = Http::str('status');
+            $action = Http::str('action');
             $userId = Http::int('user_id');
             $roleId = Http::int('role_id');
+            $status = Http::str('status');
+            $firstName = trim(Http::str('first_name'));
+            $lastName = trim(Http::str('last_name'));
+            $email = strtolower(trim(Http::str('email')));
+            $phone = trim(Http::str('phone')) ?: null;
+            $newPassword = (string) ($_POST['new_password'] ?? '');
+            $validation = new Validator();
+            $validation->require($_POST, ['first_name', 'last_name', 'email', 'role_id', 'status']);
+            $validation->email('email', $email);
             if ($userId < 1 || $roleId < 1 || !in_array($status, ['active', 'inactive', 'suspended', 'pending'], true)) {
-                Http::flash('danger', 'Choose a valid user, role, and status.');
-            } else {
-                $error = null;
-                Database::transaction(function () use ($userId, $roleId, $status, &$error): void {
+                $validation->errors['user'] = 'Choose a valid user, role, and status.';
+            }
+            if (strlen($firstName) > 100 || strlen($lastName) > 100) {
+                $validation->errors['name'] = 'Names must be 100 characters or fewer.';
+            }
+            if ($phone !== null && strlen($phone) > 30) {
+                $validation->errors['phone'] = 'Phone numbers must be 30 characters or fewer.';
+            }
+            if ($newPassword !== '' && strlen($newPassword) < 8) {
+                $validation->errors['new_password'] = 'A new password must contain at least 8 characters.';
+            }
+            if ($action !== 'update' || !$validation->ok()) {
+                $errors = $validation->errors;
+                Http::flash('danger', $errors ? reset($errors) : 'Choose a valid user update action.');
+                Http::redirect('admin/users');
+            }
+
+            $error = null;
+            try {
+                Database::transaction(function () use ($userId, $roleId, $status, $firstName, $lastName, $email, $phone, $newPassword, &$error): void {
                     $target = Database::fetch(
-                        'SELECT u.user_id, u.role_id, u.status, r.role_name
+                        'SELECT u.user_id, u.role_id, u.first_name, u.last_name, u.email, u.phone, u.status, r.role_name
                          FROM users u JOIN roles r ON r.role_id = u.role_id
                          WHERE u.user_id = ? FOR UPDATE',
                         [$userId]
@@ -82,9 +107,14 @@ final class AdminController
                         $error = 'Choose an existing user and role.';
                         return;
                     }
+                    $duplicate = Database::fetch('SELECT user_id FROM users WHERE email = ? AND user_id <> ? LIMIT 1', [$email, $userId]);
+                    if ($duplicate) {
+                        $error = 'That email address is already used by another account.';
+                        return;
+                    }
                     if ((int) $target['user_id'] === Auth::id()
                         && ((int) $target['role_id'] !== $roleId || $target['status'] !== $status)) {
-                        $error = 'You cannot change your own role or status.';
+                        $error = 'You can edit your own details, but cannot change your own role or account status.';
                         return;
                     }
                     if ($target['role_name'] === 'System Administrator' && $target['status'] === 'active'
@@ -100,14 +130,55 @@ final class AdminController
                             return;
                         }
                     }
-                    Database::execute('UPDATE users SET role_id = ?, status = ? WHERE user_id = ?', [$roleId, $status, $userId]);
-                    Audit::log('user.updated', 'user', (string) $userId);
+
+                    $driver = Database::fetch('SELECT driver_id, status FROM drivers WHERE user_id = ? FOR UPDATE', [$userId]);
+                    $disableDriver = $driver && ($newRole['role_name'] !== 'Driver' || $status !== 'active');
+                    if ($disableDriver && $driver['status'] === 'active') {
+                        $upcoming = Database::fetch(
+                            "SELECT r.reservation_code FROM driver_assignments da
+                             JOIN reservations r ON r.reservation_id = da.reservation_id
+                             WHERE da.driver_id = ? AND r.status IN ('pending','confirmed') AND r.return_datetime > NOW()
+                             LIMIT 1",
+                            [(int) $driver['driver_id']]
+                        );
+                        if ($upcoming) {
+                            $error = 'Reassign upcoming driver trips before deactivating or changing this linked Driver account.';
+                            return;
+                        }
+                    }
+
+                    $before = [
+                        'first_name' => $target['first_name'], 'last_name' => $target['last_name'],
+                        'email' => $target['email'], 'phone' => $target['phone'],
+                        'role_id' => (int) $target['role_id'], 'role_name' => $target['role_name'], 'status' => $target['status'],
+                    ];
+                    if ($newPassword !== '') {
+                        Database::execute(
+                            'UPDATE users SET role_id=?,first_name=?,last_name=?,email=?,phone=?,status=?,password_hash=? WHERE user_id=?',
+                            [$roleId, $firstName, $lastName, $email, $phone, $status, password_hash($newPassword, PASSWORD_DEFAULT), $userId]
+                        );
+                    } else {
+                        Database::execute(
+                            'UPDATE users SET role_id=?,first_name=?,last_name=?,email=?,phone=?,status=? WHERE user_id=?',
+                            [$roleId, $firstName, $lastName, $email, $phone, $status, $userId]
+                        );
+                    }
+                    if ($disableDriver && $driver['status'] !== 'inactive') {
+                        Database::execute("UPDATE drivers SET status='inactive' WHERE driver_id=?", [(int) $driver['driver_id']]);
+                    }
+                    Audit::log('user.updated', 'user', (string) $userId, $email, $before, [
+                        'first_name' => $firstName, 'last_name' => $lastName, 'email' => $email, 'phone' => $phone,
+                        'role_id' => $roleId, 'role_name' => $newRole['role_name'], 'status' => $status,
+                        'password_changed' => $newPassword !== '',
+                    ]);
                 });
-                if ($error !== null) {
-                    Http::flash('danger', $error);
-                } else {
-                    Http::flash('success', 'User updated.');
-                }
+            } catch (\Throwable) {
+                $error = 'Could not update the account. Check that the email is unique and the details are valid.';
+            }
+            if ($error !== null) {
+                Http::flash('danger', $error);
+            } else {
+                Http::flash('success', 'User details and account status updated.');
             }
             Http::redirect('admin/users');
         }

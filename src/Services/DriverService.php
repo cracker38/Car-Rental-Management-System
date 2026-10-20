@@ -100,6 +100,15 @@ final class DriverService
             $stmt->execute([$driverId]);
             $driver = $stmt->fetch();
             if (!$driver || $driver['status'] !== 'active') throw new InvalidArgumentException('Choose an active driver available to your role.');
+            if (!empty($driver['user_id'])) {
+                $account = Database::fetch(
+                    "SELECT u.status, r.role_name FROM users u JOIN roles r ON r.role_id=u.role_id WHERE u.user_id=?",
+                    [(int) $driver['user_id']]
+                );
+                if (!$account || $account['status'] !== 'active' || $account['role_name'] !== 'Driver') {
+                    throw new InvalidArgumentException('The linked Driver account is not active. Reactivate or relink the driver before assigning a trip.');
+                }
+            }
             if (!empty($driver['license_expiry_date']) && $driver['license_expiry_date'] < date('Y-m-d')) {
                 throw new InvalidArgumentException('The selected driver licence has expired.');
             }

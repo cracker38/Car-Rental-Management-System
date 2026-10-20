@@ -11,6 +11,7 @@ use Crms\Rbac;
 use Crms\Upload;
 use Crms\Validator;
 use Crms\View;
+use Crms\Services\MaintenanceService;
 
 final class VehicleController
 {
@@ -19,12 +20,16 @@ final class VehicleController
         Rbac::require('vehicles.view');
         $q = Http::str('q');
         $customer = Auth::isCustomer();
+        $inspectorMode = (Auth::user()['role_name'] ?? '') === 'Vehicle Inspector/Maintenance Staff';
         $sql = $customer
             ? "SELECT v.vehicle_id, v.category_id, v.make, v.model, v.manufacture_year, v.transmission, v.fuel_type,
                       v.daily_rate, v.image_path, 'available' AS status, NULL AS registration_no, c.category_name
                FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.status = 'available'"
             : 'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE 1=1';
         $params = [];
+        if (!$customer && $inspectorMode) {
+            $sql .= " AND v.status = 'maintenance'";
+        }
         if ($q !== '') {
             $like = '%' . $q . '%';
             $sql .= $customer
@@ -34,7 +39,7 @@ final class VehicleController
         }
         $sql .= ' ORDER BY v.updated_at DESC';
         View::render('vehicles/index', [
-            'title' => $customer ? 'Available vehicles' : 'Vehicles',
+            'title' => $customer ? 'Available vehicles' : ($inspectorMode ? 'Vehicles in maintenance' : 'Vehicles'),
             'vehicles' => Database::fetchAll($sql, $params),
             'q' => $q,
             'customerMode' => $customer,
@@ -160,12 +165,16 @@ final class VehicleController
     {
         Rbac::require('vehicles.view');
         $id = Http::int('id');
-        $vehicleSql = Auth::isCustomer()
+        $isCustomer = Auth::isCustomer();
+        $inspectorMode = (Auth::user()['role_name'] ?? '') === 'Vehicle Inspector/Maintenance Staff';
+        $vehicleSql = $isCustomer
             ? "SELECT v.vehicle_id, v.category_id, v.make, v.model, v.manufacture_year, v.transmission, v.fuel_type,
                       v.daily_rate, v.weekly_rate, v.monthly_rate, v.image_path, v.description, v.status, c.category_name
                FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id
                WHERE v.vehicle_id = ? AND v.status NOT IN ('inactive','maintenance')"
-            : 'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.vehicle_id = ?';
+            : ($inspectorMode
+                ? "SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.vehicle_id = ? AND v.status = 'maintenance'"
+                : 'SELECT v.*, c.category_name FROM vehicles v JOIN vehicle_categories c ON c.category_id = v.category_id WHERE v.vehicle_id = ?');
         $vehicle = Database::fetch($vehicleSql, [$id]);
         if (!$vehicle) {
             http_response_code(404);
@@ -173,7 +182,7 @@ final class VehicleController
             return;
         }
         // Reservation history contains other customers' booking data. Never expose it to customers.
-        $history = Auth::isCustomer() ? [] : Database::fetchAll(
+        $history = $isCustomer || $inspectorMode ? [] : Database::fetchAll(
             'SELECT reservation_code, pickup_datetime, return_datetime, status FROM reservations WHERE vehicle_id = ? ORDER BY pickup_datetime DESC LIMIT 20',
             [$id]
         );
@@ -205,8 +214,12 @@ final class VehicleController
             Http::flash('danger', 'Enter a safety reason of 250 characters or fewer.');
             Http::redirect('vehicles/show', ['id' => $id]);
         }
-        Database::execute("UPDATE vehicles SET status = 'maintenance' WHERE vehicle_id = ?", [$id]);
-        Audit::log('vehicle.flagged_unsafe', 'vehicle', (string) $id, $vehicle['registration_no'], ['status' => $vehicle['status']], ['status' => 'maintenance', 'reason' => $note]);
+        try {
+            (new MaintenanceService())->updateVehicleReadiness($id, 'maintenance', $note);
+        } catch (\InvalidArgumentException $e) {
+            Http::flash('danger', $e->getMessage());
+            Http::redirect('vehicles/show', ['id' => $id]);
+        }
         Http::flash('success', $vehicle['registration_no'] . ' is flagged unavailable until maintenance is cleared.');
         Http::redirect('vehicles/show', ['id' => $id]);
     }

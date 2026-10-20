@@ -6,6 +6,7 @@ namespace Crms\Services;
 use Crms\Audit;
 use Crms\Auth;
 use Crms\Database;
+use Crms\Rbac;
 use InvalidArgumentException;
 use PDO;
 
@@ -168,9 +169,15 @@ final class MaintenanceService
         });
     }
 
-    public function updateStatus(int $id, string $newStatus, string $reason = '', bool $vehicleSafe = false): void
+    public function updateStatus(
+        int $id,
+        string $newStatus,
+        string $reason = '',
+        bool $vehicleSafe = false,
+        string $vehicleStatus = ''
+    ): void
     {
-        Database::transaction(function (PDO $pdo) use ($id, $newStatus, $reason, $vehicleSafe) {
+        Database::transaction(function (PDO $pdo) use ($id, $newStatus, $reason, $vehicleSafe, $vehicleStatus) {
             $stmt = $pdo->prepare('SELECT * FROM maintenance_records WHERE maintenance_id = ? FOR UPDATE');
             $stmt->execute([$id]);
             $record = $stmt->fetch();
@@ -191,8 +198,30 @@ final class MaintenanceService
             if ($newStatus === 'cancelled' && !$vehicleSafe) {
                 throw new InvalidArgumentException('Confirm the vehicle is safe before releasing it from a cancelled job.');
             }
+            if ($newStatus === 'completed') {
+                if (!in_array($vehicleStatus, ['available', 'maintenance'], true)) {
+                    throw new InvalidArgumentException('Choose whether the inspected vehicle is ready for service or must stay in maintenance.');
+                }
+                if (trim($reason) === '') {
+                    throw new InvalidArgumentException('Add an inspection or completion note before closing the maintenance job.');
+                }
+            }
             if ($this->length($reason) > 500) {
                 throw new InvalidArgumentException('The status note must be 500 characters or fewer.');
+            }
+
+            $vehicleLock = $pdo->prepare('SELECT status FROM vehicles WHERE vehicle_id = ? FOR UPDATE');
+            $vehicleLock->execute([(int) $record['vehicle_id']]);
+            $vehicle = $vehicleLock->fetch();
+            if (!$vehicle) {
+                throw new InvalidArgumentException('The vehicle for this maintenance record no longer exists.');
+            }
+            $otherOpen = Database::fetch(
+                "SELECT maintenance_id FROM maintenance_records WHERE vehicle_id = ? AND status IN ('scheduled','in_progress') AND maintenance_id <> ? LIMIT 1",
+                [(int) $record['vehicle_id'], $id]
+            );
+            if ($newStatus === 'completed' && $vehicleStatus === 'available' && $otherOpen) {
+                throw new InvalidArgumentException('Resolve all other open maintenance jobs before returning this vehicle to service.');
             }
 
             Database::execute(
@@ -200,18 +229,18 @@ final class MaintenanceService
                 [$newStatus, $newStatus === 'completed' ? date('Y-m-d') : null, $id]
             );
 
-            if ($newStatus === 'completed' || ($newStatus === 'cancelled' && $vehicleSafe)) {
-                $vehicleLock = $pdo->prepare('SELECT status FROM vehicles WHERE vehicle_id = ? FOR UPDATE');
-                $vehicleLock->execute([$record['vehicle_id']]);
-                $otherOpen = Database::fetch(
-                    "SELECT maintenance_id FROM maintenance_records WHERE vehicle_id = ? AND status IN ('scheduled','in_progress') AND maintenance_id <> ? LIMIT 1",
-                    [$record['vehicle_id'], $id]
-                );
-                if (!$otherOpen) {
-                    // Completing the last open job releases the vehicle from its maintenance hold.
-                    Database::execute("UPDATE vehicles SET status = 'available' WHERE vehicle_id = ? AND status = 'maintenance'", [$record['vehicle_id']]);
+            if ($newStatus === 'completed') {
+                if ($vehicleStatus === 'maintenance') {
+                    if ($vehicle['status'] !== 'inactive') {
+                        Database::execute("UPDATE vehicles SET status = 'maintenance' WHERE vehicle_id = ?", [(int) $record['vehicle_id']]);
+                    }
+                } elseif ($vehicle['status'] !== 'inactive') {
+                    Database::execute("UPDATE vehicles SET status = 'available' WHERE vehicle_id = ?", [(int) $record['vehicle_id']]);
                     (new ReservationService())->syncVehicleStatus((int) $record['vehicle_id']);
                 }
+            } elseif ($newStatus === 'cancelled' && $vehicleSafe && !$otherOpen && $vehicle['status'] !== 'inactive') {
+                Database::execute("UPDATE vehicles SET status = 'available' WHERE vehicle_id = ?", [(int) $record['vehicle_id']]);
+                (new ReservationService())->syncVehicleStatus((int) $record['vehicle_id']);
             }
 
             Audit::log(
@@ -219,8 +248,66 @@ final class MaintenanceService
                 'maintenance',
                 (string) $id,
                 $record['maintenance_number'],
-                ['status' => $oldStatus],
-                ['status' => $newStatus, 'reason' => trim($reason), 'vehicle_safe' => $vehicleSafe]
+                ['status' => $oldStatus, 'vehicle_status' => $vehicle['status']],
+                [
+                    'status' => $newStatus,
+                    'vehicle_status' => $newStatus === 'completed' ? $vehicleStatus : (($newStatus === 'cancelled' && $vehicleSafe && !$otherOpen) ? 'available' : $vehicle['status']),
+                    'reason' => trim($reason),
+                    'vehicle_safe' => $vehicleSafe,
+                ]
+            );
+        });
+    }
+
+    /** Set or release a maintenance safety hold without rewriting maintenance history. */
+    public function updateVehicleReadiness(int $vehicleId, string $newStatus, string $reason): void
+    {
+        if (!Rbac::can('maintenance.manage') && !Rbac::can('inspections.manage')) {
+            throw new InvalidArgumentException('You are not allowed to update vehicle readiness.');
+        }
+        if ($vehicleId < 1 || !in_array($newStatus, ['available', 'maintenance'], true)) {
+            throw new InvalidArgumentException('Choose a valid vehicle and readiness status.');
+        }
+        $reason = trim($reason);
+        if ($this->length($reason) < 5 || $this->length($reason) > 500) {
+            throw new InvalidArgumentException('Enter an inspection note between 5 and 500 characters.');
+        }
+
+        Database::transaction(function (PDO $pdo) use ($vehicleId, $newStatus, $reason): void {
+            $stmt = $pdo->prepare('SELECT vehicle_id, registration_no, status FROM vehicles WHERE vehicle_id=? FOR UPDATE');
+            $stmt->execute([$vehicleId]);
+            $vehicle = $stmt->fetch();
+            if (!$vehicle) {
+                throw new InvalidArgumentException('Vehicle not found.');
+            }
+            if ($vehicle['status'] === 'inactive') {
+                throw new InvalidArgumentException('Inactive vehicles cannot be released or placed on a maintenance hold.');
+            }
+            if ($newStatus === 'available') {
+                if ($vehicle['status'] !== 'maintenance') {
+                    throw new InvalidArgumentException('Only vehicles currently held for maintenance can be released from that hold.');
+                }
+                $openJob = Database::fetch(
+                    "SELECT maintenance_id FROM maintenance_records WHERE vehicle_id=? AND status IN ('scheduled','in_progress') LIMIT 1",
+                    [$vehicleId]
+                );
+                if ($openJob) {
+                    throw new InvalidArgumentException('Complete or cancel every open maintenance job before releasing this vehicle.');
+                }
+            }
+            $beforeStatus = (string) $vehicle['status'];
+            Database::execute('UPDATE vehicles SET status=? WHERE vehicle_id=?', [$newStatus, $vehicleId]);
+            if ($newStatus === 'available') {
+                (new ReservationService())->syncVehicleStatus($vehicleId);
+            }
+            $after = Database::fetch('SELECT status FROM vehicles WHERE vehicle_id=?', [$vehicleId]);
+            Audit::log(
+                $newStatus === 'maintenance' ? 'vehicle.readiness_hold' : 'vehicle.readiness_released',
+                'vehicle',
+                (string) $vehicleId,
+                $vehicle['registration_no'],
+                ['status' => $beforeStatus],
+                ['status' => $after['status'] ?? $newStatus, 'inspection_note' => $reason]
             );
         });
     }

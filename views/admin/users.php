@@ -1,4 +1,4 @@
-<p class="lead-muted mb-3">Create staff accounts and assign their role-based permissions here. Customers register on the website. Drivers also need a linked driver record.</p>
+<p class="lead-muted mb-3">Create staff accounts, edit user details, change roles, and activate or deactivate access here. Customers register on the website. Driver accounts also need a linked driver record.</p>
 <form method="post" class="panel mb-4">
   <?= \Crms\Csrf::field() ?>
   <input type="hidden" name="action" value="create">
@@ -19,19 +19,24 @@
 </form>
 <div class="panel table-panel">
   <div class="table-responsive"><table class="table align-middle mb-0">
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Phone</th><th>Role</th><th>Account status</th><th>New password</th><th></th></tr></thead>
     <tbody>
-    <?php if (!$users): ?><tr><td colspan="5"><div class="empty-state">No accounts yet.</div></td></tr><?php endif; ?>
+    <?php if (!$users): ?><tr><td colspan="8"><div class="empty-state">No accounts yet.</div></td></tr><?php endif; ?>
     <?php foreach ($users as $u): ?>
       <tr>
-        <td><?= e($u['first_name'] . ' ' . $u['last_name']) ?></td>
-        <td><?= e((string)$u['email']) ?></td>
+        <?php $formId = 'user-form-' . (int) $u['user_id']; ?>
         <td>
-          <?php $formId = 'user-form-' . (int) $u['user_id']; ?>
           <form id="<?= e($formId) ?>" method="post">
             <?= \Crms\Csrf::field() ?>
+            <input type="hidden" name="action" value="update">
             <input type="hidden" name="user_id" value="<?= (int)$u['user_id'] ?>">
           </form>
+          <input class="form-control form-control-sm" name="first_name" value="<?= e($u['first_name']) ?>" maxlength="100" required form="<?= e($formId) ?>" aria-label="First name for <?= e($u['email'] ?? ('user ' . $u['user_id'])) ?>">
+        </td>
+        <td><input class="form-control form-control-sm" name="last_name" value="<?= e($u['last_name']) ?>" maxlength="100" required form="<?= e($formId) ?>" aria-label="Last name for <?= e($u['email'] ?? ('user ' . $u['user_id'])) ?>"></td>
+        <td><input class="form-control form-control-sm" type="email" name="email" value="<?= e((string)$u['email']) ?>" maxlength="190" required form="<?= e($formId) ?>" aria-label="Email for <?= e($u['first_name'] . ' ' . $u['last_name']) ?>"></td>
+        <td><input class="form-control form-control-sm" name="phone" value="<?= e((string)$u['phone']) ?>" maxlength="30" form="<?= e($formId) ?>" aria-label="Phone for <?= e($u['first_name'] . ' ' . $u['last_name']) ?>"></td>
+        <td>
           <select class="form-select form-select-sm" name="role_id" form="<?= e($formId) ?>" aria-label="Role for <?= e($u['email']) ?>">
             <?php foreach ($roles as $r): ?>
               <option value="<?= (int)$r['role_id'] ?>" <?= (int)$r['role_id'] === (int)$u['role_id'] ? 'selected' : '' ?>><?= e($r['role_name']) ?></option>
@@ -40,11 +45,12 @@
         </td>
         <td>
           <select class="form-select form-select-sm" name="status" form="<?= e($formId) ?>" aria-label="Status for <?= e($u['email']) ?>">
-            <?php foreach (['active','inactive','suspended','pending'] as $s): ?>
-              <option value="<?= $s ?>" <?= $u['status'] === $s ? 'selected' : '' ?>><?= $s ?></option>
+            <?php foreach (['active' => 'Active', 'inactive' => 'Deactivated', 'suspended' => 'Suspended', 'pending' => 'Pending'] as $s => $label): ?>
+              <option value="<?= $s ?>" <?= $u['status'] === $s ? 'selected' : '' ?>><?= e($label) ?></option>
             <?php endforeach; ?>
           </select>
         </td>
+        <td><input class="form-control form-control-sm" type="password" name="new_password" minlength="8" autocomplete="new-password" form="<?= e($formId) ?>" placeholder="Leave blank to keep" aria-label="Set a new password for <?= e($u['email']) ?>"></td>
         <td><button class="btn btn-sm btn-primary" form="<?= e($formId) ?>">Save</button></td>
       </tr>
     <?php endforeach; ?>

@@ -12,7 +12,8 @@ final class DriverAccess
         if (!preg_match('/^[a-z][a-z0-9_]*$/i', $alias)) {
             throw new \InvalidArgumentException('Invalid driver query alias.');
         }
-        // The drivers.manage permission gates these screens; the creator role does not restrict records.
+        // drivers.manage is role-scoped. Managers intentionally see and manage drivers
+        // created by the System Administrator as well as their own driver records.
         return '1=1';
     }
 
