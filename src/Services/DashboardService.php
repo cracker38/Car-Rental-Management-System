@@ -133,18 +133,7 @@ final class DashboardService
                 'Monitor security events and account access',
                 'Generate system-wide reports',
             ],
-            'Rental Officer' => [
-                'Register and update customer records',
-                'Register vehicles and update permitted vehicle details',
-                'Search available vehicles by dates, category, model, price, fuel and transmission',
-                'Create, review, confirm, update and cancel reservations according to business rules',
-                'Prevent overlapping confirmed bookings for the same vehicle',
-                'Generate rental agreements',
-                'Record vehicle pickup and return details',
-                'Record mileage, fuel levels and handover information',
-                'Flag late returns, damage and additional charges for processing',
-                'View upcoming pickups, returns and reservation notifications',
-            ],
+            'Rental Officer' => [],
             'Accountant/Cashier' => [
                 'View invoices and rental charges',
                 'Create or finalize invoices according to the assigned workflow',
@@ -177,7 +166,7 @@ final class DashboardService
     {
         return match ($role) {
             'System Administrator' => 'Do not automatically approve financial transactions or refunds. Approve them only when explicitly authorized by business policy.',
-            'Rental Officer' => 'Should not access unrestricted system administration or perform unauthorized financial adjustments.',
+            'Rental Officer' => '',
             'Accountant/Cashier' => 'Refunds, reversals and financial adjustments must follow approval rules, include a reason, and be recorded in the audit log. Posted rows are never deleted.',
             'Customer' => 'You can only access your own account, reservations, rentals and financial records. Changing a URL or record ID cannot show another customer’s records.',
             'Driver' => '',

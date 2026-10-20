@@ -4,6 +4,9 @@
 <?php if (!empty($managerMode)): ?>
   <p class="lead-muted mb-3">Read-only inspector report for vehicles currently held in maintenance. Scheduling and service updates are handled by authorized staff.</p>
 <?php endif; ?>
+<?php if (!empty($rentalOfficerMode)): ?>
+  <p class="lead-muted mb-3">Read-only view of vehicles currently held for maintenance.</p>
+<?php endif; ?>
 <?php if (!empty($canSchedule)): ?>
 <form method="post" class="panel mb-4">
   <?= \Crms\Csrf::field() ?>

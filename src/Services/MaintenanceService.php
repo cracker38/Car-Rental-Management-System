@@ -336,7 +336,7 @@ final class MaintenanceService
     private function assertCanManage(): void
     {
         $role = (string) (Auth::user()['role_name'] ?? '');
-        if (!Rbac::can('maintenance.manage') || $role === 'Business Manager') {
+        if (!Rbac::can('maintenance.manage') || in_array($role, ['Business Manager', 'Rental Officer'], true)) {
             throw new InvalidArgumentException('You are not allowed to manage maintenance work or vehicle readiness.');
         }
     }
@@ -344,8 +344,8 @@ final class MaintenanceService
     private function assertCanSchedule(): void
     {
         $role = (string) (Auth::user()['role_name'] ?? '');
-        if (!Rbac::can('maintenance.schedule') || $role === 'Business Manager') {
-            throw new InvalidArgumentException('Only authorized maintenance or rental staff can schedule maintenance jobs.');
+        if (!Rbac::can('maintenance.schedule') || in_array($role, ['Business Manager', 'Rental Officer'], true)) {
+            throw new InvalidArgumentException('Only authorized maintenance staff can schedule maintenance jobs.');
         }
     }
 

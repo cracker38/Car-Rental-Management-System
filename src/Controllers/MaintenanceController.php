@@ -18,18 +18,26 @@ final class MaintenanceController
         $role = (string) (Auth::user()['role_name'] ?? '');
         $inspectorMode = $role === 'Vehicle Inspector/Maintenance Staff';
         $managerMode = $role === 'Business Manager';
-        $canManage = Rbac::can('maintenance.manage') && !$managerMode;
-        $canSchedule = Rbac::can('maintenance.schedule') && !$managerMode;
+        $rentalOfficerMode = $role === 'Rental Officer';
+        $canManage = Rbac::can('maintenance.manage') && !$managerMode && !$rentalOfficerMode;
+        $canSchedule = Rbac::can('maintenance.schedule') && !$managerMode && !$rentalOfficerMode;
         if (!$canManage && !$canSchedule) {
             Rbac::require('maintenance.view');
         }
         if (Http::isPost()) {
-            if ($managerMode) {
+            if ($managerMode || $rentalOfficerMode) {
                 http_response_code(403);
                 View::render('errors/403', ['title' => 'Forbidden']);
                 return;
             }
-            Rbac::require(Http::str('action') === 'create' ? 'maintenance.schedule' : 'maintenance.manage');
+            if (Http::str('action') === 'create' && !$canSchedule) {
+                http_response_code(403);
+                View::render('errors/403', ['title' => 'Forbidden']);
+                return;
+            }
+            if (Http::str('action') !== 'create') {
+                Rbac::require('maintenance.manage');
+            }
         }
         if (Http::isPost() && Http::str('action') === 'create') {
             if (!$canSchedule) {
@@ -82,7 +90,7 @@ final class MaintenanceController
             }
             Http::redirect('maintenance');
         }
-        $vehicleScope = ($inspectorMode || $managerMode) ? " WHERE v.status = 'maintenance'" : '';
+        $vehicleScope = ($inspectorMode || $managerMode || $rentalOfficerMode) ? " WHERE v.status = 'maintenance'" : '';
         $rows = Database::fetchAll(
             'SELECT m.*, v.registration_no FROM maintenance_records m
              JOIN vehicles v ON v.vehicle_id = m.vehicle_id' . $vehicleScope . ' ORDER BY
@@ -104,6 +112,7 @@ final class MaintenanceController
             'canSchedule' => $canSchedule,
             'inspectorMode' => $inspectorMode,
             'managerMode' => $managerMode,
+            'rentalOfficerMode' => $rentalOfficerMode,
         ]);
     }
 }
