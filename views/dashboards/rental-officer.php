@@ -13,6 +13,7 @@ $dashboardActions = [
 require dirname(__DIR__) . '/partials/dashboard-heading.php';
 require dirname(__DIR__) . '/partials/kpis.php';
 require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
+require dirname(__DIR__) . '/partials/dashboard-fleet-preview.php';
 ?>
 <div class="row g-3">
   <div class="col-xl-6">
@@ -23,7 +24,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
           <thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Pickup</th><th></th></tr></thead>
           <tbody><?php foreach ($pending as $item): ?><tr>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
-            <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td><td><?= e($item['registration_no']) ?></td><td><?= e($item['pickup_datetime']) ?></td>
+            <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td><td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td><td><?= e($item['pickup_datetime']) ?></td>
             <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>">Review &amp; decide</a></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
@@ -37,7 +38,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
         <div class="table-responsive"><table class="table table-sm align-middle mb-0">
           <thead><tr><th>Time</th><th>Customer</th><th>Vehicle</th><th>Booking</th></tr></thead>
           <tbody><?php foreach ($upcomingPickups as $item): ?><tr>
-            <td><?= e($item['pickup_datetime']) ?></td><td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td><td><?= e($item['registration_no']) ?></td>
+            <td><?= e($item['pickup_datetime']) ?></td><td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td><td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
@@ -53,7 +54,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
           <tbody><?php foreach ($upcomingReturns as $item): ?><tr>
             <td><a href="<?= e(url('rentals/show', ['id' => $item['rental_id']])) ?>"><?= e($item['rental_number']) ?></a></td>
             <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td>
-            <td><?= e($item['registration_no']) ?></td><td><?= e($item['expected_return_datetime']) ?></td><td><?= status_badge((string) $item['display_status']) ?></td>
+            <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td><td><?= e($item['expected_return_datetime']) ?></td><td><?= status_badge((string) $item['display_status']) ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>

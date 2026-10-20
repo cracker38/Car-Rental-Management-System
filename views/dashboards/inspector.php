@@ -13,7 +13,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
     <?php if (empty($maintenanceVehicles)): ?><tr><td colspan="5"><div class="empty-state">No vehicles are currently held for maintenance.</div></td></tr><?php endif; ?>
     <?php foreach ($maintenanceVehicles as $vehicle): ?>
       <tr>
-        <td><strong><?= e($vehicle['registration_no']) ?></strong><small class="d-block text-muted"><?= e($vehicle['make'] . ' ' . $vehicle['model']) ?></small></td>
+        <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($vehicle['image_path'] ?? null, $vehicle['category_name'] ?? null)) ?>" alt="<?= e($vehicle['make'] . ' ' . $vehicle['model']) ?>"><span><strong><?= e($vehicle['registration_no']) ?></strong><small class="d-block text-muted"><?= e($vehicle['make'] . ' ' . $vehicle['model']) ?></small></span></div></td>
         <td><?= (int)$vehicle['open_jobs'] ?></td>
         <td><?= e($vehicle['current_job'] ?? 'No open job') ?></td>
         <td><?php if (!empty($vehicle['expected_completion_date'])): ?><?= e($vehicle['expected_completion_date']) ?><?php if ($vehicle['expected_completion_date'] < date('Y-m-d')): ?> <span class="badge text-bg-danger">Overdue</span><?php endif; ?><?php else: ?>Not set<?php endif; ?></td>

@@ -321,6 +321,12 @@ final class DashboardService
         $kpis[] = ['label' => 'Returns due / overdue', 'value' => $this->count('SELECT COUNT(*) c FROM rentals WHERE ' . $dueCondition), 'hint' => 'Overdue or due within 7 days', 'href' => url('rentals')];
         return [
             'kpis' => $kpis,
+            'fleetPreview' => Database::fetchAll(
+                "SELECT v.vehicle_id, v.registration_no, v.make, v.model, v.image_path, v.status, vc.category_name
+                 FROM vehicles v JOIN vehicle_categories vc ON vc.category_id=v.category_id
+                 WHERE v.status <> 'inactive'
+                 ORDER BY CASE v.status WHEN 'available' THEN 0 WHEN 'maintenance' THEN 2 ELSE 1 END, v.updated_at DESC LIMIT 4"
+            ),
             'pendingReservations' => Database::fetchAll(
                 "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime,
                         c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name
@@ -381,6 +387,12 @@ final class DashboardService
                 ['label' => 'Returns this week', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY)"), 'hint' => 'Due back or overdue', 'href' => url('rentals')],
                 ['label' => 'Late returns', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status IN ('active','overdue') AND expected_return_datetime < NOW()"), 'hint' => 'Needs follow-up', 'href' => url('rentals')],
             ],
+            'fleetPreview' => Database::fetchAll(
+                "SELECT v.vehicle_id, v.registration_no, v.make, v.model, v.image_path, v.status, vc.category_name
+                 FROM vehicles v JOIN vehicle_categories vc ON vc.category_id=v.category_id
+                 WHERE v.status <> 'inactive'
+                 ORDER BY CASE v.status WHEN 'available' THEN 0 WHEN 'maintenance' THEN 2 ELSE 1 END, v.updated_at DESC LIMIT 4"
+            ),
             'pending' => Database::fetchAll(
                 "SELECT r.reservation_id, r.reservation_code, r.pickup_datetime, r.return_datetime, r.status,
                         c.first_name, c.last_name, v.registration_no, v.make, v.model, v.image_path, vc.category_name

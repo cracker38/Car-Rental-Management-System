@@ -13,6 +13,7 @@
 <?php require dirname(__DIR__) . '/partials/dashboard-duties.php'; ?>
 <?php $kpiColClass = count($kpis) >= 6 ? 'col-6 col-md-4 col-xl-2' : 'col-6 col-lg-3'; require dirname(__DIR__) . '/partials/kpis.php'; ?>
 <?php require dirname(__DIR__) . '/partials/dashboard-shortcuts.php'; ?>
+<?php require dirname(__DIR__) . '/partials/dashboard-fleet-preview.php'; ?>
 
 <section class="panel table-panel mb-3">
   <div class="panel-h d-flex flex-wrap align-items-baseline justify-content-between gap-2">
@@ -25,7 +26,7 @@
       <tbody><?php foreach ($pendingReservations as $item): ?><tr>
         <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
         <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td>
-        <td><?= e($item['registration_no']) ?></td>
+        <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td>
         <td><?= e($item['pickup_datetime']) ?></td>
         <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>">Review &amp; decide</a></td>
       </tr><?php endforeach; ?></tbody>
@@ -75,7 +76,7 @@ $maxRevenue = max(1, ...array_column($trends, 'revenue'));
           <tbody><?php foreach ($due as $item): ?><tr>
             <td><a href="<?= e(url('rentals/show', ['id' => $item['rental_id']])) ?>"><?= e($item['rental_number']) ?></a></td>
             <td><?= e($item['first_name'] . ' ' . $item['last_name']) ?></td>
-            <td><?= e($item['registration_no']) ?></td><td class="text-nowrap"><?= e($item['expected_return_datetime']) ?></td><td><?= status_badge((string) $item['status']) ?></td>
+            <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td><td class="text-nowrap"><?= e($item['expected_return_datetime']) ?></td><td><?= status_badge((string) $item['status']) ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
       <?php endif; ?>
@@ -90,7 +91,7 @@ $maxRevenue = max(1, ...array_column($trends, 'revenue'));
       <?php endforeach; ?>
       <div class="manager-subsection-heading">Maintenance alerts <a class="small fw-normal" href="<?= e(url('maintenance')) ?>">View records</a></div>
       <?php if (!$maintAlerts): ?><p class="small text-muted mb-0">No scheduled or in-progress maintenance alerts.</p><?php else: ?>
-        <?php foreach ($maintAlerts as $alert): ?><div class="mini-row"><strong><?= e($alert['registration_no']) ?></strong><span><?= e($alert['title']) ?> &middot; <?= e(ucwords(str_replace('_', ' ', $alert['status']))) ?></span></div><?php endforeach; ?>
+        <?php foreach ($maintAlerts as $alert): ?><div class="mini-row"><span class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($alert['image_path'] ?? null, $alert['category_name'] ?? null)) ?>" alt="<?= e($alert['make'] . ' ' . $alert['model']) ?>"><strong><?= e($alert['registration_no']) ?></strong></span><span><?= e($alert['title']) ?> &middot; <?= e(ucwords(str_replace('_', ' ', $alert['status']))) ?></span></div><?php endforeach; ?>
       <?php endif; ?>
     </section>
   </div>

@@ -21,7 +21,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
           <thead><tr><th>Booking</th><th>Vehicle</th><th>Dates</th><th>Status</th></tr></thead>
           <tbody><?php foreach ($reservations as $item): ?><tr>
             <td><a href="<?= e(url('reservations/show', ['id' => $item['reservation_id']])) ?>"><?= e($item['reservation_code']) ?></a></td>
-            <td><?= e($item['make'] . ' ' . $item['model']) ?></td><td><?= e($item['pickup_datetime']) ?><small class="d-block text-muted"><?= e($item['return_datetime']) ?></small></td>
+            <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($item['image_path'] ?? null, $item['category_name'] ?? null)) ?>" alt="<?= e($item['make'] . ' ' . $item['model']) ?>"><span><strong><?= e($item['make'] . ' ' . $item['model']) ?></strong><small class="d-block text-muted"><?= e($item['registration_no']) ?></small></span></div></td><td><?= e($item['pickup_datetime']) ?><small class="d-block text-muted"><?= e($item['return_datetime']) ?></small></td>
             <td><?= status_badge(\Crms\Ui::reservationStatusLabel((string) $item['status'], (string) ($item['payment_status'] ?? 'unpaid'))) ?></td>
           </tr><?php endforeach; ?></tbody>
         </table></div>
@@ -97,7 +97,7 @@ require dirname(__DIR__) . '/partials/dashboard-shortcuts.php';
           <thead><tr><th>Agreement</th><th>Vehicle</th><th>Return</th><th>Status</th></tr></thead>
           <tbody><?php foreach ($rentals as $rental): ?><tr>
             <td><a href="<?= e(url('rentals/show', ['id' => $rental['rental_id']])) ?>"><?= e($rental['rental_number']) ?></a><small class="d-block text-muted"><?= e($rental['reservation_code']) ?></small></td>
-            <td><?= e($rental['make'] . ' ' . $rental['model']) ?></td>
+            <td><div class="dashboard-vehicle-cell"><img class="dashboard-vehicle-thumb" src="<?= e(vehicle_img($rental['image_path'] ?? null, $rental['category_name'] ?? null)) ?>" alt="<?= e($rental['make'] . ' ' . $rental['model']) ?>"><span><strong><?= e($rental['make'] . ' ' . $rental['model']) ?></strong><small class="d-block text-muted"><?= e($rental['registration_no']) ?></small></span></div></td>
             <td><?= e($rental['actual_return_datetime'] ?: $rental['expected_return_datetime']) ?></td>
             <td><?= status_badge((string)$rental['status']) ?><small class="d-block text-muted">Agreement: <?= e($rental['agreement_status']) ?></small></td>
           </tr><?php endforeach; ?></tbody>
