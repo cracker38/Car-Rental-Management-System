@@ -63,8 +63,15 @@ final class Auth
         if (!$id) {
             return null;
         }
+        static $cachedUserId = null;
+        static $cachedCustomerId = null;
+        if ($cachedUserId === $id) {
+            return $cachedCustomerId;
+        }
         $row = Database::fetch('SELECT customer_id FROM customers WHERE linked_user_id = ?', [$id]);
-        return $row ? (int) $row['customer_id'] : null;
+        $cachedUserId = $id;
+        $cachedCustomerId = $row ? (int) $row['customer_id'] : null;
+        return $cachedCustomerId;
     }
 
     public static function login(string $email, string $password): bool

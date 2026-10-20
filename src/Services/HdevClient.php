@@ -100,6 +100,11 @@ final class HdevClient
         return $message;
     }
 
+    public static function hasTransportError(object|array|null $result): bool
+    {
+        return !empty(self::payload($result)['transport_error']);
+    }
+
     public static function accepted(object|array|null $result): bool
     {
         return in_array(self::statusOf($result), ['success', 'pending'], true);

@@ -172,6 +172,20 @@ final class HdevPaymentService
             $this->notifyTransactionStatus($row, 'pending');
             throw new InvalidArgumentException('HDEV did not return a final request response. The ledger remains pending; check its status before retrying.');
         }
+        if (HdevClient::hasTransportError($pay)) {
+            $detail = HdevClient::messageOf($pay);
+            Audit::log(
+                'hdev.pay_no_response',
+                'financial_transaction',
+                (string) $row['transaction_id'],
+                $txRef . ($detail !== '' ? ' ' . substr($detail, 0, 160) : ''),
+                null,
+                ['status' => 'pending'],
+                'failure'
+            );
+            $this->notifyTransactionStatus($row, 'pending');
+            throw new InvalidArgumentException('HDEV timed out without returning a response. The transaction remains pending because the gateway may have received it. Check its status before retrying.');
+        }
         $st = HdevClient::statusOf($pay);
         $gatewayMessage = HdevClient::messageOf($pay);
         Audit::log('hdev.pay_initiated', 'financial_transaction', (string) $row['transaction_id'], $txRef . ' ' . $st);

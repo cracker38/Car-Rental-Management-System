@@ -31,7 +31,7 @@ class hdev_payment
             'amount' => $amount,
             'tx_ref' => $transaction_ref,
             'link' => $calback,
-        ]);
+        ], 20);
     }
 
     public static function get_pay($tx_ref)
@@ -39,10 +39,10 @@ class hdev_payment
         return self::request([
             'ref' => 'read',
             'tx_ref' => $tx_ref,
-        ]);
+        ], 10);
     }
 
-    private static function request(array $fields)
+    private static function request(array $fields, int $timeoutSeconds = 45)
     {
         if (self::$api_id === '' || self::$api_key === '') {
             return (object) ['status' => 'error', 'message' => 'HDEV payment API credentials are missing.'];
@@ -54,8 +54,8 @@ class hdev_payment
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => '',
             CURLOPT_MAXREDIRS => 5,
-            CURLOPT_TIMEOUT => 45,
-            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT => $timeoutSeconds,
+            CURLOPT_CONNECTTIMEOUT => min(8, $timeoutSeconds),
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_POST => true,
@@ -69,10 +69,17 @@ class hdev_payment
         ]);
         $response = curl_exec($curl);
         $http = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $curlErrno = curl_errno($curl);
         $err = curl_error($curl);
         curl_close($curl);
         if ($response === false) {
-            return (object) ['status' => 'error', 'message' => $err !== '' ? $err : 'HDEV payment request failed.', 'http_code' => $http];
+            return (object) [
+                'status' => 'error',
+                'message' => $err !== '' ? $err : 'HDEV payment request failed.',
+                'http_code' => $http,
+                'transport_error' => true,
+                'curl_errno' => $curlErrno,
+            ];
         }
         $decoded = json_decode($response);
         if (is_object($decoded) || is_array($decoded)) {

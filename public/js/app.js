@@ -91,24 +91,48 @@ document.querySelectorAll('.home-nav .navbar-collapse .nav-link[href^="#"]').for
   });
 });
 
-document.querySelectorAll('[data-payment-poll]').forEach(function (el) {
-  var pollUrl = el.getAttribute('data-payment-poll');
-  if (!pollUrl) return;
-  var tries = 0;
-  var timer = setInterval(function () {
-    tries += 1;
-    fetch(pollUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      .then(function (res) { return res.json(); })
+var paymentPollRows = Array.prototype.slice.call(document.querySelectorAll('[data-payment-poll]'));
+if (paymentPollRows.length) {
+  var paymentPollIndex = 0;
+  var paymentPollAttempts = 0;
+  var maxPaymentPollAttempts = 8;
+
+  function pollNextPayment() {
+    if (paymentPollAttempts >= maxPaymentPollAttempts) return;
+    var pollableRows = paymentPollRows.filter(function (row) {
+      return row.getAttribute('data-payment-poll');
+    });
+    if (!pollableRows.length) return;
+
+    var row = pollableRows[paymentPollIndex % pollableRows.length];
+    paymentPollIndex += 1;
+    paymentPollAttempts += 1;
+    fetch(row.getAttribute('data-payment-poll'), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Payment status check failed.');
+        return res.json();
+      })
       .then(function (data) {
         if (data && data.ledger_status && data.ledger_status !== 'pending') {
-          clearInterval(timer);
           window.location.reload();
+          return;
         }
       })
-      .catch(function () {});
-    if (tries >= 40) clearInterval(timer);
-  }, 3000);
-});
+      .catch(function () {})
+      .then(function () {
+        if (paymentPollAttempts < maxPaymentPollAttempts) {
+          var backoffStep = Math.min(paymentPollAttempts - 1, 3);
+          var delay = Math.min(60000, 15000 * Math.pow(2, backoffStep));
+          window.setTimeout(pollNextPayment, delay);
+        }
+      });
+  }
+
+  window.setTimeout(pollNextPayment, 15000);
+}
 
 document.querySelectorAll('input[type="range"][data-range-label]').forEach(function (el) {
   var output = document.getElementById(el.id + '-output');
