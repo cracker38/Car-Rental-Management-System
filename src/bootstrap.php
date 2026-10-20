@@ -74,6 +74,10 @@ if (!function_exists('report_mode')) {
             return null;
         }
         $role = (string) ($user['role_name'] ?? '');
+        // Older installed databases may not have the report grants from the latest seed.
+        if ($role === 'System Administrator' && \Crms\Rbac::can('users.manage')) {
+            return 'company';
+        }
         if (Auth::isCustomer()) {
             return Auth::customerId() ? 'customer' : null;
         }

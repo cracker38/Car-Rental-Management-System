@@ -276,11 +276,19 @@ final class AdminController
     public function audit(): void
     {
         Rbac::require('audit.view');
+        $perPage = 50;
+        $total = (int) (Database::fetch('SELECT COUNT(*) AS total FROM audit_logs')['total'] ?? 0);
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, Http::int('page', 1)), $totalPages);
+        $offset = ($page - 1) * $perPage;
         $rows = Database::fetchAll(
             'SELECT a.*, u.email FROM audit_logs a LEFT JOIN users u ON u.user_id = a.user_id
-             ORDER BY a.created_at DESC LIMIT 300'
+             ORDER BY a.created_at DESC, a.audit_log_id DESC LIMIT ' . $perPage . ' OFFSET ' . $offset
         );
-        View::render('admin/audit', ['title' => 'Audit log', 'rows' => $rows]);
+        View::render('admin/audit', [
+            'title' => 'Audit log', 'rows' => $rows, 'page' => $page,
+            'totalPages' => $totalPages, 'totalRows' => $total, 'perPage' => $perPage,
+        ]);
     }
 
     public function backup(): void

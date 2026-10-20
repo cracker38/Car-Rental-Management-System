@@ -14,7 +14,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="<?= e(asset('public/css/app.css')) ?>" rel="stylesheet">
 </head>
-<body class="site-body<?= $isHome ? ' home-body' : '' ?>">
+<body class="site-body<?= $isHome ? ' home-body' : '' ?><?= !empty($printReceipt) ? ' receipt-print' : '' ?>">
 <?php require dirname(__DIR__) . '/partials/site-nav.php'; ?>
 <?php foreach ($flashes as $f): ?>
   <div class="container pt-3"><div class="alert alert-<?= e($f['type']) ?> mb-0"><?= e($f['message']) ?></div></div>

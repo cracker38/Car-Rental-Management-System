@@ -195,7 +195,9 @@ final class PaymentController
             Http::flash('warning', 'A receipt is available after the transaction is completed.');
             Http::redirect(!empty($row['invoice_id']) ? 'invoices/show' : 'finance', !empty($row['invoice_id']) ? ['id' => $row['invoice_id']] : []);
         }
-        \Crms\View::render('payments/receipt', ['title' => 'Receipt ' . $row['transaction_number'], 'row' => $row]);
+        \Crms\View::render('payments/receipt', [
+            'title' => 'Receipt ' . $row['transaction_number'], 'row' => $row, 'printReceipt' => true,
+        ]);
     }
 
     private function canAccess(array $row): bool

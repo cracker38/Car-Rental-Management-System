@@ -572,6 +572,18 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
   .site-page > .page-title { display: none !important; }
   .receipt-card { max-width: 100% !important; border: 0 !important; box-shadow: none !important; }
   .receipt-amount { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  body.receipt-print > :not(.site-page) { display: none !important; }
+  body.receipt-print .site-page { position: static !important; min-height: 0 !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+  body.receipt-print .site-page > :not(.receipt-card) { display: none !important; }
+  body.receipt-print .receipt-card {
+    position: relative !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 1rem !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
 }
 
 @media (max-width: 991.98px) {
