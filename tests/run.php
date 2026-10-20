@@ -204,11 +204,11 @@ try {
     $roles = $pdo->query('SELECT COUNT(*) FROM roles')->fetchColumn();
     expect((int) $roles === 7, 'all seven roles seeded');
     $rolePermissions = [
-        'System Administrator' => ['users.manage', 'settings.manage', 'audit.view'],
-        'Business Manager' => ['reports.operational', 'reports.financial', 'rentals.manage'],
-        'Rental Officer' => ['reservations.manage', 'rentals.manage'],
+        'System Administrator' => ['users.manage', 'settings.manage', 'audit.view', 'drivers.manage'],
+        'Business Manager' => ['reports.operational', 'reports.financial', 'rentals.manage', 'drivers.manage', 'drivers.schedule', 'reservations.view', 'reservations.manage'],
+        'Rental Officer' => ['reservations.manage', 'reservations.decide', 'rentals.manage'],
         'Accountant/Cashier' => ['invoices.manage', 'transactions.manage', 'reports.financial'],
-        'Vehicle Inspector/Maintenance Staff' => ['maintenance.manage', 'inspections.manage'],
+        'Vehicle Inspector/Maintenance Staff' => ['maintenance.manage', 'vehicles.view'],
         'Customer' => ['reservations.view', 'invoices.view'],
         'Driver' => ['drivers.schedule'],
     ];
@@ -225,7 +225,17 @@ try {
         if ($roleName !== 'System Administrator') {
             expect(!in_array('users.manage', $assigned, true), $roleName . ' cannot manage user roles');
         }
+        if ($roleName === 'Vehicle Inspector/Maintenance Staff') {
+            expect(!in_array('rentals.view', $assigned, true) && !in_array('inspections.manage', $assigned, true), 'maintenance inspectors cannot browse or schedule rental work');
+        }
+        if ($roleName === 'Business Manager') {
+            expect(!in_array('reservations.decide', $assigned, true), 'manager may view reservations but cannot sign decisions');
+        }
+        if ($roleName === 'Rental Officer') {
+            expect(in_array('reservations.view', $assigned, true), 'Rental Officer can view reservation requests they review');
+        }
     }
+    expect(\Crms\Services\DriverAccess::scopeSql('d') === '1=1', 'driver management scope includes System Administrator-created driver records');
 
     // Exercise reservation, decision, payment-gate and notification persistence inside a rollback-only fixture.
     $sessionHadUser = array_key_exists('user_id', $_SESSION);
@@ -235,8 +245,9 @@ try {
         $tag = strtoupper(bin2hex(random_bytes(4)));
         $customerRole = \Crms\Database::fetch("SELECT role_id FROM roles WHERE role_name = 'Customer'");
         $managerRole = \Crms\Database::fetch("SELECT role_id FROM roles WHERE role_name = 'Business Manager'");
+        $rentalRole = \Crms\Database::fetch("SELECT role_id FROM roles WHERE role_name = 'Rental Officer'");
         $category = \Crms\Database::fetch('SELECT category_id FROM vehicle_categories ORDER BY category_id LIMIT 1');
-        if (!$customerRole || !$managerRole || !$category) {
+        if (!$customerRole || !$managerRole || !$rentalRole || !$category) {
             throw new RuntimeException('Workflow fixture needs seeded roles and a vehicle category.');
         }
         $customerEmail = 'workflow-customer-' . strtolower($tag) . '@example.invalid';
@@ -256,6 +267,12 @@ try {
             [$managerRole['role_id'], 'Workflow', 'Manager', $managerEmail, '123', password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT)]
         );
         $managerUserId = (int) \Crms\Database::lastId();
+        $rentalEmail = 'workflow-rental-' . strtolower($tag) . '@example.invalid';
+        \Crms\Database::execute(
+            'INSERT INTO users (role_id,first_name,last_name,email,phone,password_hash,status) VALUES (?,?,?,?,?,?,\'active\')',
+            [$rentalRole['role_id'], 'Workflow', 'Rental Officer', $rentalEmail, '123', password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT)]
+        );
+        $rentalUserId = (int) \Crms\Database::lastId();
         \Crms\Database::execute(
             'INSERT INTO vehicles (category_id,registration_no,make,model,daily_rate,status,created_by) VALUES (?,?,?,?,?,\'available\',?)',
             [$category['category_id'], 'TST-' . $tag, 'Workflow', 'Test Car', '10000.00', $managerUserId]
@@ -316,6 +333,13 @@ try {
 
         $_SESSION['user_id'] = $managerUserId;
         try {
+            (new ReservationService())->decide((int) $first['reservation_id'], 'approve', 'Manager must not sign decisions', $signature);
+            expect(false, 'manager cannot sign or record reservation decisions');
+        } catch (InvalidArgumentException) {
+            expect(true, 'manager cannot sign or record reservation decisions');
+        }
+        $_SESSION['user_id'] = $rentalUserId;
+        try {
             (new ReservationService())->decide((int) $second['reservation_id'], 'reject', '', $signature);
             expect(false, 'approval decision requires a note');
         } catch (InvalidArgumentException) {
@@ -324,7 +348,7 @@ try {
         (new ReservationService())->decide((int) $first['reservation_id'], 'approve', 'Workflow test approval', $signature);
         $approved = \Crms\Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$first['reservation_id']]);
         $firstInvoice = \Crms\Database::fetch('SELECT * FROM invoices WHERE invoice_id = ?', [$firstInvoice['invoice_id']]);
-        expect($approved['status'] === 'confirmed' && $approved['decision_by'] == $managerUserId && !empty($approved['approver_signature']), 'authorized approval records reviewer, note, date, and signature');
+        expect($approved['status'] === 'confirmed' && $approved['decision_by'] == $rentalUserId && !empty($approved['approver_signature']), 'Rental Officer approval records reviewer, note, date, and signature');
         expect($firstInvoice['status'] === 'issued', 'approval issues the booking invoice');
         \Crms\Services\HdevPaymentService::assertBookingPaymentAllowed((int) $first['reservation_id']);
         expect(true, 'signed approved reservations pass the backend eligibility gate');
@@ -370,6 +394,87 @@ try {
         }
         $_SESSION['user_id'] = $managerUserId;
         expect($notifications->unreadCount($managerUserId, null) > 0, 'manager receives persisted reservation workflow notifications');
+
+        $adminRole = \Crms\Database::fetch("SELECT role_id FROM roles WHERE role_name='System Administrator'");
+        $inspectorRole = \Crms\Database::fetch("SELECT role_id FROM roles WHERE role_name='Vehicle Inspector/Maintenance Staff'");
+        if (!$adminRole || !$inspectorRole) {
+            throw new RuntimeException('Workflow fixture needs the System Administrator and inspector roles.');
+        }
+        $adminEmail = 'workflow-admin-' . strtolower($tag) . '@example.invalid';
+        \Crms\Database::execute(
+            'INSERT INTO users (role_id,first_name,last_name,email,phone,password_hash,status) VALUES (?,?,?,?,?,?,\'active\')',
+            [$adminRole['role_id'], 'Workflow', 'Administrator', $adminEmail, '123', password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT)]
+        );
+        $adminUserId = (int) \Crms\Database::lastId();
+        $inspectorEmail = 'workflow-inspector-' . strtolower($tag) . '@example.invalid';
+        \Crms\Database::execute(
+            'INSERT INTO users (role_id,first_name,last_name,email,phone,password_hash,status) VALUES (?,?,?,?,?,?,\'active\')',
+            [$inspectorRole['role_id'], 'Workflow', 'Inspector', $inspectorEmail, '123', password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT)]
+        );
+        $inspectorUserId = (int) \Crms\Database::lastId();
+        \Crms\Database::execute(
+            'INSERT INTO drivers (first_name,last_name,phone,email,driving_license_number,status,created_by) VALUES (?,?,?,?,?,\'active\',?)',
+            ['AdminCreated', 'Driver', '123', 'admin-driver-' . strtolower($tag) . '@example.invalid', 'LIC-' . $tag, $adminUserId]
+        );
+        $adminCreatedDriverId = (int) \Crms\Database::lastId();
+        expect(\Crms\Rbac::can('drivers.manage') && \Crms\Services\DriverAccess::canAccess($adminCreatedDriverId), 'manager can access System Administrator-created drivers');
+        $updatedDriver = (new \Crms\Services\DriverService())->save([
+            'first_name' => 'Managed', 'last_name' => 'ByManager', 'phone' => '123', 'email' => 'managed-driver-' . strtolower($tag) . '@example.invalid',
+            'driving_license_number' => 'LIC-' . $tag, 'license_expiry_date' => '', 'status' => 'active', 'notes' => '', 'user_id' => '',
+        ], $adminCreatedDriverId);
+        expect($updatedDriver['first_name'] === 'Managed' && (int)$updatedDriver['created_by'] === $adminUserId, 'manager can edit an administrator-created driver without changing its audit ownership');
+
+        $maintenanceService = new \Crms\Services\MaintenanceService();
+        $maintenanceInput = [
+            'vehicle_id' => (string) $vehicleId, 'maintenance_type' => 'repair', 'title' => 'Workflow safety repair',
+            'start_date' => date('Y-m-d'), 'expected_completion_date' => date('Y-m-d'), 'next_service_date' => '',
+            'cost' => '0', 'odometer_reading' => '', 'description' => 'Rollback-only maintenance fixture',
+            'service_provider' => '', 'notes' => '',
+        ];
+        $_SESSION['user_id'] = $inspectorUserId;
+        expect(\Crms\Rbac::can('maintenance.manage') && !\Crms\Rbac::can('drivers.manage') && !\Crms\Rbac::can('inspections.manage'), 'inspector can manage maintenance but cannot access driver or rental scheduling');
+        try {
+            $maintenanceService->create($maintenanceInput);
+            expect(false, 'inspector cannot schedule maintenance jobs');
+        } catch (InvalidArgumentException) {
+            expect(true, 'inspector cannot schedule maintenance jobs');
+        }
+        $_SESSION['user_id'] = $managerUserId;
+        $maintenanceJob = $maintenanceService->create($maintenanceInput);
+        $_SESSION['user_id'] = $inspectorUserId;
+        try {
+            $maintenanceService->updateVehicleReadiness($vehicleId, 'available', 'Premature release');
+            expect(false, 'maintenance vehicle cannot be released while a job is open');
+        } catch (InvalidArgumentException) {
+            expect(true, 'maintenance vehicle cannot be released while a job is open');
+        }
+        $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'in_progress');
+        try {
+            $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'completed', '', false, 'available');
+            expect(false, 'maintenance completion requires an inspection note');
+        } catch (InvalidArgumentException) {
+            expect(true, 'maintenance completion requires an inspection note');
+        }
+        $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'completed', 'Repair complete; road test still required.', false, 'maintenance');
+        $heldVehicle = \Crms\Database::fetch('SELECT status FROM vehicles WHERE vehicle_id=?', [$vehicleId]);
+        expect($heldVehicle['status'] === 'maintenance', 'inspector can complete work and keep the vehicle in maintenance');
+        $maintenanceService->updateVehicleReadiness($vehicleId, 'available', 'Road test passed and vehicle is safe.');
+        $reservedAfterRelease = \Crms\Database::fetch('SELECT status FROM vehicles WHERE vehicle_id=?', [$vehicleId]);
+        expect($reservedAfterRelease['status'] === 'reserved', 'readiness release preserves an existing confirmed reservation status');
+
+        \Crms\Database::execute(
+            'INSERT INTO vehicles (category_id,registration_no,make,model,daily_rate,status,created_by) VALUES (?,?,?,?,?,\'available\',?)',
+            [$category['category_id'], 'MNT-' . $tag, 'Workflow', 'Service Car', '10000.00', $managerUserId]
+        );
+        $releaseVehicleId = (int) \Crms\Database::lastId();
+        $maintenanceInput['vehicle_id'] = (string) $releaseVehicleId;
+        $_SESSION['user_id'] = $managerUserId;
+        $maintenanceJob = $maintenanceService->create($maintenanceInput);
+        $_SESSION['user_id'] = $inspectorUserId;
+        $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'in_progress');
+        $maintenanceService->updateStatus((int)$maintenanceJob['maintenance_id'], 'completed', 'Inspection passed; ready for hire.', false, 'available');
+        $releasedVehicle = \Crms\Database::fetch('SELECT status FROM vehicles WHERE vehicle_id=?', [$releaseVehicleId]);
+        expect($releasedVehicle['status'] === 'available', 'inspector can return a safe vehicle to available status');
     } catch (Throwable $workflowError) {
         expect(false, 'database reservation workflow integration: ' . $workflowError->getMessage());
     } finally {

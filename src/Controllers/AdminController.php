@@ -163,6 +163,13 @@ final class AdminController
                             [$roleId, $firstName, $lastName, $email, $phone, $status, $userId]
                         );
                     }
+                    $customerProfile = Database::fetch('SELECT customer_id,phone FROM customers WHERE linked_user_id=? FOR UPDATE', [$userId]);
+                    if ($customerProfile) {
+                        Database::execute(
+                            'UPDATE customers SET first_name=?,last_name=?,email=?,phone=? WHERE customer_id=?',
+                            [$firstName, $lastName, $email, $phone ?? $customerProfile['phone'], (int) $customerProfile['customer_id']]
+                        );
+                    }
                     if ($disableDriver && $driver['status'] !== 'inactive') {
                         Database::execute("UPDATE drivers SET status='inactive' WHERE driver_id=?", [(int) $driver['driver_id']]);
                     }

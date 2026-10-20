@@ -47,7 +47,7 @@ if (!function_exists('crms_nav_link')) {
           <?php if (can('drivers.schedule') && !can('drivers.manage')): ?><a class="nav-link<?= $current === 'drivers/schedule' ? ' active' : '' ?>" href="<?= e(url('drivers/schedule')) ?>">My schedule</a><?php endif; ?>
           <?php
             $ops = [];
-            if (can('vehicles.view') && !\Crms\Auth::isCustomer()) $ops[] = ['vehicles', 'Vehicles'];
+            if (can('vehicles.view') && !\Crms\Auth::isCustomer()) $ops[] = ['vehicles', ($user['role_name'] ?? '') === 'Vehicle Inspector/Maintenance Staff' ? 'Vehicles in maintenance' : 'Vehicles'];
             if (can('customers.view') && !\Crms\Auth::isCustomer()) $ops[] = ['customers', 'Customers'];
             if (can('rentals.manage') || can('rentals.view')) $ops[] = ['rentals', 'Rentals'];
             if (can('transactions.manage') || can('transactions.view')) $ops[] = ['finance', 'Payments'];

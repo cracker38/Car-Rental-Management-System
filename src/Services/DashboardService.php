@@ -96,9 +96,8 @@ final class DashboardService
                 ['route' => 'rentals', 'icon' => 'bi-key', 'label' => 'Pickups and returns', 'hint' => 'Agreements and handover records'],
             ],
             'Vehicle Inspector/Maintenance Staff' => [
-                ['route' => 'rentals', 'icon' => 'bi-clipboard-check', 'label' => 'Pickup and return inspections', 'hint' => 'Record vehicle condition and damage'],
-                ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Servicing and maintenance', 'hint' => 'Schedule jobs and update permitted statuses'],
-                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Permitted vehicle records', 'hint' => 'Review fleet condition and flag unsafe vehicles'],
+                ['route' => 'maintenance', 'icon' => 'bi-wrench-adjustable', 'label' => 'Maintenance vehicles', 'hint' => 'Review open work and record readiness decisions'],
+                ['route' => 'vehicles', 'icon' => 'bi-car-front', 'label' => 'Vehicles in maintenance', 'hint' => 'View vehicles currently held out of service'],
             ],
             'Customer' => [
                 ['route' => 'search', 'icon' => 'bi-search', 'label' => 'Search vehicles', 'hint' => 'Filter dates, category, price and features'],
@@ -164,15 +163,12 @@ final class DashboardService
                 'Generate revenue, payment, deposit and refund reports',
             ],
             'Vehicle Inspector/Maintenance Staff' => [
-                'View assigned or permitted vehicle records',
-                'Conduct pickup and return condition inspections',
-                'Record existing and new damage, fuel level, mileage and inspection notes',
-                'Attach inspection photographs when supported',
-                'Create maintenance and servicing records',
-                'Record service dates, work performed, costs and next service dates',
-                'Update permitted maintenance statuses',
-                'Flag unsafe or unavailable vehicles',
-                'View upcoming servicing and overdue maintenance',
+                'View vehicles currently held in maintenance and their service records',
+                'Update maintenance job progress and completion details',
+                'Choose whether a vehicle is ready for service or must remain on a safety hold',
+                'Record an inspection note for every vehicle readiness decision',
+                'Release a vehicle only after all open maintenance jobs are resolved',
+                'Do not manage rental schedules, reservations, or driver assignments',
             ],
             'Customer' => [
                 'Register an account and log in securely',
@@ -459,52 +455,17 @@ final class DashboardService
     {
         return [
             'kpis' => [
-                ['label' => 'Pickup checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id WHERE ((rt.status = 'scheduled' AND r.pickup_datetime >= NOW() AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY)) OR (rt.status IN ('active','overdue') AND rt.actual_pickup_datetime >= DATE_SUB(NOW(), INTERVAL 1 DAY))) AND NOT EXISTS (SELECT 1 FROM inspections i JOIN users iu ON iu.user_id = i.inspected_by JOIN roles ir ON ir.role_id = iu.role_id WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup' AND i.inspection_id = (SELECT MAX(i2.inspection_id) FROM inspections i2 WHERE i2.rental_id = rt.rental_id AND i2.inspection_type = 'pickup') AND ir.role_name = 'Vehicle Inspector/Maintenance Staff')"), 'hint' => 'Upcoming / recent handovers', 'href' => url('rentals')],
-                ['label' => 'Return checks due', 'value' => $this->count("SELECT COUNT(*) c FROM rentals WHERE status = 'returned'"), 'hint' => 'Returned vehicles', 'href' => url('rentals')],
-                ['label' => 'Open maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records WHERE status IN ('scheduled','in_progress')"), 'hint' => 'Blocking hire', 'href' => url('maintenance')],
-                ['label' => 'Overdue maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM (SELECT vehicle_id FROM maintenance_records WHERE status IN ('scheduled','in_progress') AND expected_completion_date < CURDATE() UNION SELECT m.vehicle_id FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date < CURDATE() AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.next_service_date IS NOT NULL AND newer.maintenance_id > m.maintenance_id)) due"), 'hint' => 'Late jobs or service due', 'href' => url('maintenance')],
-                ['label' => 'Upcoming service', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m WHERE m.status = 'completed' AND m.next_service_date >= CURDATE() AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.next_service_date IS NOT NULL AND newer.maintenance_id > m.maintenance_id)"), 'hint' => 'Next 30 days', 'href' => url('maintenance')],
-                ['label' => 'Unavailable vehicles', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'maintenance'"), 'hint' => 'Unsafe or in service', 'href' => url('vehicles')],
+                ['label' => 'Vehicles in maintenance', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles WHERE status = 'maintenance'"), 'hint' => 'Held out of service', 'href' => url('vehicles')],
+                ['label' => 'Open maintenance jobs', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m JOIN vehicles v ON v.vehicle_id=m.vehicle_id WHERE v.status='maintenance' AND m.status IN ('scheduled','in_progress')"), 'hint' => 'Work still in progress', 'href' => url('maintenance')],
+                ['label' => 'Awaiting readiness review', 'value' => $this->count("SELECT COUNT(*) c FROM vehicles v WHERE v.status='maintenance' AND NOT EXISTS (SELECT 1 FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress'))"), 'hint' => 'No open jobs; inspection sign-off required', 'href' => url('maintenance')],
+                ['label' => 'Overdue open jobs', 'value' => $this->count("SELECT COUNT(*) c FROM maintenance_records m JOIN vehicles v ON v.vehicle_id=m.vehicle_id WHERE v.status='maintenance' AND m.status IN ('scheduled','in_progress') AND m.expected_completion_date < CURDATE()"), 'hint' => 'Past expected completion', 'href' => url('maintenance')],
             ],
-            'pickupChecks' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, rt.status, COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) AS pickup_datetime, v.registration_no, v.make, v.model
-                 FROM rentals rt JOIN reservations r ON r.reservation_id = rt.reservation_id
-                 JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
-                 WHERE ((rt.status = 'scheduled' AND r.pickup_datetime >= NOW()
-                         AND r.pickup_datetime <= DATE_ADD(NOW(), INTERVAL 14 DAY))
-                        OR (rt.status IN ('active','overdue') AND rt.actual_pickup_datetime >= DATE_SUB(NOW(), INTERVAL 1 DAY)))
-                   AND NOT EXISTS (SELECT 1 FROM inspections i JOIN users iu ON iu.user_id = i.inspected_by
-                                   JOIN roles ir ON ir.role_id = iu.role_id
-                                   WHERE i.rental_id = rt.rental_id AND i.inspection_type = 'pickup'
-                                     AND i.inspection_id = (SELECT MAX(i2.inspection_id) FROM inspections i2 WHERE i2.rental_id = rt.rental_id AND i2.inspection_type = 'pickup')
-                                     AND ir.role_name = 'Vehicle Inspector/Maintenance Staff')
-                 ORDER BY COALESCE(rt.actual_pickup_datetime, r.pickup_datetime) LIMIT 10"
-            ),
-            'returns' => Database::fetchAll(
-                "SELECT rt.rental_id, rt.rental_number, rt.actual_return_datetime, v.registration_no, v.make, v.model
-                 FROM rentals rt JOIN vehicles v ON v.vehicle_id = rt.vehicle_id
-                 WHERE rt.status = 'returned' ORDER BY rt.updated_at DESC LIMIT 10"
-            ),
-            'maint' => Database::fetchAll(
-                "SELECT m.maintenance_id, m.maintenance_number, m.title, m.status, m.start_date, m.expected_completion_date, v.registration_no
-                 FROM maintenance_records m JOIN vehicles v ON v.vehicle_id = m.vehicle_id
-                 WHERE m.status IN ('scheduled','in_progress') ORDER BY CASE WHEN m.expected_completion_date < CURDATE() THEN 0 ELSE 1 END, m.expected_completion_date, m.start_date LIMIT 10"
-            ),
-            'dueChecks' => Database::fetchAll(
-                "SELECT vehicle_id, registration_no, make, model, inspection_expiry_date
-                 FROM vehicles
-                 WHERE inspection_expiry_date IS NOT NULL AND inspection_expiry_date <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) AND status <> 'inactive'
-                 ORDER BY inspection_expiry_date LIMIT 8"
-            ),
-            'serviceSchedule' => Database::fetchAll(
-                "SELECT v.vehicle_id, v.registration_no, m.next_service_date, m.title,
-                        CASE WHEN m.next_service_date < CURDATE() THEN 'overdue' ELSE 'upcoming' END AS due_state
-                 FROM maintenance_records m
-                 JOIN vehicles v ON v.vehicle_id = m.vehicle_id
-                 WHERE m.status = 'completed' AND m.next_service_date IS NOT NULL
-                   AND m.next_service_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-                   AND NOT EXISTS (SELECT 1 FROM maintenance_records newer WHERE newer.vehicle_id = m.vehicle_id AND newer.status = 'completed' AND newer.next_service_date IS NOT NULL AND newer.maintenance_id > m.maintenance_id)
-                 ORDER BY m.next_service_date LIMIT 10"
+            'maintenanceVehicles' => Database::fetchAll(
+                "SELECT v.vehicle_id, v.registration_no, v.make, v.model,
+                        (SELECT COUNT(*) FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress')) AS open_jobs,
+                        (SELECT m.title FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress') ORDER BY COALESCE(m.expected_completion_date,m.start_date),m.maintenance_id LIMIT 1) AS current_job,
+                        (SELECT m.expected_completion_date FROM maintenance_records m WHERE m.vehicle_id=v.vehicle_id AND m.status IN ('scheduled','in_progress') ORDER BY COALESCE(m.expected_completion_date,m.start_date),m.maintenance_id LIMIT 1) AS expected_completion_date
+                 FROM vehicles v WHERE v.status='maintenance' ORDER BY v.registration_no LIMIT 100"
             ),
         ];
     }

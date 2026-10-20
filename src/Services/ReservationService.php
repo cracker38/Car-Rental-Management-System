@@ -105,7 +105,7 @@ final class ReservationService
             $id = (int) Database::lastId();
             (new InvoiceService())->createFromReservation($id);
             $customerMessage = 'Reservation ' . $code . ' is ' . $status . '. Pickup ' . $pickup . '.';
-            $customerMessage .= ' A manager or rental officer will review the signed request before payment is available.';
+            $customerMessage .= ' A Rental Officer will review the signed request before payment is available.';
             Audit::log('reservation.created', 'reservation', (string) $id, $code . ' ' . $status);
             $notifications = new NotificationService();
             $notifications->notifyUser(
@@ -118,7 +118,7 @@ final class ReservationService
                 $id
             );
             $notifications->notifyUsersWithPermission(
-                'reservations.manage',
+                'reservations.view',
                 'reservation_created',
                 'Reservation ' . $code,
                 'A signed reservation request is waiting for approval. ' . $customerMessage,
@@ -128,7 +128,7 @@ final class ReservationService
             );
             return Database::fetch('SELECT * FROM reservations WHERE reservation_id = ?', [$id]);
         });
-        $smsMessage = 'Reservation ' . $created['reservation_code'] . ' was submitted and is awaiting manager or rental officer review.';
+        $smsMessage = 'Reservation ' . $created['reservation_code'] . ' was submitted and is awaiting Rental Officer review.';
         (new SmsService())->sendToCustomer(
             (int) $created['customer_id'],
             'reservation_created',
@@ -459,8 +459,8 @@ final class ReservationService
 
     public function decide(int $id, string $decision, string $note, string $signatureData): array
     {
-        if (!Auth::check() || Auth::isCustomer() || !Rbac::can('reservations.manage')) {
-            throw new InvalidArgumentException('You are not authorized to review reservations.');
+        if (!Auth::check() || Auth::isCustomer() || !Rbac::can('reservations.decide')) {
+            throw new InvalidArgumentException('Only authorized Rental Officers may sign and record reservation decisions.');
         }
         if (!in_array($decision, ['approve', 'reject'], true)) {
             throw new InvalidArgumentException('Choose approve or reject.');
@@ -566,7 +566,7 @@ final class ReservationService
                 );
             }
             $notifications->notifyUsersWithPermission(
-                'reservations.manage',
+                'reservations.view',
                 'reservation_decided',
                 'Reservation ' . $reservation['reservation_code'] . ' ' . ($decision === 'approve' ? 'approved' : 'rejected'),
                 'A review decision was recorded. Note: ' . $note,

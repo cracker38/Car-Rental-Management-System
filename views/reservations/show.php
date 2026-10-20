@@ -44,15 +44,15 @@
     </div>
   </div>
 </section>
-<?php if ($row['status'] === 'pending' && can('reservations.manage') && !\Crms\Auth::isCustomer()): ?>
+<?php if ($row['status'] === 'pending' && can('reservations.decide') && !\Crms\Auth::isCustomer()): ?>
   <form method="post" action="<?= e(url('reservations/decision', ['id' => $row['reservation_id']])) ?>" class="panel mb-3" id="reservation-decision-form">
     <?= \Crms\Csrf::field() ?>
     <div class="panel-h">Review reservation request</div>
-    <p class="small text-muted">Approve only after confirming the vehicle and dates. A rejection or approval note and your signature are required. Approval creates the booking invoice and unlocks customer payment.</p>
+    <p class="small text-muted">Review the vehicle and dates before deciding. A decision note and your Rental Officer signature are required. Approval creates the booking invoice and unlocks customer payment.</p>
     <label class="form-label" for="reservation-decision-note">Decision note</label>
     <textarea class="form-control mb-3" id="reservation-decision-note" name="note" maxlength="500" rows="3" required></textarea>
-    <label class="form-label" for="approver-signature-canvas">Approver signature</label>
-    <canvas id="approver-signature-canvas" width="600" height="180" class="w-100 border rounded bg-white" style="height:180px;touch-action:none" role="img" aria-label="Draw approver signature here" tabindex="0"></canvas>
+    <label class="form-label" for="approver-signature-canvas">Rental Officer signature</label>
+    <canvas id="approver-signature-canvas" width="600" height="180" class="w-100 border rounded bg-white" style="height:180px;touch-action:none" role="img" aria-label="Draw Rental Officer signature here" tabindex="0"></canvas>
     <input type="hidden" name="approver_signature" id="approver-signature-data">
     <div class="d-flex justify-content-between align-items-center mt-2">
       <small class="text-muted">Sign using a mouse, touch screen, or stylus.</small>
@@ -99,7 +99,7 @@
         <p class="small text-muted mt-2 mb-2">Pay the confirmed hire quote before the rental agreement is issued and before vehicle pickup. Approved extra charges, if any, are invoiced after return inspection.</p>
         <a class="btn btn-primary" href="<?= e(url('invoices/show', ['id' => $bookingInvoice['invoice_id']])) ?>">Pay booking invoice</a>
       <?php else: ?>
-        <p class="small text-muted mt-2 mb-0">Payment is available after a Manager or Rental Officer records a signed decision on your signed request.</p>
+        <p class="small text-muted mt-2 mb-0">Payment is available after a Rental Officer records a signed decision on your signed request.</p>
       <?php endif; ?>
     <?php elseif (\Crms\Auth::isCustomer() && $bookingInvoice['status'] === 'draft'): ?>
       <p class="small text-muted mt-2 mb-0">Your booking invoice will be issued after the reservation is confirmed.</p>

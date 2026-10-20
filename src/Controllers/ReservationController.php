@@ -213,7 +213,7 @@ final class ReservationController
     public function decision(): void
     {
         $id = Http::int('id');
-        Rbac::require('reservations.manage');
+        Rbac::require('reservations.decide');
         if (!Http::isPost()) {
             Http::flash('danger', 'Submit the reservation decision form to continue.');
             Http::redirect('reservations/show', ['id' => $id]);

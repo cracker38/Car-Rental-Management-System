@@ -24,9 +24,8 @@ $isSystemAdmin = $role === 'System Administrator';
   <?php if (can('reservations.view')): ?><a class="nav-link <?= nav_active('reservations') ?>" href="<?= e(url('reservations')) ?>"><i class="bi bi-calendar3"></i> Reservations</a><?php endif; ?>
   <?php if (can('rentals.manage') || can('rentals.view')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-key"></i> Pickups &amp; Returns</a><?php endif; ?>
 <?php elseif ($isInspector): ?>
-  <?php if (can('vehicles.view')): ?><a class="nav-link <?= nav_active('vehicles') ?>" href="<?= e(url('vehicles')) ?>"><i class="bi bi-car-front"></i> Permitted vehicles</a><?php endif; ?>
-  <?php if (can('inspections.manage')): ?><a class="nav-link <?= nav_active('rentals') ?>" href="<?= e(url('rentals')) ?>"><i class="bi bi-clipboard-check"></i> Pickup &amp; return inspections</a><?php endif; ?>
-  <?php if (can('maintenance.manage') || can('maintenance.view')): ?><a class="nav-link <?= nav_active('maintenance') ?>" href="<?= e(url('maintenance')) ?>"><i class="bi bi-wrench-adjustable"></i> Maintenance &amp; servicing</a><?php endif; ?>
+  <?php if (can('vehicles.view')): ?><a class="nav-link <?= nav_active('vehicles') ?>" href="<?= e(url('vehicles')) ?>"><i class="bi bi-car-front"></i> Vehicles in maintenance</a><?php endif; ?>
+  <?php if (can('maintenance.manage') || can('maintenance.view')): ?><a class="nav-link <?= nav_active('maintenance') ?>" href="<?= e(url('maintenance')) ?>"><i class="bi bi-wrench-adjustable"></i> Maintenance &amp; readiness</a><?php endif; ?>
 <?php elseif ($isSystemAdmin): ?>
   <div class="nav-label">Administration</div>
   <?php if (can('users.manage')): ?><a class="nav-link <?= nav_active('admin/users') ?>" href="<?= e(url('admin/users')) ?>"><i class="bi bi-people"></i> Users</a><?php endif; ?>

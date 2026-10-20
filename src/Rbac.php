@@ -7,6 +7,7 @@ final class Rbac
 {
     /** @var array<string,bool>|null */
     private static ?array $perms = null;
+    private static ?int $permsRoleId = null;
 
     public static function can(string $permission): bool
     {
@@ -14,17 +15,19 @@ final class Rbac
         if (!$user || $user['status'] !== 'active') {
             return false;
         }
-        if (self::$perms === null) {
+        $roleId = (int) $user['role_id'];
+        if (self::$perms === null || self::$permsRoleId !== $roleId) {
             $rows = Database::fetchAll(
                 'SELECT p.permission_key FROM role_permissions rp
                  JOIN permissions p ON p.permission_id = rp.permission_id
                  WHERE rp.role_id = ?',
-                [$user['role_id']]
+                [$roleId]
             );
             self::$perms = [];
             foreach ($rows as $r) {
                 self::$perms[$r['permission_key']] = true;
             }
+            self::$permsRoleId = $roleId;
         }
         if (isset(self::$perms[$permission])) {
             return true;

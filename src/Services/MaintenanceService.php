@@ -22,6 +22,7 @@ final class MaintenanceService
 
     public function create(array $input): array
     {
+        $this->assertCanSchedule();
         $vehicleInput = $this->stringInput($input['vehicle_id'] ?? '', 'vehicle');
         $vehicleId = ctype_digit($vehicleInput) ? (int) $vehicleInput : 0;
         $type = $this->stringInput($input['maintenance_type'] ?? '', 'maintenance type');
@@ -101,6 +102,7 @@ final class MaintenanceService
 
     public function updateDetails(int $id, array $input): void
     {
+        $this->assertCanManage();
         $title = $this->stringInput($input['title'] ?? '', 'title');
         $startDate = $this->date($input['start_date'] ?? '', 'Start date', true);
         $expectedDate = $this->date($input['expected_completion_date'] ?? '', 'Expected completion date');
@@ -177,6 +179,7 @@ final class MaintenanceService
         string $vehicleStatus = ''
     ): void
     {
+        $this->assertCanManage();
         Database::transaction(function (PDO $pdo) use ($id, $newStatus, $reason, $vehicleSafe, $vehicleStatus) {
             $stmt = $pdo->prepare('SELECT * FROM maintenance_records WHERE maintenance_id = ? FOR UPDATE');
             $stmt->execute([$id]);
@@ -202,8 +205,8 @@ final class MaintenanceService
                 if (!in_array($vehicleStatus, ['available', 'maintenance'], true)) {
                     throw new InvalidArgumentException('Choose whether the inspected vehicle is ready for service or must stay in maintenance.');
                 }
-                if (trim($reason) === '') {
-                    throw new InvalidArgumentException('Add an inspection or completion note before closing the maintenance job.');
+                if ($this->length(trim($reason)) < 5) {
+                    throw new InvalidArgumentException('Add an inspection or completion note of at least 5 characters before closing the maintenance job.');
                 }
             }
             if ($this->length($reason) > 500) {
@@ -243,6 +246,8 @@ final class MaintenanceService
                 (new ReservationService())->syncVehicleStatus((int) $record['vehicle_id']);
             }
 
+            $finalVehicle = Database::fetch('SELECT status FROM vehicles WHERE vehicle_id=?', [(int) $record['vehicle_id']]);
+
             Audit::log(
                 'maintenance.status_changed',
                 'maintenance',
@@ -251,7 +256,8 @@ final class MaintenanceService
                 ['status' => $oldStatus, 'vehicle_status' => $vehicle['status']],
                 [
                     'status' => $newStatus,
-                    'vehicle_status' => $newStatus === 'completed' ? $vehicleStatus : (($newStatus === 'cancelled' && $vehicleSafe && !$otherOpen) ? 'available' : $vehicle['status']),
+                    'vehicle_status' => $finalVehicle['status'] ?? $vehicle['status'],
+                    'requested_vehicle_status' => $newStatus === 'completed' ? $vehicleStatus : null,
                     'reason' => trim($reason),
                     'vehicle_safe' => $vehicleSafe,
                 ]
@@ -262,9 +268,7 @@ final class MaintenanceService
     /** Set or release a maintenance safety hold without rewriting maintenance history. */
     public function updateVehicleReadiness(int $vehicleId, string $newStatus, string $reason): void
     {
-        if (!Rbac::can('maintenance.manage') && !Rbac::can('inspections.manage')) {
-            throw new InvalidArgumentException('You are not allowed to update vehicle readiness.');
-        }
+        $this->assertCanManage();
         if ($vehicleId < 1 || !in_array($newStatus, ['available', 'maintenance'], true)) {
             throw new InvalidArgumentException('Choose a valid vehicle and readiness status.');
         }
@@ -327,6 +331,21 @@ final class MaintenanceService
             throw new InvalidArgumentException('Enter a valid ' . strtolower($label) . '.');
         }
         return $value;
+    }
+
+    private function assertCanManage(): void
+    {
+        if (!Rbac::can('maintenance.manage')) {
+            throw new InvalidArgumentException('You are not allowed to manage maintenance work or vehicle readiness.');
+        }
+    }
+
+    private function assertCanSchedule(): void
+    {
+        $role = (string) (Auth::user()['role_name'] ?? '');
+        if (!Rbac::can('maintenance.manage') || $role === 'Vehicle Inspector/Maintenance Staff') {
+            throw new InvalidArgumentException('Only operations staff can schedule maintenance jobs.');
+        }
     }
 
     private function optionalText(mixed $value, int $maxLength): ?string

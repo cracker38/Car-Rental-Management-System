@@ -16,6 +16,8 @@ Use prepared statements through `Crms\Database`, escape view output with `e()`, 
 
 The financial transaction table is an append-only ledger at the service layer. Payments, refunds, deposits, and deductions are represented as separate transaction rows; corrections should be posted as new entries. Backups are SQL exports, not an in-app restore feature.
 
+User administration can update account identity, contact details, role and status; optional password resets are hashed before storage. It protects the last active System Administrator and blocks deactivation or demotion of a linked Driver with upcoming assignments. Manager driver access is permission-based and includes records created by the System Administrator. Inspector role grants are limited to maintenance and vehicle viewing; vehicle list/detail queries are restricted to `maintenance` status. Maintenance completion requires a readiness choice and inspection note, and open service jobs prevent release. A vehicle placed back into service is resynchronized against active rentals and confirmed reservations.
+
 ## Integrations and current boundaries
 
 - HDEV is used for MoMo and SMS when configured. Pending MoMo requests do not count as paid until a provider response confirms them.
