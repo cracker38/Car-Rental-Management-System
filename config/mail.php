@@ -26,5 +26,6 @@ return [
     'password' => (string) $env('CRMS_MAIL_PASSWORD', $local['password'] ?? ''),
     'from_address' => (string) $env('CRMS_MAIL_FROM_ADDRESS', $local['from_address'] ?? $username),
     'from_name' => (string) $env('CRMS_MAIL_FROM_NAME', $local['from_name'] ?? 'CRMS'),
+    'contact_recipient' => (string) $env('CRMS_CONTACT_EMAIL', $local['contact_recipient'] ?? 'it.elias38@gmail.com'),
     'timeout' => max(3, min(60, (int) $env('CRMS_MAIL_TIMEOUT', $local['timeout'] ?? 15))),
 ];

@@ -11,7 +11,7 @@ final class EmailService
     /** @var array<string,mixed>|null */
     private ?array $config = null;
 
-    public function send(string $recipient, string $subject, string $message): void
+    public function send(string $recipient, string $subject, string $message, ?string $replyTo = null): void
     {
         $config = $this->config();
         $recipient = trim($recipient);
@@ -20,6 +20,9 @@ final class EmailService
         }
         if (!filter_var((string) $config['from_address'], FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('Set a valid CRMS_MAIL_FROM_ADDRESS or Gmail username.');
+        }
+        if ($replyTo !== null && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('The reply-to email address is invalid.');
         }
         if ((string) $config['username'] === '' || (string) $config['password'] === '') {
             throw new RuntimeException('Gmail SMTP is not configured. Set the Gmail username and Google app password.');
@@ -73,7 +76,7 @@ final class EmailService
             $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
 
-            $data = $this->buildMessage($recipient, $subject, $message, $config);
+            $data = $this->buildMessage($recipient, $subject, $message, $config, $replyTo);
             $this->writeAll($socket, $this->dotStuff($data) . "\r\n.\r\n");
             $this->expect($socket, [250], 'message acceptance');
             $this->command($socket, 'QUIT', [221]);
@@ -86,6 +89,19 @@ final class EmailService
                 fclose($socket);
             }
         }
+    }
+
+    public function sendContactEnquiry(string $name, string $contact, string $message): void
+    {
+        $config = $this->config();
+        $recipient = trim((string) ($config['contact_recipient'] ?? ''));
+        $replyTo = filter_var($contact, FILTER_VALIDATE_EMAIL) ? $contact : null;
+        $body = "Website contact form enquiry\n\n"
+            . "Name: {$name}\n"
+            . "Email or phone: {$contact}\n\n"
+            . "Message:\n{$message}";
+
+        $this->send($recipient, 'Website enquiry from ' . $name, $body, $replyTo);
     }
 
     /** @return array<string,mixed> */
@@ -150,7 +166,7 @@ final class EmailService
     }
 
     /** @param array<string,mixed> $config */
-    private function buildMessage(string $recipient, string $subject, string $message, array $config): string
+    private function buildMessage(string $recipient, string $subject, string $message, array $config, ?string $replyTo = null): string
     {
         $fromName = $this->encodeHeader($this->safeHeader((string) $config['from_name']));
         $subject = $this->encodeHeader($this->safeHeader($subject));
@@ -166,6 +182,9 @@ final class EmailService
             'Content-Transfer-Encoding: quoted-printable',
             'X-Mailer: CRMS',
         ];
+        if ($replyTo !== null) {
+            $headers[] = 'Reply-To: <' . $replyTo . '>';
+        }
         return implode("\r\n", $headers) . "\r\n\r\n" . $body;
     }
 

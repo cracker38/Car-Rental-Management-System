@@ -14,9 +14,9 @@
             <?= \Crms\Csrf::field() ?>
             <div class="contact-form-heading"><span class="booking-icon"><i class="bi bi-send" aria-hidden="true"></i></span><div><h2>Send an enquiry</h2><p>We usually reply during Kigali business hours.</p></div></div>
             <div class="row g-3">
-              <div class="col-md-6"><label class="form-label" for="contact-name">Your name</label><input class="form-control" id="contact-name" name="name" autocomplete="name" required></div>
-              <div class="col-md-6"><label class="form-label" for="contact-details">Email or phone</label><input class="form-control" id="contact-details" name="contact" autocomplete="email" required></div>
-              <div class="col-12"><label class="form-label" for="contact-message">How can we help?</label><textarea class="form-control" id="contact-message" name="message" rows="5" required></textarea></div>
+              <div class="col-md-6"><label class="form-label" for="contact-name">Your name</label><input class="form-control" id="contact-name" name="name" autocomplete="name" maxlength="120" required></div>
+              <div class="col-md-6"><label class="form-label" for="contact-details">Email or phone</label><input class="form-control" id="contact-details" name="contact" autocomplete="email" maxlength="190" required></div>
+              <div class="col-12"><label class="form-label" for="contact-message">How can we help?</label><textarea class="form-control" id="contact-message" name="message" rows="5" maxlength="5000" required></textarea></div>
               <div class="col-12"><button class="btn btn-primary" type="submit">Send message <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></button></div>
             </div>
           </form>

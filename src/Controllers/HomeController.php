@@ -10,6 +10,7 @@ use Crms\View;
 use Crms\Services\AvailabilityService;
 use Crms\Services\PricingService;
 use Crms\Services\DashboardService;
+use Crms\Services\EmailService;
 
 final class HomeController
 {
@@ -156,21 +157,18 @@ final class HomeController
     public function contact(): void
     {
         if (Http::isPost()) {
-            $name = Http::str('name');
-            $contact = Http::str('contact');
-            $message = Http::str('message');
+            $name = trim(substr(Http::str('name'), 0, 120));
+            $contact = trim(substr(Http::str('contact'), 0, 190));
+            $message = trim(substr(Http::str('message'), 0, 5000));
             if ($name === '' || $contact === '' || $message === '') {
-                Http::flash('danger', 'Please complete the contact form.');
+                Http::flash('danger', 'Please complete the contact form with your name, email or phone, and message.');
             } else {
                 try {
-                    Database::execute(
-                        'INSERT INTO notifications (channel, notification_type, subject, message, status)
-                         VALUES (\'in_app\',\'contact_form\',?,?,\'queued\')',
-                        ['Website enquiry from ' . $name, $contact . "\n" . $message]
-                    );
+                    (new EmailService())->sendContactEnquiry($name, $contact, $message);
                     Http::flash('success', 'Thank you. We have received your message.');
                     Http::redirect('contact');
-                } catch (\Throwable) {
+                } catch (\Throwable $error) {
+                    error_log('Contact form email failed: ' . $error->getMessage());
                     Http::flash('danger', 'Could not send the message. Try again later.');
                 }
             }
