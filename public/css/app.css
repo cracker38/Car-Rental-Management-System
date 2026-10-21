@@ -1297,10 +1297,13 @@ html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
 }
 @media print {
   .report-filters, .report-pagination { display: none !important; }
-  .report-heading { align-items: flex-start; margin: 0 0 10mm; padding-bottom: 5mm; border-bottom: 1px solid #bbb; }
+  .report-heading { align-items: center; flex-direction: row; gap: 8mm; margin: 0 0 8mm; padding-bottom: 5mm; border-bottom: 1px solid #bbb; }
+  .report-heading-copy { flex: 1 1 auto; }
+  .report-period-card { min-width: 48mm; max-width: 58mm; }
   .report-period-card, .report-summary-card, .report-detail-panel, .report-table-panel { border-color: #bbb !important; box-shadow: none !important; }
-  .report-summary-grid { gap: 3mm; margin-bottom: 5mm; }
-  .report-summary-card { min-height: 0; padding: 3mm; break-inside: avoid; }
+  .report-summary-grid { grid-template-columns: repeat(auto-fit, minmax(42mm, 1fr)); gap: 2.5mm; margin-bottom: 5mm; }
+  .report-summary-card { align-items: center; flex-direction: row; gap: 2.5mm; min-height: 0; padding: 3mm; break-inside: avoid; }
+  .report-summary-icon { width: 8mm; height: 8mm; flex-basis: 8mm; border-radius: 2mm; }
   .report-data-table { min-width: 0; font-size: 8pt; }
   .report-data-table thead th, .report-data-table tbody td { padding: 2mm; }
   .report-data-table thead th { background: #eee !important; color: #222 !important; }

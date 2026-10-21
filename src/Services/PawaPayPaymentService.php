@@ -174,8 +174,6 @@ final class PawaPayPaymentService
             ],
             'amount' => (string) (int) round((float) $amount),
             'currency' => 'RWF',
-            'country' => 'RWA',
-            'customerTimestamp' => gmdate('Y-m-d\TH:i:s\Z'),
             'clientReferenceId' => (string) $row['transaction_number'],
             'customerMessage' => 'Car rental payment',
         ]);

@@ -21,13 +21,21 @@ $summaryIcons = [
 ];
 $rowStart = $reportTotalRows > 0 ? (($reportPage - 1) * $pageSize) + 1 : 0;
 $rowEnd = min($reportTotalRows, $reportPage * $pageSize);
+$reportDescription = $reportMode === 'customer'
+    ? 'Your reservation records for the selected reporting period.'
+    : 'Review ' . strtolower($reportModeLabel) . ' activity, totals and records for a selected reporting period.';
+$recordHeading = match ($reportMode) {
+    'customer' => 'Reservation records',
+    'financial' => 'Financial activity totals',
+    default => $title . ' records',
+};
 ?>
 <div class="report-print-area">
   <header class="report-heading">
     <div class="report-heading-copy">
       <div class="report-eyebrow"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><?= e($reportModeLabel) ?> report</div>
       <h1><?= e($title) ?></h1>
-      <p>Review <?= e(strtolower($reportModeLabel)) ?> activity, totals and records for a selected reporting period.</p>
+      <p><?= e($reportDescription) ?></p>
     </div>
     <div class="report-period-card">
       <span><i class="bi bi-calendar3" aria-hidden="true"></i> Reporting period</span>
@@ -36,6 +44,7 @@ $rowEnd = min($reportTotalRows, $reportPage * $pageSize);
     </div>
   </header>
 
+  <?php if (empty($isFullReportOutput)): ?>
   <form method="get" action="<?= e(url('reports')) ?>" class="report-filters panel">
     <input type="hidden" name="r" value="reports">
     <div class="report-filter-heading">
@@ -62,8 +71,9 @@ $rowEnd = min($reportTotalRows, $reportPage * $pageSize);
       <a class="btn btn-outline-dark" href="<?= e(url('reports', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'print' => '1'])) ?>"><i class="bi bi-printer" aria-hidden="true"></i> Print / PDF</a>
     </div>
   </div>
+  <?php endif; ?>
 
-  <?php if ($summary): ?>
+  <?php if ($summary && $reportMode !== 'customer'): ?>
     <section class="report-summary-grid" aria-label="Report summary">
       <?php foreach ($summary as $item): $iconKey = strtolower((string) $item['label']); ?>
         <article class="report-summary-card">
@@ -93,7 +103,7 @@ $rowEnd = min($reportTotalRows, $reportPage * $pageSize);
 
   <section class="panel report-table-panel">
     <div class="report-section-heading">
-      <div><h2><?= e($reportMode === 'financial' ? 'Financial activity totals' : $title . ' records') ?></h2><p>Activity from <?= e($dateFrom) ?> through <?= e($dateTo) ?>, inclusive.</p></div>
+      <div><h2><?= e($recordHeading) ?></h2><p><?= $reportMode === 'customer' ? 'Reservations from ' : 'Activity from ' ?><?= e(date('d M Y', strtotime($dateFrom))) ?> through <?= e(date('d M Y', strtotime($dateTo))) ?>.</p></div>
       <span class="report-record-count"><i class="bi bi-list-ul" aria-hidden="true"></i><?= number_format($reportTotalRows) ?> <?= $reportTotalRows === 1 ? 'record' : 'records' ?></span>
     </div>
     <?php if (!$rows): ?>

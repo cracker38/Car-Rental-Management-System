@@ -710,6 +710,6 @@ final class AdminController
             'reportPage' => $reportPage, 'reportPages' => $reportPages, 'reportTotalRows' => $reportTotalRows,
             'pageSize' => $pageSize, 'generatedAt' => date('d M Y, H:i'),
             'reportPrint' => true, 'autoPrintReport' => Http::str('print') === '1', 'isFullReportOutput' => $isFullOutput,
-        ]);
+        ], Http::str('print') === '1' ? 'report-print' : null);
     }
 }
